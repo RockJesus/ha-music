@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.0.0";
+export const CARD_VERSION = "1.0.1";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -115,6 +115,7 @@ const EN = {
   soundMode: "Sound mode",
   queue: "Queue",
   library: "Library",
+  assistant: "Music Assistant",
   more: "More info",
   power: "Power",
   group: "Group",
@@ -156,6 +157,7 @@ const ZH = {
   soundMode: "声音模式",
   queue: "播放队列",
   library: "媒体库",
+  assistant: "Music Assistant",
   more: "更多信息",
   power: "开关",
   group: "分组",

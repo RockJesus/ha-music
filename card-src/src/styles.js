@@ -234,6 +234,16 @@ export const cardStyles = css`
     -webkit-backdrop-filter: blur(10px);
   }
 
+  .hm-ma {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: rgb(var(--hm-a1-rgb));
+    border-color: rgba(var(--hm-a1-rgb), 0.4);
+    background: rgba(var(--hm-a1-rgb), 0.1);
+    box-shadow: 0 0 10px -4px rgba(var(--hm-a1-rgb), 0.6);
+  }
+
   .hm-icon-btn:hover {
     background: rgba(255, 255, 255, 0.13);
     border-color: rgba(255, 255, 255, 0.18);

@@ -575,6 +575,36 @@ class HaMusicCard extends LitElement {
     fireEvent(this, "hass-more-info", { entityId: this._eid() });
   }
 
+  _maUrl() {
+    const value = this._config?.music_assistant;
+    if (value === false) return "";
+    if (typeof value === "string" && value.trim()) return value.trim();
+    const looksLikeMA = this._entities().some((id) => {
+      const attrs = this._hass?.states?.[id]?.attributes || {};
+      return Object.keys(attrs).some((key) => key.startsWith("mass_"));
+    });
+    if (looksLikeMA || value === true) return "/music-assistant";
+    return "";
+  }
+
+  _openAssistant() {
+    const url = this._maUrl();
+    if (!url) return;
+    if (/^(https?:)?\/\//i.test(url)) {
+      window.open(url, "_blank", "noopener");
+      return;
+    }
+    const path = url.startsWith("/") ? url : `/${url}`;
+    try {
+      window.history.pushState(null, "", path);
+      window.dispatchEvent(
+        new Event("location-changed", { bubbles: true, composed: true })
+      );
+    } catch (error) {
+      window.location.href = path;
+    }
+  }
+
   _onCardClick(event) {
     if (!this._menu) return;
     const path = event.composedPath?.() || [];
@@ -889,6 +919,7 @@ class HaMusicCard extends LitElement {
       ? hasFeature(state, FEATURES.TURN_ON)
       : hasFeature(state, FEATURES.TURN_OFF);
     const canBrowse = hasFeature(state, FEATURES.BROWSE_MEDIA);
+    const maUrl = this._maUrl();
     const canSeek = hasFeature(state, FEATURES.SEEK);
     const sourceList = Array.isArray(state.attributes?.source_list)
       ? state.attributes.source_list
@@ -947,6 +978,16 @@ class HaMusicCard extends LitElement {
               <span class="hm-status-text hm-status-player">${config.name || friendlyName(hass, entityId, entityId)}</span>
             </div>
             <div class="hm-top-actions">
+              ${maUrl
+                ? html`<button
+                    class="hm-icon-btn hm-ma"
+                    aria-label=${t("assistant")}
+                    title=${t("assistant")}
+                    @click=${() => this._openAssistant()}
+                  >
+                    MA
+                  </button>`
+                : nothing}
               ${showQueue
                 ? html`<button
                     class="hm-icon-btn"

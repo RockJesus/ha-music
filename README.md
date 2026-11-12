@@ -23,6 +23,7 @@
 - **播放队列**：读取播放器 `queue` 属性，抽屉内点击任意曲目跳播。
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`。
+- **Music Assistant 入口**：自动识别 MA 播放器（实体属性带 `mass_*`），顶栏显示 `MA` 徽标，一点直达 MA 面板；可用 `music_assistant` 指定自定义地址或加载项 ingress 路径。
 - **能力自适应**：按 `supported_features` 位掩码显示按钮，不出现无效控件。
 - **可视化编辑器**：UI 内直接改布局、主题、背景、频谱、标题、强调色、音量实体与显示开关。
 - **无 CDN 依赖**：单文件 ESM，内联全部依赖与图标，离线可用。
@@ -59,7 +60,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.0.0`
+   - URL：`/local/ha-music.js?v=1.0.1`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -87,6 +88,7 @@ entity: media_player.living_room
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |
 | `max_queue` | number | `60` | 队列最多展示条数 |
+| `music_assistant` | `true` \| `false` \| string | 自动 | `MA` 入口：`true` 强制显示并跳 `/music-assistant`；字符串可填自定义路径或 `https://` 地址（新标签打开）；`false` 隐藏；不填时检测到 MA 播放器才显示 |
 
 ### 示例
 
@@ -122,6 +124,13 @@ theme: cyber
 show_volume: false
 ```
 
+### Music Assistant
+
+- 默认使用 HA 内的 MA 面板路径 `/music-assistant`。
+- 如果 MA 通过加载项 ingress 暴露，可填 `/hassio/ingress/<slug>` 之类的相对路径，卡片会在 HA 内跳转。
+- 填完整 `https://` 地址时用新标签页打开。
+- 队列与媒体库浏览同样走 MA 实体暴露的 `queue` 与 `browse_media`，无需额外配置。
+
 ## 交互说明
 
 - **点击封面 / 右下角菜单** → 打开更多信息（more-info）。
@@ -156,6 +165,13 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.0.1
+
+- 新增 Music Assistant 入口：自动识别 MA 播放器，顶栏 `MA` 徽标一键跳转 MA 面板。
+- 支持 `music_assistant: true / false / "自定义地址"`，兼容加载项 ingress 路径与外部地址。
+- 编辑器新增入口开关与地址输入。
+- 预览截图同步刷新。
 
 ### 1.0.0
 

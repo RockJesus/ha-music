@@ -390,6 +390,38 @@ class HaMusicEditor extends LitElement {
             config.show_group !== false,
             (checked) => this._update({ show_group: checked })
           )}
+          ${this._switch(
+            this._zh ? "显示 Music Assistant 入口" : "Show Music Assistant shortcut",
+            config.music_assistant !== false,
+            (checked) =>
+              this._update({
+                music_assistant:
+                  checked
+                    ? typeof config.music_assistant === "string"
+                      ? config.music_assistant
+                      : true
+                    : false,
+              })
+          )}
+          <label class="field">
+            <span class="label">
+              ${this._zh ? "Music Assistant 地址（留空自动）" : "Music Assistant URL (optional)"}
+            </span>
+            <input
+              type="text"
+              .value=${typeof config.music_assistant === "string" ? config.music_assistant : ""}
+              placeholder="/music-assistant"
+              @change=${(e) =>
+                this._update({
+                  music_assistant: e.target.value.trim() || true,
+                })}
+            />
+            <span class="hint">
+              ${this._zh
+                ? "留空使用 /music-assistant；也可填 https:// 外部地址或加载项 ingress 路径"
+                : "Leave empty for /music-assistant; absolute URLs open in a new tab"}
+            </span>
+          </label>
         </div>
       </div>
     `;

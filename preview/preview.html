@@ -163,6 +163,13 @@
       const hass = {
         language: LANG,
         states,
+        panels: {
+          b93b5321_music_assistant: {
+            url_path: "b93b5321_music_assistant",
+            title: "Music Assistant",
+            component_name: "app",
+          },
+        },
         hassUrl: (path) => path,
         callService: (domain, service, data) => {
           calls.push({ domain, service, data });

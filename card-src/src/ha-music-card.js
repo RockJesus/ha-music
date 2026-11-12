@@ -579,6 +579,21 @@ class HaMusicCard extends LitElement {
     const value = this._config?.music_assistant;
     if (value === false) return "";
     if (typeof value === "string" && value.trim()) return value.trim();
+
+    // 优先用 HA 实际注册的面板路径（加载项 ingress 的前缀因实例而异）
+    const panels = this._hass?.panels || {};
+    for (const key of Object.keys(panels)) {
+      const panel = panels[key] || {};
+      const path = panel.url_path || key;
+      if (
+        panel.component_name === "music_assistant" ||
+        /music[-_ ]?assistant/i.test(path) ||
+        /music\s*assistant/i.test(panel.title || "")
+      ) {
+        return `/${path}`;
+      }
+    }
+
     const looksLikeMA = this._entities().some((id) => {
       const attrs = this._hass?.states?.[id]?.attributes || {};
       return Object.keys(attrs).some((key) => key.startsWith("mass_"));

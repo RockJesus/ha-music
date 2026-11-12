@@ -23,7 +23,7 @@
 - **播放队列**：读取播放器 `queue` 属性，抽屉内点击任意曲目跳播。
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`。
-- **Music Assistant 入口**：自动读取 HA 面板清单定位 MA 面板（兼容加载项 ingress 的实例前缀），同时识别带 `mass_*` 属性的播放器；顶栏显示 `MA` 徽标，一点直达。
+- **Music Assistant 歌单**：顶栏歌单按钮直接列出 MA 播放列表，点击任意歌单即通过 `music_assistant.play_media` 开播；抽屉右上角仍可跳转 MA 面板。
 - **能力自适应**：按 `supported_features` 位掩码显示按钮，不出现无效控件。
 - **可视化编辑器**：UI 内直接改布局、主题、背景、频谱、标题、强调色、音量实体与显示开关。
 - **无 CDN 依赖**：单文件 ESM，内联全部依赖与图标，离线可用。
@@ -46,6 +46,10 @@
 | --- | --- |
 | ![Queue](docs/preview-queue.webp) | ![Library](docs/preview-library.webp) |
 
+| Music Assistant 歌单 |
+| --- |
+| ![Playlists](docs/preview-playlists.webp) |
+
 ## 安装
 
 ### HACS（推荐）
@@ -60,7 +64,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.0.2`
+   - URL：`/local/ha-music.js?v=1.0.3`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -88,7 +92,7 @@ entity: media_player.living_room
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |
 | `max_queue` | number | `60` | 队列最多展示条数 |
-| `music_assistant` | `true` \| `false` \| string | 自动 | `MA` 入口：不填时优先读 HA 面板路径（如 `/b93b5321_music_assistant`），其次回退 `/music-assistant`；`true` 强制显示；字符串可填自定义路径或 `https://` 地址（新标签打开）；`false` 隐藏 |
+| `music_assistant` | `true` \| `false` \| string | 自动 | 歌单入口：不填时检测到 MA 服务/播放器即显示；`false` 隐藏；字符串同时作为抽屉内「打开 MA」按钮的面板地址（留空自动读 HA 面板路径） |
 
 ### 示例
 
@@ -126,10 +130,10 @@ show_volume: false
 
 ### Music Assistant
 
-- 默认自动读取 HA 已注册的 MA 面板路径（加载项 ingress 的前缀因实例而异，如 `/b93b5321_music_assistant`），读不到时回退 `/music-assistant`。
-- 如果 MA 通过加载项 ingress 暴露，可填 `/hassio/ingress/<slug>` 之类的相对路径，卡片会在 HA 内跳转。
-- 填完整 `https://` 地址时用新标签页打开。
-- 队列与媒体库浏览同样走 MA 实体暴露的 `queue` 与 `browse_media`，无需额外配置。
+- 顶栏歌单按钮列出 MA 播放列表（走 `media_player/browse_media` 的 `Playlists` 目录），点击后调用 `music_assistant.play_media`（`media_type: playlist`、`enqueue: play`）直接开播。
+- 没有 MA 服务时自动回退 `media_player.play_media`，因此普通播放器的歌单也能用。
+- 抽屉右上角的跳转图标打开 MA 面板：默认自动读取 HA 面板路径（加载项 ingress 的前缀因实例而异，如 `/b93b5321_music_assistant`），也可用 `music_assistant` 指定相对路径或 `https://` 地址。
+- 队列与媒体库浏览仍走实体暴露的 `queue` 与 `browse_media`，无需额外配置。
 
 ## 交互说明
 
@@ -165,6 +169,13 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.0.3
+
+- 顶栏 `MA` 跳转按钮改为 **Music Assistant 歌单选择器**：列出播放列表，点击即开播（`music_assistant.play_media`）。
+- 非 MA 播放器自动回退到 `media_player.play_media`。
+- 抽屉右上角保留「打开 MA 面板」快捷入口，面板路径仍自动读取。
+- 歌单抽屉新增封面/无封面占位、空列表与错误提示。
 
 ### 1.0.2
 

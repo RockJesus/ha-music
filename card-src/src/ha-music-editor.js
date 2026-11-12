@@ -391,7 +391,7 @@ class HaMusicEditor extends LitElement {
             (checked) => this._update({ show_group: checked })
           )}
           ${this._switch(
-            this._zh ? "显示 Music Assistant 入口" : "Show Music Assistant shortcut",
+            this._zh ? "显示 Music Assistant 歌单入口" : "Show Music Assistant playlists",
             config.music_assistant !== false,
             (checked) =>
               this._update({
@@ -405,7 +405,7 @@ class HaMusicEditor extends LitElement {
           )}
           <label class="field">
             <span class="label">
-              ${this._zh ? "Music Assistant 地址（留空自动）" : "Music Assistant URL (optional)"}
+              ${this._zh ? "MA 面板地址（留空自动，仅供抽屉内跳转）" : "MA panel URL (optional)"}
             </span>
             <input
               type="text"
@@ -418,8 +418,8 @@ class HaMusicEditor extends LitElement {
             />
             <span class="hint">
               ${this._zh
-                ? "留空使用 /music-assistant；也可填 https:// 外部地址或加载项 ingress 路径"
-                : "Leave empty for /music-assistant; absolute URLs open in a new tab"}
+                ? "留空自动读取 HA 面板路径；歌单入口本身不依赖此项"
+                : "Leave empty to auto-detect the HA panel path"}
             </span>
           </label>
         </div>

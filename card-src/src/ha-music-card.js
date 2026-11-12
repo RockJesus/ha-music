@@ -575,6 +575,27 @@ class HaMusicCard extends LitElement {
     fireEvent(this, "hass-more-info", { entityId: this._eid() });
   }
 
+  _maEnabled() {
+    const value = this._config?.music_assistant;
+    if (value === false) return false;
+    if (value === true || (typeof value === "string" && value.trim())) return true;
+    if (this._hass?.services?.music_assistant?.play_media) return true;
+    const hasMassAttr = this._entities().some((id) => {
+      const attrs = this._hass?.states?.[id]?.attributes || {};
+      return Object.keys(attrs).some((key) => key.startsWith("mass_"));
+    });
+    if (hasMassAttr) return true;
+    const panels = this._hass?.panels || {};
+    return Object.keys(panels).some((key) => {
+      const panel = panels[key] || {};
+      return (
+        panel.component_name === "music_assistant" ||
+        /music[-_ ]?assistant/i.test(panel.url_path || key) ||
+        /music\s*assistant/i.test(panel.title || "")
+      );
+    });
+  }
+
   _maUrl() {
     const value = this._config?.music_assistant;
     if (value === false) return "";
@@ -603,6 +624,7 @@ class HaMusicCard extends LitElement {
   }
 
   _openAssistant() {
+    if (this._drawer?.open) this._closeDrawer();
     const url = this._maUrl();
     if (!url) return;
     if (/^(https?:)?\/\//i.test(url)) {
@@ -676,6 +698,128 @@ class HaMusicCard extends LitElement {
     };
     this.requestUpdate();
     this._fetchBrowse();
+  }
+
+  _openPlaylists() {
+    const t = translator(this._hass?.language);
+    this._drawer = {
+      open: true,
+      mode: "playlists",
+      nodes: [],
+      cursor: -1,
+      items: [],
+      title: t("playlists"),
+      loading: true,
+      error: "",
+      maUrl: this._maUrl(),
+    };
+    this.requestUpdate();
+    this._fetchPlaylists();
+  }
+
+  async _browseMedia(contentId, contentType) {
+    const connection = this._hass?.connection;
+    if (!connection?.sendMessagePromise) throw new Error("unsupported");
+    const payload = {
+      type: "media_player/browse_media",
+      entity_id: this._eid(),
+    };
+    if (contentId) {
+      payload.media_content_id = contentId;
+      if (contentType) payload.media_content_type = contentType;
+    }
+    return connection.sendMessagePromise(payload);
+  }
+
+  async _fetchPlaylists() {
+    const t = translator(this._hass?.language);
+    try {
+      const root = await this._browseMedia();
+      const children = root?.children || [];
+      const folder = children.find(
+        (child) =>
+          (child.can_expand &&
+            (/playlist/i.test(child.media_class || "") ||
+              /playlist/i.test(child.media_content_type || "") ||
+              /播放列表|playlists?/i.test(child.title || ""))) ||
+          false
+      );
+      let list = [];
+      if (folder) {
+        const result = await this._browseMedia(
+          folder.media_content_id,
+          folder.media_content_type
+        );
+        list = result?.children || [];
+      }
+      if (!list.length) {
+        list = children.filter((child) =>
+          /playlist/i.test(child.media_class || "")
+        );
+      }
+      const items = list
+        .map((child) => ({
+          title: child.title || "",
+          subtitle: (() => {
+            const label = mediaClassLabel(child.media_class, this._hass?.language);
+            return label && label !== t("playlists") ? label : "";
+          })(),
+          contentId: child.media_content_id || "",
+          contentType: child.media_content_type || "playlist",
+          thumb: child.thumbnail || "",
+        }))
+        .filter((item) => item.contentId);
+      if (this._drawer.mode !== "playlists") return;
+      this._drawer = { ...this._drawer, loading: false, items, error: "" };
+    } catch (err) {
+      if (this._drawer.mode !== "playlists") return;
+      this._drawer = {
+        ...this._drawer,
+        loading: false,
+        items: [],
+        error: err?.message
+          ? `${t("browseFailed")} · ${String(err.message).slice(0, 40)}`
+          : t("browseFailed"),
+      };
+    }
+    this.requestUpdate();
+  }
+
+  async _playPlaylistItem(item) {
+    if (!item?.contentId) return;
+    const t = translator(this._hass?.language);
+    const entityId = this._eid();
+    const mediaType = item.contentType || "playlist";
+    const notifyDone = () => {
+      this._notify(`${t("playingPlaylist")} · ${item.title || ""}`);
+      this._closeDrawer();
+    };
+    const useMA = Boolean(
+      this._hass?.services?.music_assistant?.play_media
+    );
+    if (useMA) {
+      try {
+        await this._hass.callService("music_assistant", "play_media", {
+          entity_id: entityId,
+          media_id: item.contentId,
+          media_type: "playlist",
+          enqueue: "play",
+        });
+        notifyDone();
+        return;
+      } catch (err) {
+        // 退回到标准 play_media，兼容不同 MA 版本
+      }
+    }
+    try {
+      await this._call("play_media", {
+        media_content_id: item.contentId,
+        media_content_type: mediaType,
+      });
+      notifyDone();
+    } catch (err) {
+      this._notify(err?.message || t("browseFailed"));
+    }
   }
 
   _closeDrawer() {
@@ -934,7 +1078,7 @@ class HaMusicCard extends LitElement {
       ? hasFeature(state, FEATURES.TURN_ON)
       : hasFeature(state, FEATURES.TURN_OFF);
     const canBrowse = hasFeature(state, FEATURES.BROWSE_MEDIA);
-    const maUrl = this._maUrl();
+    const maShow = this._maEnabled();
     const canSeek = hasFeature(state, FEATURES.SEEK);
     const sourceList = Array.isArray(state.attributes?.source_list)
       ? state.attributes.source_list
@@ -993,14 +1137,14 @@ class HaMusicCard extends LitElement {
               <span class="hm-status-text hm-status-player">${config.name || friendlyName(hass, entityId, entityId)}</span>
             </div>
             <div class="hm-top-actions">
-              ${maUrl
+              ${maShow
                 ? html`<button
                     class="hm-icon-btn hm-ma"
-                    aria-label=${t("assistant")}
-                    title=${t("assistant")}
-                    @click=${() => this._openAssistant()}
+                    aria-label=${t("playlists")}
+                    title=${t("playlists")}
+                    @click=${() => this._openPlaylists()}
                   >
-                    MA
+                    ${icon("playlist", 16)}
                   </button>`
                 : nothing}
               ${showQueue
@@ -1381,6 +1525,7 @@ class HaMusicCard extends LitElement {
     const drawer = this._drawer;
     const t = translator(this._hass?.language);
     const isLibrary = drawer.mode === "library";
+    const isPlaylists = drawer.mode === "playlists";
     return html`
       <div
         class="hm-drawer ${drawer.open ? "open" : ""}"
@@ -1399,6 +1544,16 @@ class HaMusicCard extends LitElement {
               </button>`
             : nothing}
           <div class="hm-drawer-title">${drawer.title || (isLibrary ? t("library") : "")}</div>
+          ${isPlaylists && drawer.maUrl
+            ? html`<button
+                class="hm-icon-btn hm-ma"
+                aria-label=${t("openAssistant")}
+                title=${t("openAssistant")}
+                @click=${() => this._openAssistant()}
+              >
+                ${icon("external", 15)}
+              </button>`
+            : nothing}
           <button
             class="hm-icon-btn"
             aria-label=${t("close")}
@@ -1414,18 +1569,43 @@ class HaMusicCard extends LitElement {
             : drawer.error
               ? html`<div class="hm-empty">${drawer.error}</div>`
               : drawer.items.length
-                ? this._renderDrawerItems(drawer.items, isLibrary)
+                ? this._renderDrawerItems(drawer.items, drawer.mode)
                 : html`<div class="hm-empty">
-                    ${isLibrary ? t("browseFailed") : t("queueEmpty")}
+                    ${isLibrary
+                      ? t("browseFailed")
+                      : isPlaylists
+                        ? t("playlistsEmpty")
+                        : t("queueEmpty")}
                   </div>`}
         </div>
       </div>
     `;
   }
 
-  _renderDrawerItems(items, isLibrary) {
+  _renderDrawerItems(items, mode) {
     const t = translator(this._hass?.language);
+    const isLibrary = mode === "library";
+    const isPlaylists = mode === "playlists";
     return items.map((item) => {
+      if (isPlaylists) {
+        const thumb = normalizeArt(this._hass, item.thumb);
+        return html`<button
+          class="hm-list-item"
+          @click=${() => this._playPlaylistItem(item)}
+        >
+          <span
+            class="hm-list-thumb"
+            style=${thumb ? `background-image:url("${thumb}")` : ""}
+          >
+            ${thumb ? nothing : icon("playlist", 16)}
+          </span>
+          <span class="hm-list-text">
+            <span class="hm-list-name">${item.title || "—"}</span>
+            <span class="hm-list-sub">${item.subtitle}</span>
+          </span>
+          <span class="hm-list-tail">${icon("play", 14)}</span>
+        </button>`;
+      }
       if (isLibrary) {
         const thumb = normalizeArt(this._hass, item.thumb);
         return html`<button

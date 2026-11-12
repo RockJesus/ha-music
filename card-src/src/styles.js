@@ -235,9 +235,6 @@ export const cardStyles = css`
   }
 
   .hm-ma {
-    font-size: 9.5px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
     color: rgb(var(--hm-a1-rgb));
     border-color: rgba(var(--hm-a1-rgb), 0.4);
     background: rgba(var(--hm-a1-rgb), 0.1);

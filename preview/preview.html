@@ -163,6 +163,7 @@
       const hass = {
         language: LANG,
         states,
+        services: { music_assistant: { play_media: {} } },
         panels: {
           b93b5321_music_assistant: {
             url_path: "b93b5321_music_assistant",
@@ -189,6 +190,17 @@
                   { title: "歌曲", media_class: "track", media_content_id: "root>tracks", media_content_type: "tracks", can_expand: true, can_play: false },
                   { title: "Neon River", media_class: "music", media_content_id: "root>track1", media_content_type: "music", thumbnail: ART.aurora, can_play: true, can_expand: false },
                   { title: "Glass Bloom", media_class: "music", media_content_id: "root>track2", media_content_type: "music", thumbnail: ART.liquid, can_play: true, can_expand: false },
+                ],
+              };
+            }
+            if (id === "root>playlists") {
+              return {
+                title: "播放列表",
+                children: [
+                  { title: "深夜电台", media_class: "playlist", media_content_id: "library://playlist/1", media_content_type: "playlist", thumbnail: ART.cyber, can_play: true, can_expand: false },
+                  { title: "City Pop 自驾", media_class: "playlist", media_content_id: "library://playlist/2", media_content_type: "playlist", thumbnail: ART.aurora, can_play: true, can_expand: false },
+                  { title: "Liquid Focus", media_class: "playlist", media_content_id: "library://playlist/3", media_content_type: "playlist", thumbnail: ART.liquid, can_play: true, can_expand: false },
+                  { title: "赛博夜跑", media_class: "playlist", media_content_id: "library://playlist/4", media_content_type: "playlist", can_play: true, can_expand: false },
                 ],
               };
             }

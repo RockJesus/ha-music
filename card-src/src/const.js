@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.0.2";
+export const CARD_VERSION = "1.0.3";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -116,6 +116,10 @@ const EN = {
   queue: "Queue",
   library: "Library",
   assistant: "Music Assistant",
+  playlists: "Playlists",
+  playlistsEmpty: "No playlists found",
+  playingPlaylist: "Playing",
+  openAssistant: "Open Music Assistant",
   more: "More info",
   power: "Power",
   group: "Group",
@@ -158,6 +162,10 @@ const ZH = {
   queue: "播放队列",
   library: "媒体库",
   assistant: "Music Assistant",
+  playlists: "播放列表",
+  playlistsEmpty: "没有找到播放列表",
+  playingPlaylist: "开始播放",
+  openAssistant: "打开 Music Assistant",
   more: "更多信息",
   power: "开关",
   group: "分组",

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HA Music · Editor Audit</title>
+<style>
+  body { margin: 0; padding: 16px; background: #05060a; font-family: "PingFang SC", -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #stage { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  #editor { width: 420px; background: #0d1018; border-radius: 14px; padding: 14px; }
+  #preview { width: 440px; }
+  #out { color: #9fb0c8; font-size: 12px; white-space: pre-wrap; padding: 10px 0 40px; }
+</style>
+<script type="module" src="../ha-music.js"></script>
+</head>
+<body>
+<div id="stage">
+  <div id="editor"></div>
+  <div id="preview"></div>
+</div>
+<pre id="out"></pre>
+<script type="module">
+const FEATURES = 1 + 2 + 4 + 8 + 16 + 32 + 128 + 256 + 512 + 2048 + 16384 + 32768 + 65536 + 131072 + 262144 + 524288;
+const ART = "art/cover-aurora-720.jpg";
+const QUEUE = [
+  { title: "Neon River", artist: "AURORA LAB", duration: 257, entity_picture: ART, active: true, media_content_id: "media-source://preview/neon", media_content_type: "music" },
+];
+function player(id, name, art = ART) {
+  return [id, { entity_id: id, state: "playing", attributes: {
+    friendly_name: name, media_title: "Neon River", media_artist: "AURORA LAB", media_album_name: "Midnight Signals",
+    entity_picture: art, media_duration: 257, media_position: 85, media_position_updated_at: new Date().toISOString(),
+    volume_level: 0.42, is_volume_muted: false, shuffle: true, repeat: "all", mass_player_type: "player",
+    source: "Spotify", source_list: ["Spotify", "本地媒体"], sound_mode: "Music", sound_mode_list: ["Music", "Night"],
+    supported_features: FEATURES, group_members: [], app_name: "Spotify", media_track: 3, queue: QUEUE,
+  } }];
+}
+const states = Object.fromEntries([
+  player("media_player.living", "客厅 · Living Room"),
+  player("media_player.study", "书房 · Studio", ""),
+  ["number.amp_volume", { entity_id: "number.amp_volume", state: "40", attributes: { min: 0, max: 100 } }],
+]);
+const calls = [];
+const services = {
+  music_assistant: { play_media: {} },
+  media_player: { play_media: {}, media_pause: {}, media_play: {}, media_seek: {}, volume_set: {}, volume_mute: {}, shuffle_set: {}, repeat_set: {}, select_source: {}, select_sound_mode: {}, unjoin: {}, turn_off: {}, turn_on: {}, media_next_track: {}, media_previous_track: {} },
+  number: { set_value: {} },
+};
+const hass = {
+  language: "zh-Hans", states, services,
+  panels: { b93b5321_music_assistant: { url_path: "b93b5321_music_assistant", component_name: "app", title: "Music Assistant" } },
+  callService(d, s, data) { calls.push({ domain: d, service: s, data }); return Promise.resolve({}); },
+  connection: { sendMessagePromise() { return Promise.resolve({ children: [] }); } },
+};
+
+class FakePicker extends HTMLElement {
+  set hass(v) { this._hass = v; }
+  set value(v) { this._value = v; this.setAttribute("data-value", v || ""); }
+  get value() { return this._value || ""; }
+  set label(v) {}
+  set includeDomains(v) {}
+  set allowCustomEntity(v) {}
+  pick(v) { this.dispatchEvent(new CustomEvent("value-changed", { detail: { value: v }, bubbles: true, composed: true })); }
+}
+customElements.define("ha-entity-picker", FakePicker);
+
+const results = [];
+function check(name, ok, detail = "") { results.push({ name, ok: Boolean(ok), detail: String(detail ?? "") }); }
+const wait = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+const baseConfig = {
+  entity: "media_player.living", layout: "adaptive", theme: "aurora", cover: "ambient", visualizer: "bars",
+  name: "HA Music", palette: true, show_volume: true, show_source: true, show_queue: true,
+  show_library: true, show_group: true, music_assistant: true,
+};
+
+const card = document.createElement("ha-music");
+card.hass = hass;
+card.setConfig(baseConfig);
+document.getElementById("preview").appendChild(card);
+
+let lastConfig = null;
+const editor = document.createElement("ha-music-editor");
+editor.hass = hass;
+editor.setConfig(baseConfig);
+document.getElementById("editor").appendChild(editor);
+editor.addEventListener("config-changed", async (e) => {
+  lastConfig = e.detail.config;
+  card.setConfig({ entity: "media_player.living", ...lastConfig });
+  await card.updateComplete;
+});
+await editor.updateComplete;
+await card.updateComplete;
+await wait(60);
+
+const er = () => editor.shadowRoot;
+const cr = () => card.shadowRoot;
+const selects = () => er().querySelectorAll("select");
+const texts = () => er().querySelectorAll('input[type="text"]');
+const switches = () => er().querySelectorAll(".switch-row");
+
+(async () => {
+  // 初始状态回显
+  check("init/layout", selects()[0].value === "adaptive", selects()[0].value);
+  check("init/theme", selects()[1].value === "aurora", selects()[1].value);
+  check("init/cover", selects()[2].value === "ambient", selects()[2].value);
+  check("init/visualizer", selects()[3].value === "bars", selects()[3].value);
+  check("init/name", texts()[0]?.value === "HA Music", texts()[0]?.value);
+  check("init/color", er().querySelector('input[type="color"]')?.value === "#2ee6c5", er().querySelector('input[type="color"]')?.value);
+  check("init/switches", switches().length === 6, switches().length);
+  check("init/switch-checked", [...switches()].every((s) => s.querySelector('input[type="checkbox"]').checked), [...switches()].map((s) => s.querySelector('input[type="checkbox"]').checked).join(","));
+  check("init/pickers", er().querySelectorAll("ha-entity-picker").length === 1, er().querySelectorAll("ha-entity-picker").length);
+  check("init/option-counts", [...selects()].map((s) => s.options.length).join(",") === "4,5,4,4", [...selects()].map((s) => s.options.length).join(","));
+  check("init/card-entity", card._eid() === "media_player.living", card._eid());
+
+  // 布局
+  selects()[0].value = "compact";
+  selects()[0].dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/layout", lastConfig?.layout === "compact" && cr().querySelector(".hm-card")?.dataset.layout === "compact", cr().querySelector(".hm-card")?.dataset.layout);
+
+  // 主题
+  selects()[1].value = "cyber";
+  selects()[1].dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/theme", lastConfig?.theme === "cyber" && cr().querySelector(".hm-card")?.dataset.theme === "cyber", cr().querySelector(".hm-card")?.dataset.theme);
+
+  // 背景
+  selects()[2].value = "art";
+  selects()[2].dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/cover", lastConfig?.cover === "art" && cr().querySelector(".hm-card")?.dataset.cover === "art", cr().querySelector(".hm-card")?.dataset.cover);
+
+  // 频谱
+  selects()[3].value = "wave";
+  selects()[3].dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/visualizer", lastConfig?.visualizer === "wave" && cr().querySelector(".hm-vis")?.dataset.style === "wave", cr().querySelector(".hm-vis")?.dataset.style);
+  selects()[3].value = "none";
+  selects()[3].dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/visualizer-none", !cr().querySelector(".hm-vis"), Boolean(cr().querySelector(".hm-vis")));
+
+  // 标题
+  const nameInput = texts()[0];
+  nameInput.value = "阳台音箱";
+  nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+  await wait(30);
+  check("set/name", lastConfig?.name === "阳台音箱" && /阳台音箱/.test(cr().querySelector(".hm-status")?.textContent || ""), cr().querySelector(".hm-status")?.textContent);
+
+  // 强调色
+  const color = er().querySelector('input[type="color"]');
+  color.value = "#ff0066";
+  color.dispatchEvent(new Event("input", { bubbles: true }));
+  await wait(30);
+  check("set/accent", lastConfig?.accent === "#ff0066" && cr().querySelector(".hm-card")?.style.getPropertyValue("--hm-a1") === "#ff0066", cr().querySelector(".hm-card")?.style.getPropertyValue("--hm-a1"));
+
+  // 取色开关
+  const palette = er().querySelector("#ha-music-palette");
+  palette.checked = false;
+  palette.dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/palette-off", lastConfig?.palette === false, lastConfig?.palette);
+  palette.checked = true;
+  palette.dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/palette-on", lastConfig?.palette === true, lastConfig?.palette);
+
+  // 音量实体
+  const volEntity = texts()[1];
+  volEntity.value = "number.amp_volume";
+  volEntity.dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/volume-entity", lastConfig?.volume_entity === "number.amp_volume" && cr().querySelector('input[data-role="volume"]')?.value === "40", cr().querySelector('input[data-role="volume"]')?.value);
+
+  // 六个显示开关
+  const expectations = [
+    ["show_volume", () => !cr().querySelector(".hm-volume")],
+    ["show_source", () => ![...cr().querySelectorAll(".hm-chip-label")].some((n) => n.textContent.includes("音源"))],
+    ["show_queue", () => ![...cr().querySelectorAll(".hm-icon-btn")].some((b) => b.getAttribute("aria-label") === "播放队列")],
+    ["show_library", () => ![...cr().querySelectorAll(".hm-icon-btn")].some((b) => b.getAttribute("aria-label") === "媒体库")],
+    ["show_group", () => !cr().querySelector(".hm-group")],
+    ["music_assistant", () => !cr().querySelector(".hm-ma")],
+  ];
+  for (let i = 0; i < 6; i += 1) {
+    const [key, verifyOff] = expectations[i];
+    const box = switches()[i].querySelector('input[type="checkbox"]');
+    box.click();
+    await wait(30);
+    check(`switch/${key}-off`, lastConfig?.[key] === false && verifyOff(), `${lastConfig?.[key]} / ${verifyOff()}`);
+    switches()[i].querySelector('input[type="checkbox"]').click();
+    await wait(30);
+    check(`switch/${key}-on`, lastConfig?.[key] !== false, lastConfig?.[key]);
+  }
+
+  // MA 地址（字符串 / 留空）
+  const maInput = texts()[2];
+  maInput.value = "/b93b5321_music_assistant";
+  maInput.dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/ma-url", lastConfig?.music_assistant === "/b93b5321_music_assistant" && Boolean(cr().querySelector(".hm-ma")), lastConfig?.music_assistant);
+  maInput.value = "";
+  maInput.dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(30);
+  check("set/ma-url-empty", lastConfig?.music_assistant === true && Boolean(cr().querySelector(".hm-ma")), lastConfig?.music_assistant);
+
+  // 添加设备
+  const addBtn = [...er().querySelectorAll(".mini-btn")].find((b) => b.classList.contains("add"));
+  addBtn.click();
+  await wait(40);
+  const pickers = [...er().querySelectorAll("ha-entity-picker")];
+  check("entities/add-row", pickers.length === 2, pickers.length);
+  pickers[1].pick("media_player.study");
+  await wait(40);
+  check("entities/added", Array.isArray(lastConfig?.entities) && lastConfig.entities.length === 2 && lastConfig.entities[1] === "media_player.study", JSON.stringify(lastConfig?.entities));
+  check("entities/chips", cr().querySelectorAll(".hm-entity-chip").length === 2, cr().querySelectorAll(".hm-entity-chip").length);
+
+  // 切换第二台
+  cr().querySelectorAll(".hm-entity-chip")[1]?.click();
+  await wait(30);
+  check("entities/switch", card._eid() === "media_player.study", card._eid());
+
+  // 移除第二台
+  const removeBtns = [...er().querySelectorAll(".mini-btn:not(.add)")];
+  check("entities/remove-buttons", removeBtns.length === 2, removeBtns.length);
+  removeBtns[1].click();
+  await wait(40);
+  check("entities/removed", lastConfig?.entities === undefined && lastConfig?.entity === "media_player.living", JSON.stringify(lastConfig));
+  check("entities/chips-back", cr().querySelectorAll(".hm-entity-chip").length === 0, cr().querySelectorAll(".hm-entity-chip").length);
+
+  // 单设备 picker 改实体
+  const picker0 = er().querySelector("ha-entity-picker");
+  picker0.pick("media_player.study");
+  await wait(40);
+  check("entity/picker-change", lastConfig?.entity === "media_player.study" && card._eid() === "media_player.study", `${lastConfig?.entity} / ${card._eid()}`);
+
+  // 配置无 undefined 泄漏
+  check("config/no-undefined", Object.keys(lastConfig || {}).every((k) => lastConfig[k] !== undefined), JSON.stringify(lastConfig));
+
+  const pass = results.filter((r) => r.ok).length;
+  window.__editorAudit = { results, pass, total: results.length, lastConfig };
+  document.getElementById("out").textContent = results
+    .map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.ok ? "" : "   → " + r.detail}`)
+    .join("\n") + `\n\n${pass}/${results.length} passed`;
+})();
+</script>
+</body>
+</html>

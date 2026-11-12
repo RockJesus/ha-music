@@ -176,6 +176,9 @@ class HaMusicEditor extends LitElement {
 
   setConfig(config) {
     this._config = { ...config };
+    if (typeof config?.music_assistant === "string") {
+      this._maUrlDraft = config.music_assistant;
+    }
   }
 
   get _zh() {
@@ -428,7 +431,7 @@ class HaMusicEditor extends LitElement {
                   checked
                     ? typeof config.music_assistant === "string"
                       ? config.music_assistant
-                      : true
+                      : this._maUrlDraft || true
                     : false,
               })
           )}
@@ -440,6 +443,9 @@ class HaMusicEditor extends LitElement {
               type="text"
               .value=${typeof config.music_assistant === "string" ? config.music_assistant : ""}
               placeholder="/music-assistant"
+              @input=${(e) => {
+                this._maUrlDraft = e.target.value.trim();
+              }}
               @change=${(e) =>
                 this._update({
                   music_assistant: e.target.value.trim() || true,

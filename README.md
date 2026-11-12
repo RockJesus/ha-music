@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.0.5`
+   - URL：`/local/ha-music.js?v=1.0.6`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -174,6 +174,12 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.0.6
+
+- 可视化编辑器：关闭 MA 歌单开关后再打开，会保留之前填写的 MA 面板地址，不再被重置成 `true`。
+- 编辑器输入框统一 40–46px 高、开关整行可点（不再只能点小复选框），触屏下开关行 48px、复选框 24px。
+- 新增 `preview/editor-audit.html`：对编辑器 44 项做端到端校验（初始回显、4 个下拉选项数、标题/颜色/取色、音量实体、6 个显示开关、MA 地址、增删设备、切换设备、配置无 undefined 泄漏）。
 
 ### 1.0.5
 

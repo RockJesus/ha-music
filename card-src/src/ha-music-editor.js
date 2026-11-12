@@ -91,7 +91,10 @@ class HaMusicEditor extends LitElement {
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 3px 0;
+        min-height: 40px;
+        padding: 4px 0;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
       }
       .entity-row {
         display: flex;
@@ -132,9 +135,35 @@ class HaMusicEditor extends LitElement {
         color: var(--primary-text-color);
       }
       input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
+        width: 20px;
+        height: 20px;
+        margin: 0;
         accent-color: var(--primary-color, #2ee6c5);
+      }
+      .mini-btn {
+        min-height: 36px;
+      }
+      select,
+      input[type="text"],
+      input[type="color"] {
+        min-height: 40px;
+      }
+      @media (pointer: coarse) {
+        .mini-btn {
+          min-height: 44px;
+          padding: 8px 14px;
+        }
+        select,
+        input[type="text"] {
+          min-height: 46px;
+        }
+        .switch-row {
+          min-height: 48px;
+        }
+        input[type="checkbox"] {
+          width: 24px;
+          height: 24px;
+        }
       }
     `;
   }
@@ -428,14 +457,14 @@ class HaMusicEditor extends LitElement {
   }
 
   _switch(label, checked, onChange) {
-    return html`<div class="switch-row">
+    return html`<label class="switch-row">
       <span class="label">${label}</span>
       <input
         type="checkbox"
         .checked=${checked}
         @change=${(e) => onChange(e.target.checked)}
       />
-    </div>`;
+    </label>`;
   }
 }
 

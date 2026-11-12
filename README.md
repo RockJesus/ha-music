@@ -23,6 +23,7 @@
 - **播放队列**：读取播放器 `queue` 属性，抽屉内点击任意曲目跳播。
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`。
+- **触屏优先**：`pointer: coarse` 下按钮/滑杆/列表自动放大到 40–48px，抽屉滚动不穿透页面，点按有按压反馈；窄屏自动把音量条换到下一行，避免大按钮把卡片撑破。
 - **Music Assistant 歌单**：顶栏歌单按钮直接列出 MA 播放列表，点击任意歌单即通过 `music_assistant.play_media` 开播；抽屉右上角仍可跳转 MA 面板。
 - **能力自适应**：按 `supported_features` 位掩码显示按钮，不出现无效控件。
 - **可视化编辑器**：UI 内直接改布局、主题、背景、频谱、标题、强调色、音量实体与显示开关。
@@ -46,6 +47,10 @@
 | --- | --- |
 | ![Queue](docs/preview-queue.webp) | ![Library](docs/preview-library.webp) |
 
+| 手机触屏（完整） | 手机触屏（紧凑 / 迷你） |
+| --- | --- |
+| ![Touch](docs/preview-touch-full.webp) | ![Touch compact](docs/preview-touch-compact.webp) |
+
 | Music Assistant 歌单 | 空歌单提示 |
 | --- | --- |
 | ![Playlists](docs/preview-playlists.webp) | ![Empty](docs/preview-playlists-empty.webp) |
@@ -64,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.0.4`
+   - URL：`/local/ha-music.js?v=1.0.5`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -169,6 +174,17 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.0.5
+
+- 触屏优化：粗指针设备下图标按钮 40px、传输按钮 46px、播放键 58px 起，进度/音量滑杆触摸高度 40px、滑块 19px。
+- 抽屉列表行高 60px，点击有按压反馈；抽屉滚动 `overscroll-behavior: contain`，不再带着整页一起滚。
+- 手机宽度自动隐藏播放器名，状态文字不再被按钮挤成「正在…」。
+- 窄屏（≤470px）控制区自动换行、音量条独占一行，修复大按钮导致的横向溢出。
+- 菜单加最大高度与内部滚动；`Esc` 可关闭抽屉与音源菜单。
+- 修复点开「音源 / 声音模式」菜单瞬间被卡片外层点击逻辑关掉的问题。
+- 无 `SEEK` 能力的播放器不再响应进度条拖动。
+- 新增 `preview/audit.html` 自动化体检：主题/布局/背景/频谱/开关项/多设备/播放控制/抽屉/编辑器共 62 项，桌面与触屏均全绿。
 
 ### 1.0.4
 

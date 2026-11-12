@@ -1581,6 +1581,209 @@ export const cardStyles = css`
     }
   }
 
+
+  /* ---------- 触屏优化 ---------- */
+  .hm-card {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .hm-range {
+    touch-action: none;
+  }
+
+  .hm-drawer-body {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hm-list-item:active {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .hm-entity-chip:active,
+  .hm-chip.interactive:active,
+  .hm-menu-item:active {
+    transform: scale(0.97);
+  }
+
+  .hm-btn:active,
+  .hm-play:active,
+  .hm-icon-btn:active {
+    transition-duration: 0.06s;
+  }
+
+  @media (pointer: coarse) and (max-width: 600px) {
+    .hm-status-player,
+    .hm-status .hm-kicker-sep {
+      display: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .hm-menu {
+      max-height: min(78%, 420px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .hm-icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 13px;
+    }
+
+    .hm-btn {
+      width: 46px;
+      height: 46px;
+      flex: 0 0 auto;
+    }
+
+    .hm-play {
+      min-width: 58px;
+      min-height: 58px;
+    }
+
+    .hm-entity-chip {
+      min-height: 38px;
+      padding: 5px 12px 5px 5px;
+      font-size: 11.5px;
+    }
+
+    .hm-entity-dot {
+      width: 24px;
+      height: 24px;
+    }
+
+    .hm-list-item {
+      min-height: 60px;
+      padding: 10px 8px;
+    }
+
+    .hm-list-thumb {
+      width: 40px;
+      height: 40px;
+    }
+
+    .hm-range {
+      height: 40px;
+    }
+
+    .hm-volume .hm-range {
+      height: 40px;
+      min-width: 64px;
+    }
+
+    .hm-volume .hm-icon-btn {
+      width: 40px;
+      height: 40px;
+    }
+
+    .hm-volume {
+      gap: 8px;
+      flex: 0 1 186px;
+    }
+
+    .hm-volume .hm-range::-webkit-slider-thumb {
+      width: 19px;
+      height: 19px;
+      margin-top: -7px;
+    }
+
+    .hm-volume .hm-range::-moz-range-thumb {
+      width: 19px;
+      height: 19px;
+    }
+
+    .hm-card[data-layout="compact"] .hm-volume {
+      flex: 0 1 156px;
+    }
+
+    .hm-range::-webkit-slider-thumb {
+      width: 19px;
+      height: 19px;
+      margin-top: -7px;
+    }
+
+    .hm-range::-moz-range-thumb {
+      width: 19px;
+      height: 19px;
+    }
+
+    .hm-time {
+      min-width: 44px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .hm-menu-item {
+      min-height: 48px;
+      padding: 12px;
+      font-size: 13px;
+    }
+
+    .hm-chip {
+      min-height: 34px;
+    }
+
+    .hm-top-actions {
+      gap: 8px;
+    }
+
+    .hm-card[data-layout="compact"] .hm-btn {
+      width: 44px;
+      height: 44px;
+    }
+
+    .hm-card[data-layout="compact"] .hm-play {
+      width: 54px;
+      height: 54px;
+    }
+
+    .hm-card[data-layout="mini"] .hm-btn {
+      width: 36px;
+      height: 36px;
+    }
+
+    .hm-card[data-layout="mini"] .hm-volume .hm-icon-btn {
+      width: 40px;
+      height: 40px;
+    }
+
+    .hm-card[data-layout="mini"] .hm-play {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
+  /* 窄卡片：控制区换行，音量独占一行，避免触屏大按钮把卡片撑破 */
+  @container (max-width: 470px) {
+    .hm-card[data-layout="full"] .hm-controls,
+    .hm-card[data-layout="compact"] .hm-controls {
+      flex-wrap: wrap;
+      row-gap: 10px;
+    }
+
+    .hm-card[data-layout="full"] .hm-volume,
+    .hm-card[data-layout="compact"] .hm-volume {
+      flex: 1 1 100%;
+      margin-left: 0;
+      max-width: none;
+      width: 100%;
+      box-sizing: border-box;
+      justify-content: space-between;
+    }
+
+    .hm-card[data-layout="full"] .hm-volume .hm-range,
+    .hm-card[data-layout="compact"] .hm-volume .hm-range {
+      flex: 1 1 auto;
+      min-width: 72px;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .hm-bar,
     .hm-wave-wrap svg,

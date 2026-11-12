@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>HA Music · Audit</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: #05060a; font-family: "PingFang SC", -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #stage { display: flex; flex-wrap: wrap; gap: 18px; }
+  .cell { width: 440px; }
+  #out { color: #9fb0c8; font-size: 12px; white-space: pre-wrap; padding: 12px 0 40px; }
+</style>
+<script type="module" src="../ha-music.js"></script>
+</head>
+<body>
+<div id="stage"></div>
+<pre id="out"></pre>
+<script type="module">
+const FEATURES = 1 + 2 + 4 + 8 + 16 + 32 + 128 + 256 + 512 + 2048 + 16384 + 32768 + 65536 + 131072 + 262144 + 524288;
+
+const BASE_ART = "art/cover-aurora-720.jpg";
+
+const QUEUE = [
+  { title: "Neon River", artist: "AURORA LAB", duration: 257, entity_picture: BASE_ART, active: true, media_content_id: "media-source://preview/neon", media_content_type: "music" },
+  { title: "Velvet Static", artist: "AURORA LAB", duration: 198, entity_picture: BASE_ART, active: false, media_content_id: "media-source://preview/velvet", media_content_type: "music" },
+];
+
+function makePlayer(overrides = {}) {
+  const id = overrides.id || "media_player.living";
+  return [
+    id,
+    {
+      entity_id: id,
+      state: overrides.state || "playing",
+      attributes: {
+        friendly_name: overrides.name || "客厅 · Living Room",
+        media_title: "Neon River",
+        media_artist: "AURORA LAB",
+        media_album_name: "Midnight Signals",
+        entity_picture: BASE_ART,
+        media_duration: 257,
+        media_position: 85,
+        media_position_updated_at: new Date(Date.now() - 2000).toISOString(),
+        volume_level: 0.42,
+        is_volume_muted: false,
+        shuffle: true,
+        repeat: "all",
+        mass_player_type: "player",
+        source: "Spotify",
+        source_list: ["Spotify", "本地媒体", "AirPlay"],
+        sound_mode: "Music",
+        sound_mode_list: ["Music", "Night", "Speech"],
+        supported_features: overrides.features ?? FEATURES,
+        group_members: overrides.group || [],
+        app_name: "Spotify",
+        media_track: 3,
+        queue: QUEUE,
+        ...(overrides.attributes || {}),
+      },
+    },
+  ];
+}
+
+const states = Object.fromEntries([
+  makePlayer({ id: "media_player.living", name: "客厅 · Living Room", group: ["media_player.living", "media_player.study"] }),
+  makePlayer({ id: "media_player.study", name: "书房 · Studio", state: "idle", attributes: { media_title: "", entity_picture: null } }),
+  makePlayer({ id: "media_player.bedroom", name: "卧室 · Bedroom", state: "idle", features: 65536 + 131072 + 512 + 16384, attributes: { media_title: "", entity_picture: null, volume_level: undefined } }),
+  ["number.amp_volume", { entity_id: "number.amp_volume", state: "40", attributes: { friendly_name: "功放音量", min: 0, max: 100 } }],
+]);
+
+const calls = [];
+const services = {
+  music_assistant: { play_media: {} },
+  media_player: { play_media: {}, media_pause: {}, media_play: {}, media_seek: {}, volume_set: {}, volume_mute: {}, shuffle_set: {}, repeat_set: {}, select_source: {}, select_sound_mode: {}, unjoin: {}, turn_off: {}, turn_on: {}, media_next_track: {}, media_previous_track: {} },
+  number: { set_value: {} },
+};
+
+const hass = {
+  language: "zh-Hans",
+  states,
+  services,
+  panels: { b93b5321_music_assistant: { url_path: "b93b5321_music_assistant", component_name: "app", title: "Music Assistant" } },
+  callService(domain, service, data) {
+    calls.push({ domain, service, data });
+    if (service === "play_media" && String(data?.media_id || "").endsWith("/5")) {
+      return Promise.reject(new Error("There is nothing to play here."));
+    }
+    return Promise.resolve({ context: { id: "audit" } });
+  },
+  connection: {
+    sendMessagePromise(payload) {
+      const id = payload.media_content_id;
+      if (!id) {
+        return Promise.resolve({
+          title: "Media",
+          children: [
+            { title: "Playlists", media_class: "directory", media_content_id: "playlists", media_content_type: "music_assistant", can_expand: true },
+            { title: "Tracks", media_class: "directory", media_content_id: "tracks", media_content_type: "music_assistant", can_expand: true },
+            { title: "单曲 Demo", media_class: "music", media_content_id: "library://track/1", media_content_type: "music", can_play: true, can_expand: false, thumbnail: BASE_ART },
+          ],
+        });
+      }
+      if (id === "playlists") {
+        return Promise.resolve({
+          title: "Playlists",
+          children: [
+            { title: "深夜电台", media_class: "playlist", media_content_id: "library://playlist/1", media_content_type: "music", thumbnail: BASE_ART, can_play: true },
+            { title: "空歌单", media_class: "playlist", media_content_id: "library://playlist/5", media_content_type: "music", can_play: true },
+          ],
+        });
+      }
+      if (id === "tracks") {
+        return Promise.resolve({ title: "Tracks", children: [
+          { title: "Inner Track", media_class: "music", media_content_id: "library://track/2", media_content_type: "music", can_play: true, can_expand: false },
+        ] });
+      }
+      return Promise.resolve({ title: id, children: [] });
+    },
+  },
+};
+
+const results = [];
+function check(name, ok, detail = "") {
+  results.push({ name, ok: Boolean(ok), detail: String(detail || "") });
+}
+const wait = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+let seq = 0;
+async function mount(config, width = 440) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.style.width = width + "px";
+  const card = document.createElement("ha-music");
+  card.hass = hass;
+  card.setConfig({ entity: "media_player.living", ...config });
+  cell.appendChild(card);
+  document.getElementById("stage").appendChild(cell);
+  await card.updateComplete;
+  await wait(60);
+  await card.updateComplete;
+  return { cell, card, root: card.shadowRoot };
+}
+
+async function unmount(cell) {
+  cell.remove();
+  await wait(10);
+}
+
+const THEMES = ["aurora", "cyber", "liquid", "velvet", "mono"];
+const LAYOUTS = ["full", "compact", "mini"];
+const COVERS = ["ambient", "art", "palette", "none"];
+const VIS = ["bars", "wave", "orbit", "none"];
+
+(async () => {
+  // 1 主题
+  for (const theme of THEMES) {
+    const { cell, card, root } = await mount({ theme, layout: "full" });
+    const a1 = card.style.getPropertyValue("--hm-a1") || root.querySelector(".hm-card")?.style.getPropertyValue("--hm-a1");
+    check(`theme/${theme}`, root.querySelector(".hm-card")?.dataset.theme === theme && a1, `a1=${a1}`);
+    await unmount(cell);
+  }
+
+  // 2 布局
+  for (const layout of LAYOUTS) {
+    const { cell, root } = await mount({ layout, theme: "aurora" });
+    check(`layout/${layout}`, root.querySelector(".hm-card")?.dataset.layout === layout);
+    await unmount(cell);
+  }
+
+  // 3 自适应宽度
+  {
+    const wide = await mount({ layout: "adaptive" }, 470);
+    check("layout/adaptive→full", wide.root.querySelector(".hm-card")?.dataset.layout === "full", wide.root.querySelector(".hm-card")?.dataset.layout);
+    await unmount(wide.cell);
+    const narrow = await mount({ layout: "adaptive" }, 400);
+    check("layout/adaptive→compact", narrow.root.querySelector(".hm-card")?.dataset.layout === "compact", narrow.root.querySelector(".hm-card")?.dataset.layout);
+    await unmount(narrow.cell);
+  }
+
+  // 4 背景模式
+  for (const cover of COVERS) {
+    const { cell, root } = await mount({ cover });
+    check(`cover/${cover}`, root.querySelector(".hm-card")?.dataset.cover === cover);
+    await unmount(cell);
+  }
+
+  // 5 频谱
+  for (const vis of VIS) {
+    const { cell, root } = await mount({ visualizer: vis });
+    const el = root.querySelector(".hm-vis");
+    if (vis === "none") check("visualizer/none", !el, el ? "unexpected" : "");
+    else check(`visualizer/${vis}`, el && el.dataset.style === vis, el?.dataset.style);
+    await unmount(cell);
+  }
+
+  // 6 取色 & 强调色
+  {
+    const on = await mount({ palette: true, theme: "aurora" });
+    const off = await mount({ palette: false, theme: "aurora" });
+    const vOn = on.root.querySelector(".hm-card")?.style.getPropertyValue("--hm-a2");
+    const vOff = off.root.querySelector(".hm-card")?.style.getPropertyValue("--hm-a2");
+    check("palette/toggle", vOn !== vOff, `${vOn} vs ${vOff}`);
+    await unmount(on.cell); await unmount(off.cell);
+
+    const accent = await mount({ accent: "#ff0000", palette: false });
+    const a1 = accent.root.querySelector(".hm-card")?.style.getPropertyValue("--hm-a1");
+    check("accent/override", a1 === "#ff0000", a1);
+    await unmount(accent.cell);
+  }
+
+  // 7 标题
+  {
+    const { cell, root } = await mount({ name: "客厅音响" });
+    check("name/header", /客厅音响/.test(root.querySelector(".hm-top")?.textContent || ""), root.querySelector(".hm-top")?.textContent?.trim());
+    await unmount(cell);
+  }
+
+  // 8 显示开关
+  {
+    const volOff = await mount({ show_volume: false });
+    check("show_volume/false", !volOff.root.querySelector(".hm-volume"));
+    await unmount(volOff.cell);
+
+    const srcOff = await mount({ show_source: false });
+    check("show_source/false", ![...srcOff.root.querySelectorAll(".hm-chip-label")].some((n) => n.textContent.includes("音源")));
+    await unmount(srcOff.cell);
+
+    const qOff = await mount({ show_queue: false });
+    const qBtns = [...qOff.root.querySelectorAll(".hm-icon-btn")].map((b) => b.getAttribute("aria-label"));
+    check("show_queue/false", !qBtns.includes("播放队列"), qBtns.join(","));
+    await unmount(qOff.cell);
+
+    const lOff = await mount({ show_library: false });
+    const lBtns = [...lOff.root.querySelectorAll(".hm-icon-btn")].map((b) => b.getAttribute("aria-label"));
+    check("show_library/false", !lBtns.includes("媒体库"), lBtns.join(","));
+    await unmount(lOff.cell);
+
+    const gOff = await mount({ show_group: false, entities: ["media_player.living", "media_player.study"], entity: "media_player.living" });
+    check("show_group/false", !gOff.root.querySelector(".hm-group"), gOff.root.querySelector(".hm-chip")?.textContent);
+    await unmount(gOff.cell);
+
+    const maOff = await mount({ music_assistant: false });
+    check("music_assistant/false", !maOff.root.querySelector(".hm-ma"));
+    await unmount(maOff.cell);
+
+    const maOn = await mount({ music_assistant: true });
+    check("music_assistant/true", Boolean(maOn.root.querySelector(".hm-ma")));
+    await unmount(maOn.cell);
+  }
+
+  // 9 多设备
+  {
+    const { cell, card, root } = await mount({
+      entity: "media_player.living",
+      entities: ["media_player.living", "media_player.study", "media_player.bedroom"],
+    });
+    const chips = root.querySelectorAll(".hm-entity-chip");
+    check("entities/chips", chips.length === 3, chips.length);
+    chips[1]?.click();
+    await card.updateComplete;
+    check("entities/switch", card._eid() === "media_player.study" && chips[1].dataset.active === "true", card._eid());
+    await unmount(cell);
+  }
+
+  // 10 传输控制
+  {
+    const { cell, card, root } = await mount({});
+    calls.length = 0;
+    root.querySelector(".hm-play")?.click();
+    await wait(20);
+    check("transport/pause", calls.some((c) => c.service === "media_pause"), calls.map((c) => c.service).join(","));
+    root.querySelector('[data-role="shuffle"]')?.click();
+    await wait(10);
+    check("transport/shuffle", calls.some((c) => c.service === "shuffle_set" && c.data.shuffle === false), JSON.stringify(calls.at(-1)));
+    root.querySelector('[data-role="repeat"]')?.click();
+    await wait(10);
+    check("transport/repeat", calls.some((c) => c.service === "repeat_set" && c.data.repeat === "one"), JSON.stringify(calls.at(-1)));
+    calls.length = 0;
+    root.querySelector('.hm-volume .hm-icon-btn')?.click();
+    await wait(10);
+    check("volume/mute", calls.some((c) => c.service === "volume_mute" && c.data.is_volume_muted === true), JSON.stringify(calls.at(-1)));
+    // seek
+    const seek = root.querySelector('input[data-role="seek"]');
+    seek.value = "120";
+    seek.dispatchEvent(new Event("input", { bubbles: true }));
+    seek.dispatchEvent(new Event("change", { bubbles: true }));
+    await wait(10);
+    check("seek/commit", calls.some((c) => c.service === "media_seek" && c.data.seek_position === 120), JSON.stringify(calls.filter((c) => c.service === "media_seek").at(-1)));
+    // volume slider
+    const vol = root.querySelector('input[data-role="volume"]');
+    vol.value = "55";
+    vol.dispatchEvent(new Event("input", { bubbles: true }));
+    vol.dispatchEvent(new Event("change", { bubbles: true }));
+    await wait(10);
+    check("volume/set", calls.some((c) => c.service === "volume_set" && Math.abs(c.data.volume_level - 0.55) < 0.001), JSON.stringify(calls.filter((c) => c.service === "volume_set").at(-1)));
+    await unmount(cell);
+  }
+
+  // 11 音源 / 声音模式 / 分组
+  {
+    const { cell, root } = await mount({});
+    calls.length = 0;
+    const sourceChip = [...root.querySelectorAll(".hm-chip.interactive")].find((c) => c.textContent.includes("音源"));
+    sourceChip?.click();
+    await wait(10);
+    const menu = root.querySelector(".hm-menu");
+    check("menu/source-open", Boolean(menu), menu ? "open" : "closed");
+    const items = root.querySelectorAll(".hm-menu-item");
+    items[1]?.click();
+    await wait(10);
+    check("menu/source-select", calls.some((c) => c.service === "select_source" && c.data.source === "本地媒体"), JSON.stringify(calls.at(-1)));
+    calls.length = 0;
+    const soundChip = [...root.querySelectorAll(".hm-chip.interactive")].find((c) => c.textContent.includes("声音模式"));
+    soundChip?.click();
+    await wait(10);
+    root.querySelectorAll(".hm-menu-item")[1]?.click();
+    await wait(10);
+    check("menu/sound-select", calls.some((c) => c.service === "select_sound_mode" && c.data.sound_mode === "Night"), JSON.stringify(calls.at(-1)));
+    calls.length = 0;
+    root.querySelector(".hm-chip .hm-group")?.closest(".hm-chip")?.click();
+    await wait(10);
+    check("group/unjoin", calls.some((c) => c.service === "unjoin"), JSON.stringify(calls.at(-1)));
+    await unmount(cell);
+  }
+
+  // 12 队列抽屉
+  {
+    const { cell, root, card } = await mount({});
+    calls.length = 0;
+    [...root.querySelectorAll(".hm-icon-btn")].find((b) => b.getAttribute("aria-label") === "播放队列")?.click();
+    await wait(20);
+    const rows = root.querySelectorAll(".hm-list-item");
+    check("queue/open", rows.length === 2, rows.length);
+    rows[0]?.click();
+    await wait(10);
+    check("queue/play", calls.some((c) => c.service === "play_media" && c.data.media_content_id.startsWith("media-source://preview")), JSON.stringify(calls.at(-1)));
+    await unmount(cell);
+  }
+
+  // 13 媒体库
+  {
+    const { cell, root } = await mount({});
+    [...root.querySelectorAll(".hm-icon-btn")].find((b) => b.getAttribute("aria-label") === "媒体库")?.click();
+    await wait(30);
+    check("library/root", root.querySelectorAll(".hm-list-item").length >= 3, root.querySelectorAll(".hm-list-item").length);
+    root.querySelectorAll(".hm-list-item")[1]?.click(); // Tracks 目录
+    await wait(30);
+    check("library/enter", /Tracks|Inner Track/.test(root.querySelector(".hm-drawer-title")?.textContent || ""), root.querySelector(".hm-drawer-title")?.textContent);
+    const backBtn = [...root.querySelectorAll(".hm-drawer-head .hm-icon-btn")].find((b) => b.getAttribute("aria-label") === "返回");
+    backBtn?.click();
+    await wait(30);
+    check("library/back", root.querySelector(".hm-drawer-title")?.textContent?.includes("媒体库") || root.querySelectorAll(".hm-list-item").length >= 3, root.querySelector(".hm-drawer-title")?.textContent);
+    await unmount(cell);
+  }
+
+  // 14 歌单抽屉
+  {
+    const { cell, root } = await mount({ music_assistant: true });
+    calls.length = 0;
+    root.querySelector(".hm-ma")?.click();
+    await wait(40);
+    const rows = root.querySelectorAll(".hm-list-item");
+    check("playlists/open", rows.length === 2, rows.length);
+    rows[0]?.click();
+    await wait(30);
+    check("playlists/play", calls.some((c) => c.domain === "music_assistant" && c.service === "play_media" && c.data.media_id === "library://playlist/1" && c.data.media_type === "playlist"), JSON.stringify(calls.at(-1)));
+    check("playlists/toast", /开始播放/.test(root.querySelector(".hm-toast")?.textContent || ""), root.querySelector(".hm-toast")?.textContent);
+    await unmount(cell);
+  }
+
+  // 15 空歌单
+  {
+    const { cell, root, card } = await mount({ music_assistant: true });
+    root.querySelector(".hm-ma")?.click();
+    await wait(40);
+    root.querySelectorAll(".hm-list-item")[1]?.click();
+    await wait(30);
+    check("playlists/empty-mark", card._drawer.items[1]?.empty === true, card._drawer.items[1]?.empty);
+    check("playlists/empty-toast", /为空/.test(root.querySelector(".hm-toast")?.textContent || ""), root.querySelector(".hm-toast")?.textContent);
+    check("playlists/no-fallback", calls.filter((c) => c.service === "play_media" && c.domain === "media_player").length === 0);
+    await unmount(cell);
+  }
+
+  // 16 更多信息 / 电源
+  {
+    const { cell, root, card } = await mount({});
+    let eventDetail = null;
+    card.addEventListener("hass-more-info", (e) => (eventDetail = e.detail));
+    root.querySelector('[data-role="more"]')?.click();
+    check("more-info/event", eventDetail?.entityId === "media_player.living", JSON.stringify(eventDetail));
+    calls.length = 0;
+    root.querySelector('[data-role="power"]')?.click();
+    await wait(10);
+    check("power/off", calls.some((c) => c.service === "turn_off"), JSON.stringify(calls.at(-1)));
+    await unmount(cell);
+  }
+
+  // 17 外部音量实体
+  {
+    const { cell, root } = await mount({ volume_entity: "number.amp_volume", show_volume: true });
+    const vol = root.querySelector('input[data-role="volume"]');
+    check("volumeEntity/value", vol?.value === "40", vol?.value);
+    calls.length = 0;
+    vol.value = "70";
+    vol.dispatchEvent(new Event("input", { bubbles: true }));
+    vol.dispatchEvent(new Event("change", { bubbles: true }));
+    await wait(10);
+    check("volumeEntity/set", calls.some((c) => c.domain === "number" && c.service === "set_value" && c.data.value === 70), JSON.stringify(calls.at(-1)));
+    await unmount(cell);
+  }
+
+  // 18 能力缺失
+  {
+    const { cell, root, card } = await mount({ entity: "media_player.bedroom", entityOverride: true });
+    check("capability/no-seek", root.querySelector('input[data-role="seek"]')?.dataset.disabled === "true", root.querySelector('input[data-role="seek"]')?.dataset.disabled);
+    calls.length = 0;
+    const seek = root.querySelector('input[data-role="seek"]');
+    if (seek) {
+      seek.value = "20";
+      seek.dispatchEvent(new Event("change", { bubbles: true }));
+      await wait(10);
+    }
+    check("capability/no-seek-call", !calls.some((c) => c.service === "media_seek"), calls.map((c) => c.service).join(","));
+    await unmount(cell);
+  }
+
+  // 19 配置校验
+  {
+    let throws = false;
+    try {
+      const card = document.createElement("ha-music");
+      card.setConfig({});
+    } catch (err) {
+      throws = /entity|entities/.test(err.message);
+    }
+    check("config/requires-entity", throws);
+
+    const { cell, root } = await mount({ entity: "media_player.nope" });
+    check("config/missing-entity", /实体未找到/.test(root.querySelector(".hm-empty")?.textContent || ""), root.querySelector(".hm-empty")?.textContent);
+    await unmount(cell);
+  }
+
+  // 20 编辑器
+  {
+    const editor = document.createElement("ha-music-editor");
+    editor.hass = hass;
+    editor.setConfig({ entity: "media_player.living", theme: "aurora", show_queue: true, music_assistant: "/b93b5321_music_assistant" });
+    document.getElementById("stage").appendChild(editor);
+    await editor.updateComplete;
+    const switches = editor.shadowRoot.querySelectorAll(".switch-row");
+    check("editor/switches", switches.length === 6, switches.length);
+    let emitted = null;
+    editor.addEventListener("config-changed", (e) => (emitted = e.detail.config));
+    switches[2].querySelector('input[type="checkbox"]').click();
+    await wait(10);
+    check("editor/toggle-emits", emitted?.show_queue === false, JSON.stringify(emitted?.show_queue));
+    const themeSelect = editor.shadowRoot.querySelectorAll("select")[1];
+    themeSelect.value = "cyber";
+    themeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await wait(10);
+    check("editor/theme-emits", emitted?.theme === "cyber", emitted?.theme);
+    editor.remove();
+  }
+
+  const pass = results.filter((r) => r.ok).length;
+  window.__audit = { results, pass, total: results.length, calls };
+  document.getElementById("out").textContent = results
+    .map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.ok ? "" : "   → " + r.detail}`)
+    .join("\n") + `\n\n${pass}/${results.length} passed`;
+})();
+</script>
+</body>
+</html>

@@ -149,6 +149,15 @@ class HaMusicCard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this._onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      if (this._drawer.open) this._closeDrawer();
+      else if (this._menu) {
+        this._menu = null;
+        this.requestUpdate();
+      }
+    };
+    window.addEventListener("keydown", this._onKeyDown);
     if (typeof ResizeObserver !== "undefined") {
       this._resizeObserver = new ResizeObserver((entries) => {
         const width = entries[0]?.contentRect?.width || 0;
@@ -163,6 +172,10 @@ class HaMusicCard extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    if (this._onKeyDown) {
+      window.removeEventListener("keydown", this._onKeyDown);
+      this._onKeyDown = null;
+    }
     this._stopTimer();
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
@@ -456,6 +469,7 @@ class HaMusicCard extends LitElement {
   }
 
   _onSeekInput(event) {
+    if (!hasFeature(this._state(), FEATURES.SEEK)) return;
     const input = event.target;
     const value = Number(input.value);
     this._seekPreview = value;
@@ -467,6 +481,10 @@ class HaMusicCard extends LitElement {
   }
 
   _onSeekCommit(event) {
+    if (!hasFeature(this._state(), FEATURES.SEEK)) {
+      this.requestUpdate();
+      return;
+    }
     const value = Number(event.target.value);
     this._seekPreview = null;
     this._seekTo(value);
@@ -645,7 +663,11 @@ class HaMusicCard extends LitElement {
   _onCardClick(event) {
     if (!this._menu) return;
     const path = event.composedPath?.() || [];
-    const insideMenu = path.some((node) => node?.classList?.contains?.("hm-menu"));
+    const insideMenu = path.some(
+      (node) =>
+        node?.classList?.contains?.("hm-menu") ||
+        node?.classList?.contains?.("hm-chip")
+    );
     if (!insideMenu) {
       this._menu = null;
       this.requestUpdate();
@@ -813,9 +835,15 @@ class HaMusicCard extends LitElement {
         notifyDone();
         return;
       } catch (err) {
+        const raw = err?.message || String(err);
         // 歌单为空/曲目不可用时不再重复回退，直接给出可读提示
-        if (/nothing to play here/i.test(err?.message || "")) {
+        if (/nothing to play here/i.test(raw)) {
           this._markPlaylistEmpty(item);
+          this._notify(describe(err));
+          return;
+        }
+        // 目标实体不属于 MA（例如切到了普通播放器）才回退标准服务
+        if (!/match|target|not a valid|does not support|unsupported/i.test(raw)) {
           this._notify(describe(err));
           return;
         }
@@ -1194,6 +1222,7 @@ class HaMusicCard extends LitElement {
               ${canPower
                 ? html`<button
                     class="hm-icon-btn"
+                    data-role="power"
                     aria-label=${t("power")}
                     title=${t("power")}
                     @click=${() => this._power()}
@@ -1203,6 +1232,7 @@ class HaMusicCard extends LitElement {
                 : nothing}
               <button
                 class="hm-icon-btn"
+                data-role="more"
                 aria-label=${t("more")}
                 title=${t("more")}
                 @click=${() => this._moreInfo()}

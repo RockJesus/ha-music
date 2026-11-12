@@ -24,7 +24,7 @@
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`。
 - **触屏优先**：`pointer: coarse` 下按钮/滑杆/列表自动放大到 40–48px，抽屉滚动不穿透页面，点按有按压反馈；窄屏自动把音量条换到下一行，避免大按钮把卡片撑破。
-- **Music Assistant 歌单**：顶栏歌单按钮直接列出 MA 播放列表，点击任意歌单即通过 `music_assistant.play_media` 开播；抽屉右上角仍可跳转 MA 面板。
+- **Music Assistant 歌单**：顶栏歌单按钮直接列出 MA 播放列表，点击任意歌单即通过 `music_assistant.play_media` 开播；按钮只在当前播放器是 MA 播放器时出现，普通播放器会提示先切换，不再发出无效请求；抽屉右上角仍可跳转 MA 面板。
 - **能力自适应**：按 `supported_features` 位掩码显示按钮，不出现无效控件。
 - **可视化编辑器**：UI 内直接改布局、主题、背景、频谱、标题、强调色、音量实体与显示开关。
 - **无 CDN 依赖**：单文件 ESM，内联全部依赖与图标，离线可用。

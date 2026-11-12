@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.0.6";
+export const CARD_VERSION = "1.0.7";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -119,6 +119,7 @@ const EN = {
   playlists: "Playlists",
   playlistsEmpty: "No playlists found",
   playlistEmpty: "This playlist is empty or unavailable in Music Assistant",
+  maPlayerRequired: "Playlists need a Music Assistant player",
   playlistUnavailable: "Unavailable",
   playingPlaylist: "Playing",
   openAssistant: "Open Music Assistant",
@@ -167,6 +168,7 @@ const ZH = {
   playlists: "播放列表",
   playlistsEmpty: "没有找到播放列表",
   playlistEmpty: "该歌单为空或曲目在 Music Assistant 中不可用",
+  maPlayerRequired: "当前播放器不是 Music Assistant 播放器，请先切换到 MA 播放器",
   playlistUnavailable: "不可用",
   playingPlaylist: "开始播放",
   openAssistant: "打开 Music Assistant",

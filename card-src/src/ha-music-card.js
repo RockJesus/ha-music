@@ -614,6 +614,11 @@ class HaMusicCard extends LitElement {
     });
   }
 
+  _isMaPlayer(entityId = this._eid()) {
+    const attrs = this._state(entityId)?.attributes || {};
+    return Object.keys(attrs).some((key) => key.startsWith("mass_"));
+  }
+
   _maUrl() {
     const value = this._config?.music_assistant;
     if (value === false) return "";
@@ -724,6 +729,10 @@ class HaMusicCard extends LitElement {
 
   _openPlaylists() {
     const t = translator(this._hass?.language);
+    if (!this._isMaPlayer()) {
+      this._notify(t("maPlayerRequired"));
+      return;
+    }
     this._drawer = {
       open: true,
       mode: "playlists",
@@ -811,6 +820,10 @@ class HaMusicCard extends LitElement {
     if (!item?.contentId) return;
     const t = translator(this._hass?.language);
     const entityId = this._eid();
+    if (!this._isMaPlayer(entityId)) {
+      this._notify(t("maPlayerRequired"));
+      return;
+    }
     const mediaType = item.contentType || "playlist";
     const notifyDone = () => {
       this._notify(`${t("playingPlaylist")} · ${item.title || ""}`);
@@ -1130,7 +1143,7 @@ class HaMusicCard extends LitElement {
       ? hasFeature(state, FEATURES.TURN_ON)
       : hasFeature(state, FEATURES.TURN_OFF);
     const canBrowse = hasFeature(state, FEATURES.BROWSE_MEDIA);
-    const maShow = this._maEnabled();
+    const maShow = this._maEnabled() && this._isMaPlayer(entityId);
     const canSeek = hasFeature(state, FEATURES.SEEK);
     const sourceList = Array.isArray(state.attributes?.source_list)
       ? state.attributes.source_list

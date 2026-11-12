@@ -1045,6 +1045,10 @@ export const cardStyles = css`
     cursor: pointer;
   }
 
+  .hm-list-item[data-empty="true"] {
+    opacity: 0.45;
+  }
+
   .hm-list-item:hover {
     background: rgba(255, 255, 255, 0.07);
   }

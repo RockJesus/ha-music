@@ -797,6 +797,11 @@ class HaMusicCard extends LitElement {
     const useMA = Boolean(
       this._hass?.services?.music_assistant?.play_media
     );
+    const describe = (err) => {
+      const raw = err?.message || String(err);
+      if (/nothing to play here/i.test(raw)) return t("playlistEmpty");
+      return raw.length > 60 ? raw.slice(0, 60) : raw;
+    };
     if (useMA) {
       try {
         await this._hass.callService("music_assistant", "play_media", {
@@ -808,7 +813,12 @@ class HaMusicCard extends LitElement {
         notifyDone();
         return;
       } catch (err) {
-        // 退回到标准 play_media，兼容不同 MA 版本
+        // 歌单为空/曲目不可用时不再重复回退，直接给出可读提示
+        if (/nothing to play here/i.test(err?.message || "")) {
+          this._markPlaylistEmpty(item);
+          this._notify(describe(err));
+          return;
+        }
       }
     }
     try {
@@ -818,8 +828,22 @@ class HaMusicCard extends LitElement {
       });
       notifyDone();
     } catch (err) {
-      this._notify(err?.message || t("browseFailed"));
+      if (/nothing to play here/i.test(err?.message || "")) {
+        this._markPlaylistEmpty(item);
+      }
+      this._notify(describe(err) || t("browseFailed"));
     }
+  }
+
+  _markPlaylistEmpty(item) {
+    if (this._drawer.mode !== "playlists") return;
+    this._drawer = {
+      ...this._drawer,
+      items: this._drawer.items.map((entry) =>
+        entry.contentId === item.contentId ? { ...entry, empty: true } : entry
+      ),
+    };
+    this.requestUpdate();
   }
 
   _closeDrawer() {
@@ -1591,6 +1615,7 @@ class HaMusicCard extends LitElement {
         const thumb = normalizeArt(this._hass, item.thumb);
         return html`<button
           class="hm-list-item"
+          data-empty=${item.empty ? "true" : "false"}
           @click=${() => this._playPlaylistItem(item)}
         >
           <span
@@ -1601,7 +1626,7 @@ class HaMusicCard extends LitElement {
           </span>
           <span class="hm-list-text">
             <span class="hm-list-name">${item.title || "—"}</span>
-            <span class="hm-list-sub">${item.subtitle}</span>
+            <span class="hm-list-sub">${item.empty ? t("playlistUnavailable") : item.subtitle}</span>
           </span>
           <span class="hm-list-tail">${icon("play", 14)}</span>
         </button>`;

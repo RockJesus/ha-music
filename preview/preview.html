@@ -175,6 +175,9 @@
         callService: (domain, service, data) => {
           calls.push({ domain, service, data });
           console.log("callService", domain, service, JSON.stringify(data));
+          if (service === "play_media" && String(data?.media_id || "").endsWith("/5")) {
+            return Promise.reject(new Error("There is nothing to play here."));
+          }
           return Promise.resolve({ context: { id: "preview" } });
         },
         connection: {
@@ -201,6 +204,7 @@
                   { title: "City Pop 自驾", media_class: "playlist", media_content_id: "library://playlist/2", media_content_type: "playlist", thumbnail: ART.aurora, can_play: true, can_expand: false },
                   { title: "Liquid Focus", media_class: "playlist", media_content_id: "library://playlist/3", media_content_type: "playlist", thumbnail: ART.liquid, can_play: true, can_expand: false },
                   { title: "赛博夜跑", media_class: "playlist", media_content_id: "library://playlist/4", media_content_type: "playlist", can_play: true, can_expand: false },
+                  { title: "空歌单（网易云导入）", media_class: "playlist", media_content_id: "library://playlist/5", media_content_type: "playlist", can_play: true, can_expand: false },
                 ],
               };
             }

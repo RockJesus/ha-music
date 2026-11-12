@@ -46,9 +46,9 @@
 | --- | --- |
 | ![Queue](docs/preview-queue.webp) | ![Library](docs/preview-library.webp) |
 
-| Music Assistant 歌单 |
-| --- |
-| ![Playlists](docs/preview-playlists.webp) |
+| Music Assistant 歌单 | 空歌单提示 |
+| --- | --- |
+| ![Playlists](docs/preview-playlists.webp) | ![Empty](docs/preview-playlists-empty.webp) |
 
 ## 安装
 
@@ -64,7 +64,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.0.3`
+   - URL：`/local/ha-music.js?v=1.0.4`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -169,6 +169,11 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.0.4
+
+- 歌单在 MA 中为空时不再弹出原始英文报错，改为可读提示并置灰标记该歌单，避免重复两次错误弹窗。
+- 空歌单失败后不再盲目回退 `media_player.play_media`（同一原因必然再失败）。
 
 ### 1.0.3
 

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HA Music · Preview</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 22px;
+        background:
+          radial-gradient(60% 50% at 18% 8%, #0b1626 0%, transparent 62%),
+          radial-gradient(55% 45% at 88% 92%, #150c22 0%, transparent 60%),
+          #05060a;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        font-family: "PingFang SC", -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      .stage {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        align-items: flex-start;
+        justify-content: center;
+      }
+      .cell {
+        width: var(--w, 460px);
+      }
+      .caption {
+        margin: 8px 2px 0;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #66708a;
+      }
+      .shot body { padding: 18px; }
+    </style>
+    <script type="module" src="../ha-music.js"></script>
+  </head>
+  <body>
+    <div class="stage" id="stage"></div>
+    <script type="module">
+      const params = new URLSearchParams(location.search);
+      const THEME = params.get("theme") || "aurora";
+      const LAYOUT = params.get("layout") || "full";
+      const COVER = params.get("cover") || "ambient";
+      const VIS = params.get("vis") || "bars";
+      const LANG = params.get("lang") || "zh-Hans";
+      const WIDTH = Number(params.get("w") || 460);
+      const DRAWER = params.get("drawer") || "";
+      const GRID = params.get("grid") === "1";
+      const STATE = params.get("state") || "playing";
+
+      const ART = {
+        aurora: "art/cover-aurora-720.jpg",
+        cyber: "art/cover-cyber-720.jpg",
+        liquid: "art/cover-liquid-720.jpg",
+      };
+
+      const FEATURES =
+        1 + 2 + 4 + 8 + 16 + 32 + 128 + 256 + 512 + 2048 + 16384 + 32768 + 65536 + 131072 + 262144 + 524288;
+
+      const QUEUE = [
+        ["Neon River", "AURORA LAB", 257, ART.aurora, true],
+        ["Velvet Static", "AURORA LAB", 198, ART.aurora, false],
+        ["Glass Bloom", "LILA K.", 231, ART.liquid, false],
+        ["Chrome Horizon", "NEON DISTRICT", 274, ART.cyber, false],
+        ["After Rain", "MINT CODE", 164, "", false],
+        ["Slow Motion", "AURORA LAB", 289, "", false],
+      ].map(([title, artist, duration, art, active]) => ({
+        title,
+        artist,
+        duration,
+        entity_picture: art,
+        active,
+        media_content_id: "media-source://preview/" + encodeURIComponent(title),
+        media_content_type: "music",
+      }));
+
+      function player({ id, name, title, artist, album, art, state, pos, dur, volume, source, group }) {
+        return [
+          id,
+          {
+            entity_id: id,
+            state,
+            attributes: {
+              friendly_name: name,
+              media_title: title,
+              media_artist: artist,
+              media_album_name: album,
+              entity_picture: art,
+              media_duration: dur,
+              media_position: pos,
+              media_position_updated_at: new Date(Date.now() - 2000).toISOString(),
+              volume_level: volume,
+              is_volume_muted: false,
+              shuffle: true,
+              repeat: "all",
+              source,
+              source_list: ["Spotify", "本地媒体", "AirPlay", "TTS"],
+              sound_mode: "Music",
+              sound_mode_list: ["Music", "Night", "Speech"],
+              supported_features: FEATURES,
+              group_members: group,
+              app_name: "Spotify",
+              media_track: 3,
+              queue: QUEUE,
+            },
+          },
+        ];
+      }
+
+      const states = Object.fromEntries([
+        player({
+          id: "media_player.living",
+          name: "客厅 · Living Room",
+          title: "Neon River",
+          artist: "AURORA LAB",
+          album: "Midnight Signals",
+          art: ART.aurora,
+          state: STATE,
+          pos: 83,
+          dur: 257,
+          volume: 0.42,
+          source: "Spotify",
+          group: ["media_player.living", "media_player.study"],
+        }),
+        player({
+          id: "media_player.study",
+          name: "书房 · Studio",
+          title: "Chrome Horizon",
+          artist: "NEON DISTRICT",
+          album: "Ghost in the Grid",
+          art: ART.cyber,
+          state: "paused",
+          pos: 42,
+          dur: 274,
+          volume: 0.66,
+          source: "本地媒体",
+          group: ["media_player.living", "media_player.study"],
+        }),
+        player({
+          id: "media_player.bedroom",
+          name: "卧室 · Bedroom",
+          title: "Glass Bloom",
+          artist: "LILA K.",
+          album: "Pearl",
+          art: ART.liquid,
+          state: "idle",
+          pos: 0,
+          dur: 231,
+          volume: 0.28,
+          source: "AirPlay",
+          group: ["media_player.bedroom"],
+        }),
+      ]);
+
+      const calls = [];
+      const hass = {
+        language: LANG,
+        states,
+        hassUrl: (path) => path,
+        callService: (domain, service, data) => {
+          calls.push({ domain, service, data });
+          console.log("callService", domain, service, JSON.stringify(data));
+          return Promise.resolve({ context: { id: "preview" } });
+        },
+        connection: {
+          sendMessagePromise: async (message) => {
+            if (message.type !== "media_player/browse_media") throw new Error("unsupported");
+            const id = message.media_content_id || "root";
+            if (id === "root") {
+              return {
+                title: "媒体库",
+                children: [
+                  { title: "播放列表", media_class: "playlist", media_content_id: "root>playlists", media_content_type: "playlists", can_expand: true, can_play: false },
+                  { title: "专辑", media_class: "album", media_content_id: "root>albums", media_content_type: "albums", can_expand: true, can_play: false },
+                  { title: "歌曲", media_class: "track", media_content_id: "root>tracks", media_content_type: "tracks", can_expand: true, can_play: false },
+                  { title: "Neon River", media_class: "music", media_content_id: "root>track1", media_content_type: "music", thumbnail: ART.aurora, can_play: true, can_expand: false },
+                  { title: "Glass Bloom", media_class: "music", media_content_id: "root>track2", media_content_type: "music", thumbnail: ART.liquid, can_play: true, can_expand: false },
+                ],
+              };
+            }
+            return {
+              title: id.split(">").pop(),
+              children: QUEUE.map((item, index) => ({
+                title: item.title,
+                media_class: "music",
+                media_content_id: id + ">" + index,
+                media_content_type: "music",
+                thumbnail: item.entity_picture || "",
+                can_play: true,
+                can_expand: false,
+              })),
+            };
+          },
+        },
+      };
+
+      function makeCard(config, width) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.style.setProperty("--w", width + "px");
+        const card = document.createElement("ha-music");
+        card.hass = hass;
+        card.setConfig({
+          entity: "media_player.living",
+          theme: THEME,
+          layout: LAYOUT,
+          cover: COVER,
+          visualizer: VIS,
+          ...config,
+        });
+        cell.appendChild(card);
+        return { cell, card };
+      }
+
+      const stage = document.getElementById("stage");
+      if (GRID) {
+        const entries = [
+          { theme: "aurora", layout: "full", visualizer: "bars", cover: "ambient" },
+          { theme: "cyber", layout: "full", visualizer: "wave", cover: "art" },
+          { theme: "liquid", layout: "compact", visualizer: "orbit", cover: "palette" },
+          { theme: "velvet", layout: "mini", visualizer: "none", cover: "ambient" },
+        ];
+        for (const entry of entries) {
+          const { cell } = makeCard(entry, 460);
+          const caption = document.createElement("div");
+          caption.className = "caption";
+          caption.textContent = `${entry.theme} · ${entry.layout} · ${entry.visualizer}`;
+          cell.appendChild(caption);
+          stage.appendChild(cell);
+        }
+      } else {
+        const { cell, card } = makeCard({}, WIDTH);
+        stage.appendChild(cell);
+        if (params.get("entities") === "1") {
+          card.setConfig({
+            entity: "media_player.living",
+            entities: ["media_player.living", "media_player.study", "media_player.bedroom"],
+            theme: THEME,
+            layout: LAYOUT,
+            cover: COVER,
+            visualizer: VIS,
+          });
+        }
+        if (DRAWER === "queue") setTimeout(() => card._openQueue?.(), 120);
+        if (DRAWER === "library") setTimeout(() => card._openLibrary?.(), 120);
+      }
+
+      window.__preview = { hass, states, calls, stage };
+      document.title = `HA Music · ${GRID ? "grid" : THEME + " / " + LAYOUT}`;
+    </script>
+  </body>
+</html>

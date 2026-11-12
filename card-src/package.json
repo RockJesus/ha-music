@@ -1,0 +1,17 @@
+{
+  "name": "ha-music-card-src",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Source for the HA Music Lovelace card",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}

@@ -524,6 +524,7 @@ export const cardStyles = css`
     transform-origin: bottom center;
     animation: hmBar var(--dur) ease-in-out var(--delay) infinite alternate;
     animation-play-state: var(--run, running);
+    transition: height 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
     box-shadow: 0 0 10px -2px rgba(var(--hm-a1-rgb), 0.55);
   }
 
@@ -584,11 +585,20 @@ export const cardStyles = css`
     aspect-ratio: 1;
     border-radius: 50%;
     border: 1px solid rgba(var(--hm-a1-rgb), 0.65);
+    border-width: calc(
+      1px + var(--react, 0.5) * var(--drive, 0.5) * 1.2px
+    );
     box-shadow:
-      0 0 20px -6px rgba(var(--hm-a1-rgb), 0.55),
-      inset 0 0 18px -8px rgba(var(--hm-a1-rgb), 0.6);
+      0 0 calc(16px + var(--react, 0.5) * var(--drive, 0.5) * 16px) -6px
+        rgba(var(--hm-a1-rgb), 0.55),
+      inset 0 0 calc(14px + var(--react, 0.5) * var(--drive, 0.5) * 12px)
+        -8px rgba(var(--hm-a1-rgb), 0.6);
     animation: hmOrbit 3.4s ease-out infinite;
     animation-play-state: var(--run, running);
+    filter: brightness(
+      calc(0.72 + var(--react, 0.5) * var(--drive, 0.5) * 0.62)
+    );
+    transition: filter 0.35s ease;
   }
 
   .hm-orbit-ring:nth-child(1) {

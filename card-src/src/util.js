@@ -24,6 +24,32 @@ export function hashString(input) {
   return hash >>> 0;
 }
 
+// 伪频谱节奏：曲目（歌名+歌手+专辑）决定波形/相位，播放位置决定脉冲强度。
+// 不读取真实音频采样，只让动效随播放进度起伏。
+export function visualizerFrame(media = {}) {
+  const seed =
+    [media.title, media.artist, media.album].filter(Boolean).join("|") ||
+    "ha-music";
+  const hash = hashString(seed);
+  const period = 1.7 + ((hash >>> 8) % 90) / 100;
+  const phase = ((hash % 360) / 360) * Math.PI * 2;
+  const position =
+    Number.isFinite(media.position) && media.position > 0
+      ? media.position
+      : 0;
+  const angle = (position / period) * Math.PI * 2 + phase;
+  return {
+    seed,
+    hash,
+    period,
+    phase,
+    position,
+    pulse: 0.5 + 0.5 * Math.sin(angle),
+    low: 0.5 + 0.5 * Math.sin(angle + 0.55),
+    energy: 0.55 + ((hash >>> 16) % 100) / 220,
+  };
+}
+
 export function hueFromString(input) {
   return hashString(input) % 360;
 }

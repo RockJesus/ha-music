@@ -9,6 +9,7 @@ import {
   normalizeArt,
   readMedia,
   readQueue,
+  visualizerFrame,
 } from "../src/util.js";
 import { mediaClassLabel } from "../src/const.js";
 
@@ -126,4 +127,27 @@ test("mediaClassLabel 中英输出", () => {
   assert.equal(mediaClassLabel("album", "en"), "Album");
   assert.equal(mediaClassLabel("custom", "zh"), "custom");
   assert.equal(mediaClassLabel("", "zh"), "");
+});
+
+test("visualizerFrame 用歌名+歌手+专辑做种子", () => {
+  const a = visualizerFrame({ title: "Neon", artist: "Lab", album: "Signals" });
+  const b = visualizerFrame({ title: "Neon", artist: "Lab", album: "Signals" });
+  assert.equal(a.seed, "Neon|Lab|Signals");
+  assert.equal(a.hash, b.hash);
+  assert.equal(a.pulse, b.pulse);
+  const other = visualizerFrame({ title: "Neon", artist: "Lab", album: "Other" });
+  assert.notEqual(other.seed, a.seed);
+  assert.ok(other.period >= 1.7 && other.period <= 2.69);
+  assert.ok(a.energy >= 0.55 && a.energy <= 1);
+});
+
+test("visualizerFrame 随 media_position 改变脉冲", () => {
+  const base = { title: "Neon", artist: "Lab", album: "Signals" };
+  const p0 = visualizerFrame({ ...base, position: 0 });
+  const p1 = visualizerFrame({ ...base, position: 0.85 });
+  const p2 = visualizerFrame({ ...base, position: 1.7 });
+  assert.ok(Math.abs(p1.pulse - p0.pulse) > 0.05);
+  assert.ok(Math.abs(p2.pulse - p1.pulse) > 0.05);
+  assert.ok(p0.pulse >= 0 && p0.pulse <= 1);
+  assert.ok(p0.low >= 0 && p0.low <= 1);
 });

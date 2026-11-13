@@ -25,6 +25,7 @@ import {
   hexToHsl,
   mixHsl,
   hashString,
+  visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 
@@ -144,6 +145,7 @@ class HaMusicCard extends LitElement {
     }
     this._sig = "";
     if (this._hass) this._sig = this._computeSig(this._hass);
+    this._syncTimer();
     this.requestUpdate();
   }
 
@@ -267,7 +269,7 @@ class HaMusicCard extends LitElement {
     const state = this._state()?.state;
     const shouldTick = state === "playing" || state === "buffering";
     if (shouldTick && !this._tickTimer) {
-      this._tickTimer = setInterval(() => this.requestUpdate(), 1000);
+      this._tickTimer = setInterval(() => this.requestUpdate(), 500);
     } else if (!shouldTick) {
       this._stopTimer();
     }
@@ -1537,23 +1539,34 @@ class HaMusicCard extends LitElement {
   }
 
   _renderVisualizer(kind, media) {
+    const frame = visualizerFrame(media);
     if (kind === "wave") {
+      const amp1 = 7 + frame.energy * 6 + frame.low * 7;
+      const amp2 = 4.5 + frame.pulse * 5.5;
+      const amp3 = 2.2 + frame.pulse * 3.2;
+      const phase = frame.phase;
+      const duration = `${(frame.period * 2.4).toFixed(2)}s`;
       return html`<div class="hm-wave-wrap">
-        <svg viewBox="0 0 600 40" preserveAspectRatio="none" aria-hidden="true">
+        <svg
+          viewBox="0 0 600 40"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          style=${styleMap({ animationDuration: duration })}
+        >
           <path
-            d=${wavePath(600, 40, 150, 14, 0)}
+            d=${wavePath(600, 40, 150, amp1, phase)}
             fill="none"
             stroke="rgba(var(--hm-a1-rgb), 0.85)"
             stroke-width="1.4"
           ></path>
           <path
-            d=${wavePath(600, 40, 150, 9, 1.9)}
+            d=${wavePath(600, 40, 150, amp2, phase * 1.35 + 1.9)}
             fill="none"
             stroke="rgba(var(--hm-a2-rgb), 0.6)"
             stroke-width="1.2"
           ></path>
           <path
-            d=${wavePath(600, 40, 75, 5, 3.2)}
+            d=${wavePath(600, 40, 75, amp3, phase * 1.7 + 3.2)}
             fill="none"
             stroke="rgba(var(--hm-a1-rgb), 0.35)"
             stroke-width="0.9"
@@ -1562,24 +1575,42 @@ class HaMusicCard extends LitElement {
       </div>`;
     }
     if (kind === "orbit") {
+      const reactors = [1, 0.58, 0.34];
       return html`<div class="hm-orbit-wrap">
-        <span class="hm-orbit-ring"></span>
-        <span class="hm-orbit-ring"></span>
-        <span class="hm-orbit-ring"></span>
+        ${reactors.map((react, index) => {
+          const drive = index === 0 ? frame.low : frame.pulse;
+          return html`<span
+            class="hm-orbit-ring"
+            style=${styleMap({
+              "--react": String(react),
+              "--drive": drive.toFixed(3),
+              animationDuration: `${(frame.period * (1.8 + index * 0.25)).toFixed(2)}s`,
+              animationDelay: `${(index * frame.period * 0.55).toFixed(2)}s`,
+            })}
+          ></span>`;
+        })}
       </div>`;
     }
-    const seed = `${media.title}|${media.artist}`;
     const count = 36;
     return html`<div class="hm-bars">
       ${Array.from({ length: count }, (_, index) => {
-        const h = hashString(`${seed}#${index}`);
-        const height = 0.16 + (h % 100) / 130;
+        const h = hashString(`${frame.seed}#${index}`);
+        const base = 0.14 + (h % 100) / 135;
+        const band = index < 12 ? 0 : index < 24 ? 1 : 2;
+        const react = [1, 0.62, 0.34][band];
+        const drive = band === 0 ? frame.low : frame.pulse;
+        const boost = band === 0 ? 1 + 0.12 * drive : 1;
+        const height = clamp(
+          base * (0.55 + react * 0.55 * drive) * boost,
+          0.08,
+          1
+        );
         const duration = 0.9 + ((h >> 8) % 100) / 90;
         const delay = -(((h >> 16) % 100) / 45);
         return html`<span
           class="hm-bar"
           style=${styleMap({
-            "--h": String(Math.min(height, 1)),
+            "--h": height.toFixed(3),
             "--dur": `${duration.toFixed(2)}s`,
             "--delay": `${delay.toFixed(2)}s`,
           })}

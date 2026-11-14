@@ -115,6 +115,7 @@ frontend:
 ```
 
 - 同一个 `ha-music.js` 既可作为 Lovelace 资源，也可作为全局模块加载；内部已防止重复 `customElements.define`。
+- 不想改 `configuration.yaml` 时，也可以直接在 Lovelace 资源 URL 末尾追加 `&dock=1&dock_path=/ha-music-player`，让所有仪表盘加载时都安装悬浮入口；市场升级可能把 URL 重置回 `?v=...`，升级后需要重新追加，或使用上面的 `extra_module_url`。
 - 进入 `dock_path` 指向的播放器页面后，胶囊和悬浮按钮会自动隐藏，避免遮挡播放器。
 - 不需要悬浮入口时，保持 `dock: false`，并从 `extra_module_url` 移除该行即可。
 

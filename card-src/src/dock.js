@@ -396,8 +396,10 @@ class HaMusicMini extends HTMLElement {
       return;
     }
     const a = state.attributes || {};
-    this._title.textContent = a.media_title || a.friendly_name || this._entity;
-    const artist = a.media_artist || a.media_album_name || "";
+    const title = a.media_title || a.friendly_name || this._entity;
+    this._title.textContent = title;
+    let artist = a.media_artist || a.media_album_name || "";
+    if (artist === title) artist = "";
     const label = this._stateLabel(state.state);
     this._sub.textContent = artist ? `${artist} · ${label}` : label;
     this._setDisabled(false);
@@ -414,9 +416,14 @@ class HaMusicMini extends HTMLElement {
   _setArt(url) {
     if (!this._art) return;
     if (url) {
-      const resolved = new URL(url, window.location.href).href;
-      if (this._art.getAttribute("src") !== resolved) this._art.src = resolved;
-      this._fallback.style.display = "none";
+      try {
+        const resolved = new URL(url, window.location.href).href;
+        if (this._art.getAttribute("src") !== resolved) this._art.src = resolved;
+        this._fallback.style.display = "none";
+      } catch {
+        this._art.removeAttribute("src");
+        this._fallback.style.display = "grid";
+      }
     } else {
       this._art.removeAttribute("src");
       this._fallback.style.display = "grid";

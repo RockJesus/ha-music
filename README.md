@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.2`
+   - URL：`/local/ha-music.js?v=1.1.3`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -188,6 +188,10 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.1.3
+
+- 迷你播放器副标题去掉与歌名重复的歌手名；封面地址异常时回退音符图标。
 
 ### 1.1.2
 

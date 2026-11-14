@@ -22,9 +22,8 @@ const DOCK_STYLE = `
   }
   .cap {
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 9px);
-    left: 50%;
-    transform: translateX(-50%);
+    top: calc(env(safe-area-inset-top, 0px) + 56px);
+    right: max(16px, env(safe-area-inset-right, 0px));
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -48,7 +47,7 @@ const DOCK_STYLE = `
   }
   .cap .icon { display: inline-flex; color: #2ee6c5; }
   .cap:hover {
-    transform: translateX(-50%) translateY(-1px);
+    transform: translateY(-1px);
     border-color: rgba(46, 230, 197, 0.62);
     box-shadow:
       0 12px 34px rgba(0, 0, 0, 0.4),
@@ -88,7 +87,8 @@ const DOCK_STYLE = `
   }
   @media (max-width: 600px) {
     .cap {
-      top: calc(env(safe-area-inset-top, 0px) + 8px);
+      top: calc(env(safe-area-inset-top, 0px) + 58px);
+      right: max(12px, env(safe-area-inset-right, 0px));
       height: 32px;
       padding: 0 11px 0 9px;
       font-size: 10px;

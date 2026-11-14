@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.0`
+   - URL：`/local/ha-music.js?v=1.1.1`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -193,6 +193,10 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.1.1
+
+- 顶部悬浮胶囊改为右上角、位于 HA 顶栏下方空白区，避免遮挡仪表盘标签与标题。
 
 ### 1.1.0
 

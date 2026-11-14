@@ -135,9 +135,9 @@ const STYLE = `
   }
   .controls button[disabled] { opacity: 0.38; cursor: default; }
   .controls .toggle {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
     color: var(--hm-accent);
     background: rgba(46, 230, 197, 0.15);
   }

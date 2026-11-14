@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.4`
+   - URL：`/local/ha-music.js?v=1.1.5`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -112,6 +112,10 @@ entity: media_player.living_room
 - 关闭：编辑器选“关闭”，或移除资源 URL 里的 `dock` 参数。
 - 同一个 `ha-music.js` 既可作为 Lovelace 资源，也可作为全局模块加载；内部已防止重复 `customElements.define`。
 - 需要设置页等非仪表盘页面也加载时，再把模块地址加入 `frontend.extra_module_url`（可选）。
+
+### 面板自适应
+
+当卡片放在 HA 的面板视图（view `type: panel`）里时，会自动检测 `hui-panel-view` 并铺满面板可用宽高；普通 masonry/sections 视图仍按卡片内容高度渲染。
 
 ### 示例
 
@@ -188,6 +192,10 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.1.5
+
+- 面板视图（`type: panel`）自动识别 `hui-panel-view`，卡片铺满可用宽高，去掉圆角与 760px 内容宽度限制；窄面板自动切单列。
 
 ### 1.1.4
 

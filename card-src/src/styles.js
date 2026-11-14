@@ -14,6 +14,7 @@ export const cardStyles = css`
 
   .hm-card {
     position: relative;
+    box-sizing: border-box;
     isolation: isolate;
     overflow: hidden;
     border-radius: var(--hm-radius);
@@ -1791,6 +1792,89 @@ export const cardStyles = css`
     .hm-card[data-layout="compact"] .hm-volume .hm-range {
       flex: 1 1 auto;
       min-width: 72px;
+    }
+  }
+
+
+  /* ---------- 面板视图：自动铺满可用区域 ---------- */
+  :host([data-panel="true"]) {
+    height: 100%;
+  }
+
+  .hm-card[data-panel="true"] {
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .hm-card[data-panel="true"] .hm-body {
+    max-width: none;
+    padding: clamp(18px, 2.4vw, 40px);
+  }
+
+  .hm-card[data-panel="true"] .hm-main {
+    grid-template-columns: minmax(180px, 34%) minmax(0, 1fr);
+    gap: clamp(20px, 3.2vw, 46px);
+  }
+
+  .hm-card[data-panel="true"] .hm-cover {
+    width: 100%;
+    border-radius: 24px;
+  }
+
+  .hm-card[data-panel="true"] .hm-title {
+    font-size: clamp(26px, 3.4cqi, 54px);
+    -webkit-line-clamp: 3;
+  }
+
+  .hm-card[data-panel="true"] .hm-artist {
+    font-size: clamp(14px, 1.45cqi, 20px);
+  }
+
+  .hm-card[data-panel="true"] .hm-vis {
+    height: clamp(30px, 4.2cqi, 62px);
+  }
+
+  .hm-card[data-panel="true"] .hm-controls {
+    gap: clamp(10px, 1.6cqi, 18px);
+  }
+
+  @container (max-width: 620px) {
+    .hm-card[data-panel="true"] .hm-body {
+      padding: 16px;
+    }
+
+    .hm-card[data-panel="true"] .hm-main {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      text-align: center;
+      gap: 14px;
+    }
+
+    .hm-card[data-panel="true"] .hm-cover {
+      width: min(58%, 250px);
+    }
+
+    .hm-card[data-panel="true"] .hm-meta {
+      align-items: center;
+      width: 100%;
+    }
+
+    .hm-card[data-panel="true"] .hm-tags {
+      justify-content: center;
+    }
+
+    .hm-card[data-panel="true"] .hm-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport {
+      justify-content: center;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume {
+      width: min(100%, 260px);
+      margin: 0 auto;
     }
   }
 

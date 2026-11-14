@@ -93,6 +93,7 @@ class HaMusicCard extends LitElement {
     this._activeEntity = "";
     this._sig = "";
     this._width = 0;
+    this._panel = false;
     this._tickTimer = null;
     this._toast = "";
     this._toastTimer = null;
@@ -1006,7 +1007,29 @@ class HaMusicCard extends LitElement {
       this._crossFadeArt(card, url);
     }
     this._syncRangeValues();
+    this._syncPanelFlag();
     this._installDock();
+  }
+
+  _isPanelContext() {
+    if (this.closest?.("hui-panel-view")) return true;
+    let root = this.getRootNode?.();
+    while (root) {
+      const host = root.host;
+      if (!host) break;
+      const tag = String(host.tagName || "").toLowerCase();
+      if (tag === "hui-panel-view") return true;
+      root = host.getRootNode?.();
+    }
+    return false;
+  }
+
+  _syncPanelFlag() {
+    const panel = this._isPanelContext();
+    if (panel === this._panel) return;
+    this._panel = panel;
+    this.setAttribute("data-panel", String(panel));
+    this.renderRoot?.querySelector?.(".hm-card")?.setAttribute("data-panel", String(panel));
   }
 
   _isPreviewContext() {
@@ -1142,7 +1165,7 @@ class HaMusicCard extends LitElement {
 
     if (!hass) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-theme=${themeKey} style=${styleMap(this._themeVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._themeVars())}>
           <div class="hm-body">
             <div class="hm-empty">${t("loading")}</div>
           </div>
@@ -1154,7 +1177,7 @@ class HaMusicCard extends LitElement {
     const state = hass.states?.[entityId];
     if (!state) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-theme=${themeKey} style=${styleMap(this._themeVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._themeVars())}>
           <div class="hm-body">
             <div class="hm-empty">
               ${entityId ? `实体未找到：${entityId}` : "ha-music: entity 未配置"}
@@ -1222,6 +1245,7 @@ class HaMusicCard extends LitElement {
         class="hm-card"
         data-theme=${themeKey}
         data-layout=${layout}
+        data-panel=${this._panel ? "true" : "false"}
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
         style=${styleMap(this._themeVars())}

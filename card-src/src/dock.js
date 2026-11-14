@@ -22,7 +22,7 @@ const DOCK_STYLE = `
   }
   .cap {
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 64px);
+    top: calc(env(safe-area-inset-top, 0px) + 9px);
     left: 50%;
     transform: translateX(-50%);
     display: inline-flex;
@@ -88,7 +88,7 @@ const DOCK_STYLE = `
   }
   @media (max-width: 600px) {
     .cap {
-      top: calc(env(safe-area-inset-top, 0px) + 58px);
+      top: calc(env(safe-area-inset-top, 0px) + 8px);
       height: 32px;
       padding: 0 11px 0 9px;
       font-size: 10px;

@@ -28,7 +28,7 @@ import {
   visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
-import { installDock } from "./dock.js";
+import { installDock, saveDockPref, clearDockPref, loadDockPref, uninstallDock } from "./dock.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -1029,9 +1029,23 @@ class HaMusicCard extends LitElement {
   }
 
   _installDock() {
-    if (!this._config?.dock || !this._hass || !this.isConnected) return;
+    const mode = this._config?.dock;
+    const entity =
+      this._eid?.() ||
+      this._config?.entity ||
+      (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
+    if (mode === "none") {
+      const pref = loadDockPref();
+      if (pref && (!entity || pref.entity === entity)) {
+        clearDockPref();
+        uninstallDock();
+      }
+      return;
+    }
+    if (!mode || !this._hass || !this.isConnected || !entity) return;
     if (this._isPreviewContext()) return;
-    installDock({ path: this._config.dock_path || "/ha-music-player" });
+    installDock({ mode, entity, hass: this._hass });
+    saveDockPref({ mode, entity });
   }
 
   _artUrlFor() {

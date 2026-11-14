@@ -457,13 +457,23 @@ class HaMusicEditor extends LitElement {
                 : "Leave empty to auto-detect the HA panel path"}
             </span>
           </label>
-          ${this._switch(
-            this._zh
-              ? "全局悬浮入口（顶部胶囊 + 右下角）"
-              : "Global dock (top pill + bottom-right)",
-            config.dock === true,
-            (checked) => this._update({ dock: checked })
-          )}
+          <label class="field">
+            <span class="label">${this._zh ? "全局迷你播放器" : "Global mini player"}</span>
+            <select
+              .value=${config.dock === true ? "top" : config.dock || "none"}
+              @change=${(e) => this._update({ dock: e.target.value })}
+            >
+              <option value="none">${this._zh ? "关闭" : "Off"}</option>
+              <option value="top">${this._zh ? "顶部播放器" : "Top bar"}</option>
+              <option value="sidebar">${this._zh ? "侧边栏播放器" : "Sidebar"}</option>
+              <option value="fab">${this._zh ? "右下角播放器" : "Bottom-right"}</option>
+            </select>
+            <span class="hint">
+              ${this._zh
+                ? "直接控制播放/暂停、上一首、下一首；不跳转页面"
+                : "Direct play/pause, previous and next controls; no page jump"}
+            </span>
+          </label>
         </div>
       </div>
     `;

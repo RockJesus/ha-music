@@ -1,6 +1,6 @@
-var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,zt=Symbol(),re=new WeakMap,it=class{constructor(t,e,a){if(this._$cssResult$=!0,a!==zt)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o,e=this.t;if(xt&&t===void 0){let a=e!==void 0&&e.length===1;a&&(t=re.get(e)),t===void 0&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),a&&re.set(e,t))}return t}toString(){return this.cssText}},ne=s=>new it(typeof s=="string"?s:s+"",void 0,zt),st=(s,...t)=>{let e=s.length===1?s[0]:t.reduce((a,i,r)=>a+(n=>{if(n._$cssResult$===!0)return n.cssText;if(typeof n=="number")return n;throw Error("Value passed to 'css' function must be a 'css' function result: "+n+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+s[r+1],s[0]);return new it(e,s,zt)},oe=(s,t)=>{if(xt)s.adoptedStyleSheets=t.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(let e of t){let a=document.createElement("style"),i=yt.litNonce;i!==void 0&&a.setAttribute("nonce",i),a.textContent=e.cssText,s.appendChild(a)}},Tt=xt?s=>s:s=>s instanceof CSSStyleSheet?(t=>{let e="";for(let a of t.cssRules)e+=a.cssText;return ne(e)})(s):s;var{is:Fe,defineProperty:He,getOwnPropertyDescriptor:Ve,getOwnPropertyNames:je,getOwnPropertySymbols:Be,getPrototypeOf:Ke}=Object,T=globalThis,le=T.trustedTypes,We=le?le.emptyScript:"",Ye=T.reactiveElementPolyfillSupport,rt=(s,t)=>s,Ut={toAttribute(s,t){switch(t){case Boolean:s=s?We:null;break;case Object:case Array:s=s==null?s:JSON.stringify(s)}return s},fromAttribute(s,t){let e=s;switch(t){case Boolean:e=s!==null;break;case Number:e=s===null?null:Number(s);break;case Object:case Array:try{e=JSON.parse(s)}catch{e=null}}return e}},ce=(s,t)=>!Fe(s,t),he={attribute:!0,type:String,converter:Ut,reflect:!1,useDefault:!1,hasChanged:ce};Symbol.metadata??(Symbol.metadata=Symbol("metadata")),T.litPropertyMetadata??(T.litPropertyMetadata=new WeakMap);var C=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??(this.l=[])).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=he){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){let a=Symbol(),i=this.getPropertyDescriptor(t,a,e);i!==void 0&&He(this.prototype,t,i)}}static getPropertyDescriptor(t,e,a){let{get:i,set:r}=Ve(this.prototype,t)??{get(){return this[e]},set(n){this[e]=n}};return{get:i,set(n){let l=i?.call(this);r?.call(this,n),this.requestUpdate(t,l,a)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??he}static _$Ei(){if(this.hasOwnProperty(rt("elementProperties")))return;let t=Ke(this);t.finalize(),t.l!==void 0&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(rt("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(rt("properties"))){let e=this.properties,a=[...je(e),...Be(e)];for(let i of a)this.createProperty(i,e[i])}let t=this[Symbol.metadata];if(t!==null){let e=litPropertyMetadata.get(t);if(e!==void 0)for(let[a,i]of e)this.elementProperties.set(a,i)}this._$Eh=new Map;for(let[e,a]of this.elementProperties){let i=this._$Eu(e,a);i!==void 0&&this._$Eh.set(i,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){let e=[];if(Array.isArray(t)){let a=new Set(t.flat(1/0).reverse());for(let i of a)e.unshift(Tt(i))}else t!==void 0&&e.push(Tt(t));return e}static _$Eu(t,e){let a=e.attribute;return a===!1?void 0:typeof a=="string"?a:typeof t=="string"?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??(this._$EO=new Set)).add(t),this.renderRoot!==void 0&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){let t=new Map,e=this.constructor.elementProperties;for(let a of e.keys())this.hasOwnProperty(a)&&(t.set(a,this[a]),delete this[a]);t.size>0&&(this._$Ep=t)}createRenderRoot(){let t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return oe(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??(this.renderRoot=this.createRenderRoot()),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,a){this._$AK(t,a)}_$ET(t,e){let a=this.constructor.elementProperties.get(t),i=this.constructor._$Eu(t,a);if(i!==void 0&&a.reflect===!0){let r=(a.converter?.toAttribute!==void 0?a.converter:Ut).toAttribute(e,a.type);this._$Em=t,r==null?this.removeAttribute(i):this.setAttribute(i,r),this._$Em=null}}_$AK(t,e){let a=this.constructor,i=a._$Eh.get(t);if(i!==void 0&&this._$Em!==i){let r=a.getPropertyOptions(i),n=typeof r.converter=="function"?{fromAttribute:r.converter}:r.converter?.fromAttribute!==void 0?r.converter:Ut;this._$Em=i;let l=n.fromAttribute(e,r.type);this[i]=l??this._$Ej?.get(i)??l,this._$Em=null}}requestUpdate(t,e,a,i=!1,r){if(t!==void 0){let n=this.constructor;if(i===!1&&(r=this[t]),a??(a=n.getPropertyOptions(t)),!((a.hasChanged??ce)(r,e)||a.useDefault&&a.reflect&&r===this._$Ej?.get(t)&&!this.hasAttribute(n._$Eu(t,a))))return;this.C(t,e,a)}this.isUpdatePending===!1&&(this._$ES=this._$EP())}C(t,e,{useDefault:a,reflect:i,wrapped:r},n){a&&!(this._$Ej??(this._$Ej=new Map)).has(t)&&(this._$Ej.set(t,n??e??this[t]),r!==!0||n!==void 0)||(this._$AL.has(t)||(this.hasUpdated||a||(e=void 0),this._$AL.set(t,e)),i===!0&&this._$Em!==t&&(this._$Eq??(this._$Eq=new Set)).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}let t=this.scheduleUpdate();return t!=null&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??(this.renderRoot=this.createRenderRoot()),this._$Ep){for(let[i,r]of this._$Ep)this[i]=r;this._$Ep=void 0}let a=this.constructor.elementProperties;if(a.size>0)for(let[i,r]of a){let{wrapped:n}=r,l=this[i];n!==!0||this._$AL.has(i)||l===void 0||this.C(i,void 0,r,l)}}let t=!1,e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(a=>a.hostUpdate?.()),this.update(e)):this._$EM()}catch(a){throw t=!1,this._$EM(),a}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&(this._$Eq=this._$Eq.forEach(e=>this._$ET(e,this[e]))),this._$EM()}updated(t){}firstUpdated(t){}};C.elementStyles=[],C.shadowRootOptions={mode:"open"},C[rt("elementProperties")]=new Map,C[rt("finalized")]=new Map,Ye?.({ReactiveElement:C}),(T.reactiveElementVersions??(T.reactiveElementVersions=[])).push("2.1.2");var ot=globalThis,pe=s=>s,vt=ot.trustedTypes,de=vt?vt.createPolicy("lit-html",{createHTML:s=>s}):void 0,_e="$lit$",U=`lit$${Math.random().toFixed(9).slice(2)}$`,ye="?"+U,Ge=`<${ye}>`,j=document,lt=()=>j.createComment(""),ht=s=>s===null||typeof s!="object"&&typeof s!="function",Dt=Array.isArray,Qe=s=>Dt(s)||typeof s?.[Symbol.iterator]=="function",Rt=`[ 	
-\f\r]`,nt=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,ue=/-->/g,me=/>/g,H=RegExp(`>|${Rt}(?:([^\\s"'>=/]+)(${Rt}*=${Rt}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`,"g"),ge=/'/g,be=/"/g,xe=/^(?:script|style|textarea|title)$/i,Ft=s=>(t,...e)=>({_$litType$:s,strings:t,values:e}),c=Ft(1),m=Ft(2),_a=Ft(3),P=Symbol.for("lit-noChange"),p=Symbol.for("lit-nothing"),fe=new WeakMap,V=j.createTreeWalker(j,129);function ve(s,t){if(!Dt(s)||!s.hasOwnProperty("raw"))throw Error("invalid template strings array");return de!==void 0?de.createHTML(t):t}var Ze=(s,t)=>{let e=s.length-1,a=[],i,r=t===2?"<svg>":t===3?"<math>":"",n=nt;for(let l=0;l<e;l++){let o=s[l],h,d,u=-1,b=0;for(;b<o.length&&(n.lastIndex=b,d=n.exec(o),d!==null);)b=n.lastIndex,n===nt?d[1]==="!--"?n=ue:d[1]!==void 0?n=me:d[2]!==void 0?(xe.test(d[2])&&(i=RegExp("</"+d[2],"g")),n=H):d[3]!==void 0&&(n=H):n===H?d[0]===">"?(n=i??nt,u=-1):d[1]===void 0?u=-2:(u=n.lastIndex-d[2].length,h=d[1],n=d[3]===void 0?H:d[3]==='"'?be:ge):n===be||n===ge?n=H:n===ue||n===me?n=nt:(n=H,i=void 0);let x=n===H&&s[l+1].startsWith("/>")?" ":"";r+=n===nt?o+Ge:u>=0?(a.push(h),o.slice(0,u)+_e+o.slice(u)+U+x):o+U+(u===-2?l:x)}return[ve(s,r+(s[e]||"<?>")+(t===2?"</svg>":t===3?"</math>":"")),a]},ct=class s{constructor({strings:t,_$litType$:e},a){let i;this.parts=[];let r=0,n=0,l=t.length-1,o=this.parts,[h,d]=Ze(t,e);if(this.el=s.createElement(h,a),V.currentNode=this.el.content,e===2||e===3){let u=this.el.content.firstChild;u.replaceWith(...u.childNodes)}for(;(i=V.nextNode())!==null&&o.length<l;){if(i.nodeType===1){if(i.hasAttributes())for(let u of i.getAttributeNames())if(u.endsWith(_e)){let b=d[n++],x=i.getAttribute(u).split(U),f=/([.?@])?(.*)/.exec(b);o.push({type:1,index:r,name:f[2],strings:x,ctor:f[1]==="."?Lt:f[1]==="?"?Nt:f[1]==="@"?It:Q}),i.removeAttribute(u)}else u.startsWith(U)&&(o.push({type:6,index:r}),i.removeAttribute(u));if(xe.test(i.tagName)){let u=i.textContent.split(U),b=u.length-1;if(b>0){i.textContent=vt?vt.emptyScript:"";for(let x=0;x<b;x++)i.append(u[x],lt()),V.nextNode(),o.push({type:2,index:++r});i.append(u[b],lt())}}}else if(i.nodeType===8)if(i.data===ye)o.push({type:2,index:r});else{let u=-1;for(;(u=i.data.indexOf(U,u+1))!==-1;)o.push({type:7,index:r}),u+=U.length-1}r++}}static createElement(t,e){let a=j.createElement("template");return a.innerHTML=t,a}};function G(s,t,e=s,a){if(t===P)return t;let i=a!==void 0?e._$Co?.[a]:e._$Cl,r=ht(t)?void 0:t._$litDirective$;return i?.constructor!==r&&(i?._$AO?.(!1),r===void 0?i=void 0:(i=new r(s),i._$AT(s,e,a)),a!==void 0?(e._$Co??(e._$Co=[]))[a]=i:e._$Cl=i),i!==void 0&&(t=G(s,i._$AS(s,t.values),i,a)),t}var Ot=class{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){let{el:{content:e},parts:a}=this._$AD,i=(t?.creationScope??j).importNode(e,!0);V.currentNode=i;let r=V.nextNode(),n=0,l=0,o=a[0];for(;o!==void 0;){if(n===o.index){let h;o.type===2?h=new pt(r,r.nextSibling,this,t):o.type===1?h=new o.ctor(r,o.name,o.strings,this,t):o.type===6&&(h=new qt(r,this,t)),this._$AV.push(h),o=a[++l]}n!==o?.index&&(r=V.nextNode(),n++)}return V.currentNode=j,i}p(t){let e=0;for(let a of this._$AV)a!==void 0&&(a.strings!==void 0?(a._$AI(t,a,e),e+=a.strings.length-2):a._$AI(t[e])),e++}},pt=class s{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,a,i){this.type=2,this._$AH=p,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=a,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode,e=this._$AM;return e!==void 0&&t?.nodeType===11&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=G(this,t,e),ht(t)?t===p||t==null||t===""?(this._$AH!==p&&this._$AR(),this._$AH=p):t!==this._$AH&&t!==P&&this._(t):t._$litType$!==void 0?this.$(t):t.nodeType!==void 0?this.T(t):Qe(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==p&&ht(this._$AH)?this._$AA.nextSibling.data=t:this.T(j.createTextNode(t)),this._$AH=t}$(t){let{values:e,_$litType$:a}=t,i=typeof a=="number"?this._$AC(t):(a.el===void 0&&(a.el=ct.createElement(ve(a.h,a.h[0]),this.options)),a);if(this._$AH?._$AD===i)this._$AH.p(e);else{let r=new Ot(i,this),n=r.u(this.options);r.p(e),this.T(n),this._$AH=r}}_$AC(t){let e=fe.get(t.strings);return e===void 0&&fe.set(t.strings,e=new ct(t)),e}k(t){Dt(this._$AH)||(this._$AH=[],this._$AR());let e=this._$AH,a,i=0;for(let r of t)i===e.length?e.push(a=new s(this.O(lt()),this.O(lt()),this,this.options)):a=e[i],a._$AI(r),i++;i<e.length&&(this._$AR(a&&a._$AB.nextSibling,i),e.length=i)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){let a=pe(t).nextSibling;pe(t).remove(),t=a}}setConnected(t){this._$AM===void 0&&(this._$Cv=t,this._$AP?.(t))}},Q=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,a,i,r){this.type=1,this._$AH=p,this._$AN=void 0,this.element=t,this.name=e,this._$AM=i,this.options=r,a.length>2||a[0]!==""||a[1]!==""?(this._$AH=Array(a.length-1).fill(new String),this.strings=a):this._$AH=p}_$AI(t,e=this,a,i){let r=this.strings,n=!1;if(r===void 0)t=G(this,t,e,0),n=!ht(t)||t!==this._$AH&&t!==P,n&&(this._$AH=t);else{let l=t,o,h;for(t=r[0],o=0;o<r.length-1;o++)h=G(this,l[a+o],e,o),h===P&&(h=this._$AH[o]),n||(n=!ht(h)||h!==this._$AH[o]),h===p?t=p:t!==p&&(t+=(h??"")+r[o+1]),this._$AH[o]=h}n&&!i&&this.j(t)}j(t){t===p?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}},Lt=class extends Q{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===p?void 0:t}},Nt=class extends Q{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==p)}},It=class extends Q{constructor(t,e,a,i,r){super(t,e,a,i,r),this.type=5}_$AI(t,e=this){if((t=G(this,t,e,0)??p)===P)return;let a=this._$AH,i=t===p&&a!==p||t.capture!==a.capture||t.once!==a.once||t.passive!==a.passive,r=t!==p&&(a===p||i);i&&this.element.removeEventListener(this.name,this,a),r&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){typeof this._$AH=="function"?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}},qt=class{constructor(t,e,a){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=a}get _$AU(){return this._$AM._$AU}_$AI(t){G(this,t)}};var Xe=ot.litHtmlPolyfillSupport;Xe?.(ct,pt),(ot.litHtmlVersions??(ot.litHtmlVersions=[])).push("3.3.3");var we=(s,t,e)=>{let a=e?.renderBefore??t,i=a._$litPart$;if(i===void 0){let r=e?.renderBefore??null;a._$litPart$=i=new pt(t.insertBefore(lt(),r),r,void 0,e??{})}return i._$AI(s),i};var dt=globalThis,A=class extends C{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){var e;let t=super.createRenderRoot();return(e=this.renderOptions).renderBefore??(e.renderBefore=t.firstChild),t}update(t){let e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=we(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return P}};A._$litElement$=!0,A.finalized=!0,dt.litElementHydrateSupport?.({LitElement:A});var Je=dt.litElementPolyfillSupport;Je?.({LitElement:A});(dt.litElementVersions??(dt.litElementVersions=[])).push("4.2.2");var $e={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},ke=s=>(...t)=>({_$litDirective$:s,values:t}),wt=class{constructor(t){}get _$AU(){return this._$AM._$AU}_$AT(t,e,a){this._$Ct=t,this._$AM=e,this._$Ci=a}_$AS(t,e){return this.update(t,e)}update(t,e){return this.render(...e)}};var Ee="important",ta=" !"+Ee,z=ke(class extends wt{constructor(s){if(super(s),s.type!==$e.ATTRIBUTE||s.name!=="style"||s.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(s){return Object.keys(s).reduce((t,e)=>{let a=s[e];return a==null?t:t+`${e=e.includes("-")?e:e.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${a};`},"")}update(s,[t]){let{style:e}=s.element;if(this.ft===void 0)return this.ft=new Set(Object.keys(t)),this.render(t);for(let a of this.ft)t[a]==null&&(this.ft.delete(a),a.includes("-")?e.removeProperty(a):e[a]=null);for(let a in t){let i=t[a];if(i!=null){this.ft.add(a);let r=typeof i=="string"&&i.endsWith(ta);a.includes("-")||r?e.setProperty(a,r?i.slice(0,-11):i,r?Ee:""):e[a]=i}}return P}});var Ae=st`
+var xt=globalThis,vt=xt.ShadowRoot&&(xt.ShadyCSS===void 0||xt.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,Ot=Symbol(),ce=new WeakMap,at=class{constructor(t,e,i){if(this._$cssResult$=!0,i!==Ot)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o,e=this.t;if(vt&&t===void 0){let i=e!==void 0&&e.length===1;i&&(t=ce.get(e)),t===void 0&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),i&&ce.set(e,t))}return t}toString(){return this.cssText}},de=s=>new at(typeof s=="string"?s:s+"",void 0,Ot),st=(s,...t)=>{let e=s.length===1?s[0]:t.reduce((i,a,r)=>i+(n=>{if(n._$cssResult$===!0)return n.cssText;if(typeof n=="number")return n;throw Error("Value passed to 'css' function must be a 'css' function result: "+n+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(a)+s[r+1],s[0]);return new at(e,s,Ot)},pe=(s,t)=>{if(vt)s.adoptedStyleSheets=t.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(let e of t){let i=document.createElement("style"),a=xt.litNonce;a!==void 0&&i.setAttribute("nonce",a),i.textContent=e.cssText,s.appendChild(i)}},Nt=vt?s=>s:s=>s instanceof CSSStyleSheet?(t=>{let e="";for(let i of t.cssRules)e+=i.cssText;return de(e)})(s):s;var{is:Je,defineProperty:Xe,getOwnPropertyDescriptor:Ze,getOwnPropertyNames:ti,getOwnPropertySymbols:ei,getPrototypeOf:ii}=Object,T=globalThis,ue=T.trustedTypes,ai=ue?ue.emptyScript:"",si=T.reactiveElementPolyfillSupport,rt=(s,t)=>s,Lt={toAttribute(s,t){switch(t){case Boolean:s=s?ai:null;break;case Object:case Array:s=s==null?s:JSON.stringify(s)}return s},fromAttribute(s,t){let e=s;switch(t){case Boolean:e=s!==null;break;case Number:e=s===null?null:Number(s);break;case Object:case Array:try{e=JSON.parse(s)}catch{e=null}}return e}},ge=(s,t)=>!Je(s,t),me={attribute:!0,type:String,converter:Lt,reflect:!1,useDefault:!1,hasChanged:ge};Symbol.metadata??(Symbol.metadata=Symbol("metadata")),T.litPropertyMetadata??(T.litPropertyMetadata=new WeakMap);var C=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??(this.l=[])).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=me){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){let i=Symbol(),a=this.getPropertyDescriptor(t,i,e);a!==void 0&&Xe(this.prototype,t,a)}}static getPropertyDescriptor(t,e,i){let{get:a,set:r}=Ze(this.prototype,t)??{get(){return this[e]},set(n){this[e]=n}};return{get:a,set(n){let l=a?.call(this);r?.call(this,n),this.requestUpdate(t,l,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??me}static _$Ei(){if(this.hasOwnProperty(rt("elementProperties")))return;let t=ii(this);t.finalize(),t.l!==void 0&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(rt("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(rt("properties"))){let e=this.properties,i=[...ti(e),...ei(e)];for(let a of i)this.createProperty(a,e[a])}let t=this[Symbol.metadata];if(t!==null){let e=litPropertyMetadata.get(t);if(e!==void 0)for(let[i,a]of e)this.elementProperties.set(i,a)}this._$Eh=new Map;for(let[e,i]of this.elementProperties){let a=this._$Eu(e,i);a!==void 0&&this._$Eh.set(a,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){let e=[];if(Array.isArray(t)){let i=new Set(t.flat(1/0).reverse());for(let a of i)e.unshift(Nt(a))}else t!==void 0&&e.push(Nt(t));return e}static _$Eu(t,e){let i=e.attribute;return i===!1?void 0:typeof i=="string"?i:typeof t=="string"?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??(this._$EO=new Set)).add(t),this.renderRoot!==void 0&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){let t=new Map,e=this.constructor.elementProperties;for(let i of e.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t)}createRenderRoot(){let t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return pe(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??(this.renderRoot=this.createRenderRoot()),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,i){this._$AK(t,i)}_$ET(t,e){let i=this.constructor.elementProperties.get(t),a=this.constructor._$Eu(t,i);if(a!==void 0&&i.reflect===!0){let r=(i.converter?.toAttribute!==void 0?i.converter:Lt).toAttribute(e,i.type);this._$Em=t,r==null?this.removeAttribute(a):this.setAttribute(a,r),this._$Em=null}}_$AK(t,e){let i=this.constructor,a=i._$Eh.get(t);if(a!==void 0&&this._$Em!==a){let r=i.getPropertyOptions(a),n=typeof r.converter=="function"?{fromAttribute:r.converter}:r.converter?.fromAttribute!==void 0?r.converter:Lt;this._$Em=a;let l=n.fromAttribute(e,r.type);this[a]=l??this._$Ej?.get(a)??l,this._$Em=null}}requestUpdate(t,e,i,a=!1,r){if(t!==void 0){let n=this.constructor;if(a===!1&&(r=this[t]),i??(i=n.getPropertyOptions(t)),!((i.hasChanged??ge)(r,e)||i.useDefault&&i.reflect&&r===this._$Ej?.get(t)&&!this.hasAttribute(n._$Eu(t,i))))return;this.C(t,e,i)}this.isUpdatePending===!1&&(this._$ES=this._$EP())}C(t,e,{useDefault:i,reflect:a,wrapped:r},n){i&&!(this._$Ej??(this._$Ej=new Map)).has(t)&&(this._$Ej.set(t,n??e??this[t]),r!==!0||n!==void 0)||(this._$AL.has(t)||(this.hasUpdated||i||(e=void 0),this._$AL.set(t,e)),a===!0&&this._$Em!==t&&(this._$Eq??(this._$Eq=new Set)).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}let t=this.scheduleUpdate();return t!=null&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??(this.renderRoot=this.createRenderRoot()),this._$Ep){for(let[a,r]of this._$Ep)this[a]=r;this._$Ep=void 0}let i=this.constructor.elementProperties;if(i.size>0)for(let[a,r]of i){let{wrapped:n}=r,l=this[a];n!==!0||this._$AL.has(a)||l===void 0||this.C(a,void 0,r,l)}}let t=!1,e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(i=>i.hostUpdate?.()),this.update(e)):this._$EM()}catch(i){throw t=!1,this._$EM(),i}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&(this._$Eq=this._$Eq.forEach(e=>this._$ET(e,this[e]))),this._$EM()}updated(t){}firstUpdated(t){}};C.elementStyles=[],C.shadowRootOptions={mode:"open"},C[rt("elementProperties")]=new Map,C[rt("finalized")]=new Map,si?.({ReactiveElement:C}),(T.reactiveElementVersions??(T.reactiveElementVersions=[])).push("2.1.2");var ot=globalThis,be=s=>s,wt=ot.trustedTypes,fe=wt?wt.createPolicy("lit-html",{createHTML:s=>s}):void 0,$e="$lit$",U=`lit$${Math.random().toFixed(9).slice(2)}$`,ke="?"+U,ri=`<${ke}>`,B=document,lt=()=>B.createComment(""),ht=s=>s===null||typeof s!="object"&&typeof s!="function",Bt=Array.isArray,ni=s=>Bt(s)||typeof s?.[Symbol.iterator]=="function",It=`[ 	
+\f\r]`,nt=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,_e=/-->/g,ye=/>/g,H=RegExp(`>|${It}(?:([^\\s"'>=/]+)(${It}*=${It}*(?:[^ 	
+\f\r"'\`<>=]|("|')|))|$)`,"g"),xe=/'/g,ve=/"/g,Ee=/^(?:script|style|textarea|title)$/i,jt=s=>(t,...e)=>({_$litType$:s,strings:t,values:e}),c=jt(1),m=jt(2),Ti=jt(3),P=Symbol.for("lit-noChange"),d=Symbol.for("lit-nothing"),we=new WeakMap,V=B.createTreeWalker(B,129);function Ae(s,t){if(!Bt(s)||!s.hasOwnProperty("raw"))throw Error("invalid template strings array");return fe!==void 0?fe.createHTML(t):t}var oi=(s,t)=>{let e=s.length-1,i=[],a,r=t===2?"<svg>":t===3?"<math>":"",n=nt;for(let l=0;l<e;l++){let o=s[l],h,p,u=-1,b=0;for(;b<o.length&&(n.lastIndex=b,p=n.exec(o),p!==null);)b=n.lastIndex,n===nt?p[1]==="!--"?n=_e:p[1]!==void 0?n=ye:p[2]!==void 0?(Ee.test(p[2])&&(a=RegExp("</"+p[2],"g")),n=H):p[3]!==void 0&&(n=H):n===H?p[0]===">"?(n=a??nt,u=-1):p[1]===void 0?u=-2:(u=n.lastIndex-p[2].length,h=p[1],n=p[3]===void 0?H:p[3]==='"'?ve:xe):n===ve||n===xe?n=H:n===_e||n===ye?n=nt:(n=H,a=void 0);let x=n===H&&s[l+1].startsWith("/>")?" ":"";r+=n===nt?o+ri:u>=0?(i.push(h),o.slice(0,u)+$e+o.slice(u)+U+x):o+U+(u===-2?l:x)}return[Ae(s,r+(s[e]||"<?>")+(t===2?"</svg>":t===3?"</math>":"")),i]},ct=class s{constructor({strings:t,_$litType$:e},i){let a;this.parts=[];let r=0,n=0,l=t.length-1,o=this.parts,[h,p]=oi(t,e);if(this.el=s.createElement(h,i),V.currentNode=this.el.content,e===2||e===3){let u=this.el.content.firstChild;u.replaceWith(...u.childNodes)}for(;(a=V.nextNode())!==null&&o.length<l;){if(a.nodeType===1){if(a.hasAttributes())for(let u of a.getAttributeNames())if(u.endsWith($e)){let b=p[n++],x=a.getAttribute(u).split(U),f=/([.?@])?(.*)/.exec(b);o.push({type:1,index:r,name:f[2],strings:x,ctor:f[1]==="."?Dt:f[1]==="?"?Ft:f[1]==="@"?Ht:Q}),a.removeAttribute(u)}else u.startsWith(U)&&(o.push({type:6,index:r}),a.removeAttribute(u));if(Ee.test(a.tagName)){let u=a.textContent.split(U),b=u.length-1;if(b>0){a.textContent=wt?wt.emptyScript:"";for(let x=0;x<b;x++)a.append(u[x],lt()),V.nextNode(),o.push({type:2,index:++r});a.append(u[b],lt())}}}else if(a.nodeType===8)if(a.data===ke)o.push({type:2,index:r});else{let u=-1;for(;(u=a.data.indexOf(U,u+1))!==-1;)o.push({type:7,index:r}),u+=U.length-1}r++}}static createElement(t,e){let i=B.createElement("template");return i.innerHTML=t,i}};function G(s,t,e=s,i){if(t===P)return t;let a=i!==void 0?e._$Co?.[i]:e._$Cl,r=ht(t)?void 0:t._$litDirective$;return a?.constructor!==r&&(a?._$AO?.(!1),r===void 0?a=void 0:(a=new r(s),a._$AT(s,e,i)),i!==void 0?(e._$Co??(e._$Co=[]))[i]=a:e._$Cl=a),a!==void 0&&(t=G(s,a._$AS(s,t.values),a,i)),t}var qt=class{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){let{el:{content:e},parts:i}=this._$AD,a=(t?.creationScope??B).importNode(e,!0);V.currentNode=a;let r=V.nextNode(),n=0,l=0,o=i[0];for(;o!==void 0;){if(n===o.index){let h;o.type===2?h=new dt(r,r.nextSibling,this,t):o.type===1?h=new o.ctor(r,o.name,o.strings,this,t):o.type===6&&(h=new Vt(r,this,t)),this._$AV.push(h),o=i[++l]}n!==o?.index&&(r=V.nextNode(),n++)}return V.currentNode=B,a}p(t){let e=0;for(let i of this._$AV)i!==void 0&&(i.strings!==void 0?(i._$AI(t,i,e),e+=i.strings.length-2):i._$AI(t[e])),e++}},dt=class s{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,i,a){this.type=2,this._$AH=d,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=i,this.options=a,this._$Cv=a?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode,e=this._$AM;return e!==void 0&&t?.nodeType===11&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=G(this,t,e),ht(t)?t===d||t==null||t===""?(this._$AH!==d&&this._$AR(),this._$AH=d):t!==this._$AH&&t!==P&&this._(t):t._$litType$!==void 0?this.$(t):t.nodeType!==void 0?this.T(t):ni(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==d&&ht(this._$AH)?this._$AA.nextSibling.data=t:this.T(B.createTextNode(t)),this._$AH=t}$(t){let{values:e,_$litType$:i}=t,a=typeof i=="number"?this._$AC(t):(i.el===void 0&&(i.el=ct.createElement(Ae(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===a)this._$AH.p(e);else{let r=new qt(a,this),n=r.u(this.options);r.p(e),this.T(n),this._$AH=r}}_$AC(t){let e=we.get(t.strings);return e===void 0&&we.set(t.strings,e=new ct(t)),e}k(t){Bt(this._$AH)||(this._$AH=[],this._$AR());let e=this._$AH,i,a=0;for(let r of t)a===e.length?e.push(i=new s(this.O(lt()),this.O(lt()),this,this.options)):i=e[a],i._$AI(r),a++;a<e.length&&(this._$AR(i&&i._$AB.nextSibling,a),e.length=a)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){let i=be(t).nextSibling;be(t).remove(),t=i}}setConnected(t){this._$AM===void 0&&(this._$Cv=t,this._$AP?.(t))}},Q=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,i,a,r){this.type=1,this._$AH=d,this._$AN=void 0,this.element=t,this.name=e,this._$AM=a,this.options=r,i.length>2||i[0]!==""||i[1]!==""?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=d}_$AI(t,e=this,i,a){let r=this.strings,n=!1;if(r===void 0)t=G(this,t,e,0),n=!ht(t)||t!==this._$AH&&t!==P,n&&(this._$AH=t);else{let l=t,o,h;for(t=r[0],o=0;o<r.length-1;o++)h=G(this,l[i+o],e,o),h===P&&(h=this._$AH[o]),n||(n=!ht(h)||h!==this._$AH[o]),h===d?t=d:t!==d&&(t+=(h??"")+r[o+1]),this._$AH[o]=h}n&&!a&&this.j(t)}j(t){t===d?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}},Dt=class extends Q{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===d?void 0:t}},Ft=class extends Q{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==d)}},Ht=class extends Q{constructor(t,e,i,a,r){super(t,e,i,a,r),this.type=5}_$AI(t,e=this){if((t=G(this,t,e,0)??d)===P)return;let i=this._$AH,a=t===d&&i!==d||t.capture!==i.capture||t.once!==i.once||t.passive!==i.passive,r=t!==d&&(i===d||a);a&&this.element.removeEventListener(this.name,this,i),r&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){typeof this._$AH=="function"?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}},Vt=class{constructor(t,e,i){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(t){G(this,t)}};var li=ot.litHtmlPolyfillSupport;li?.(ct,dt),(ot.litHtmlVersions??(ot.litHtmlVersions=[])).push("3.3.3");var Se=(s,t,e)=>{let i=e?.renderBefore??t,a=i._$litPart$;if(a===void 0){let r=e?.renderBefore??null;i._$litPart$=a=new dt(t.insertBefore(lt(),r),r,void 0,e??{})}return a._$AI(s),a};var pt=globalThis,A=class extends C{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){var e;let t=super.createRenderRoot();return(e=this.renderOptions).renderBefore??(e.renderBefore=t.firstChild),t}update(t){let e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=Se(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return P}};A._$litElement$=!0,A.finalized=!0,pt.litElementHydrateSupport?.({LitElement:A});var hi=pt.litElementPolyfillSupport;hi?.({LitElement:A});(pt.litElementVersions??(pt.litElementVersions=[])).push("4.2.2");var Me={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},Ce=s=>(...t)=>({_$litDirective$:s,values:t}),$t=class{constructor(t){}get _$AU(){return this._$AM._$AU}_$AT(t,e,i){this._$Ct=t,this._$AM=e,this._$Ci=i}_$AS(t,e){return this.update(t,e)}update(t,e){return this.render(...e)}};var Pe="important",ci=" !"+Pe,z=Ce(class extends $t{constructor(s){if(super(s),s.type!==Me.ATTRIBUTE||s.name!=="style"||s.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(s){return Object.keys(s).reduce((t,e)=>{let i=s[e];return i==null?t:t+`${e=e.includes("-")?e:e.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${i};`},"")}update(s,[t]){let{style:e}=s.element;if(this.ft===void 0)return this.ft=new Set(Object.keys(t)),this.render(t);for(let i of this.ft)t[i]==null&&(this.ft.delete(i),i.includes("-")?e.removeProperty(i):e[i]=null);for(let i in t){let a=t[i];if(a!=null){this.ft.add(i);let r=typeof a=="string"&&a.endsWith(ci);i.includes("-")||r?e.setProperty(i,r?a.slice(0,-11):a,r?Pe:""):e[i]=a}}return P}});var ze=st`
   :host {
     display: block;
     --hm-radius: 26px;
@@ -1812,136 +1812,218 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
       transition: none;
     }
   }
-`;var ea={play:m`<path d="M8.2 5.4c0-.7.8-1.1 1.4-.7l9.1 5.8c.6.4.6 1.3 0 1.7l-9.1 6.1c-.6.4-1.4 0-1.4-.7V5.4z" fill="currentColor"/>`,pause:m`<rect x="7" y="5.6" width="3.6" height="12.8" rx="1.2" fill="currentColor"/><rect x="13.4" y="5.6" width="3.6" height="12.8" rx="1.2" fill="currentColor"/>`,previous:m`<path d="M7 6.2v11.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M17.6 6.6c0-.6-.7-1-1.2-.6l-7.1 5.2c-.5.4-.5 1.2 0 1.6l7.1 5.2c.5.4 1.2 0 1.2-.6V6.6z" fill="currentColor"/>`,next:m`<path d="M17 6.2v11.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M6.4 6.6c0-.6.7-1 1.2-.6l7.1 5.2c.5.4.5 1.2 0 1.6l-7.1 5.2c-.5.4-1.2 0-1.2-.6V6.6z" fill="currentColor"/>`,shuffle:m`<path d="M4.5 7.2h3.2c1 0 1.9.5 2.5 1.3l4 5.4c.6.8 1.5 1.3 2.5 1.3h3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M4.5 16.8h3.2c1 0 1.9-.5 2.5-1.3l4-5.4c.6-.8 1.5-1.3 2.5-1.3h3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M16.2 4.6l3 2.6-3 2.6M16.2 12.6l3 2.6-3 2.6" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,repeat:m`<path d="M6.4 9.1V8.3c0-1.5 1.2-2.7 2.7-2.7h8.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.8 5.6l-2.3-2.2M17.8 5.6l-2.3 2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.6 14.9v.8c0 1.5-1.2 2.7-2.7 2.7H6.7" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M6.2 18.4l2.3 2.2M6.2 18.4l2.3-2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,repeatOne:m`<path d="M6.4 9.1V8.3c0-1.5 1.2-2.7 2.7-2.7h8.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.8 5.6l-2.3-2.2M17.8 5.6l-2.3 2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.6 14.9v.8c0 1.5-1.2 2.7-2.7 2.7H6.7" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M6.2 18.4l2.3 2.2M6.2 18.4l2.3-2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M11.2 9.3l1.1-.8v6.1" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M10.6 14.6h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>`,volume:m`<path d="M4.6 9.4h2.7l3.4-2.9c.5-.4 1.2 0 1.2.6v9.8c0 .6-.7 1-1.2.6L7.3 14.6H4.6c-.6 0-1-.4-1-1v-3.2c0-.6.4-1 1-1z" fill="currentColor"/><path d="M15.4 8.6c1.6 1 1.6 5.8 0 6.8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M17.6 6.4c2.9 2 2.9 9.2 0 11.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,mute:m`<path d="M4.6 9.4h2.7l3.4-2.9c.5-.4 1.2 0 1.2.6v9.8c0 .6-.7 1-1.2.6L7.3 14.6H4.6c-.6 0-1-.4-1-1v-3.2c0-.6.4-1 1-1z" fill="currentColor"/><path d="M15.2 9.6l4.6 4.8M19.8 9.6l-4.6 4.8" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,power:m`<path d="M12 4.2v7" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/><path d="M7.6 6.6a6.9 6.9 0 1 0 8.8 0" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,more:m`<circle cx="6.4" cy="12" r="1.55" fill="currentColor"/><circle cx="12" cy="12" r="1.55" fill="currentColor"/><circle cx="17.6" cy="12" r="1.55" fill="currentColor"/>`,library:m`<rect x="4.4" y="4.4" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13.2" y="4.4" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="4.4" y="13.2" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13.2" y="13.2" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/>`,queue:m`<path d="M5 7.2h10M5 11.4h7.4M5 15.6h5.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M15.6 12.4c0-.5.5-.8.9-.5l4 2.3c.4.2.4.8 0 1l-4 2.6c-.4.3-.9 0-.9-.5v-5.4z" fill="currentColor"/>`,chevronLeft:m`<path d="M14.6 6l-5.4 6 5.4 6" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,close:m`<path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,music:m`<path d="M14.5 5.2l4.6-1v9.1a3 3 0 1 1-1.8-2.7V7.1l-2.8.6v7.7a3 3 0 1 1-1.8-2.7V5.2z" fill="currentColor"/>`,group:m`<circle cx="9" cy="9.3" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.8 18.4c0-2.7 2.3-4.6 5.2-4.6s5.2 1.9 5.2 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16.2 6.4a3 3 0 0 1 0 5.9M18.6 18.4c0-2-1-3.6-2.6-4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,chevronRight:m`<path d="M9.4 6l5.4 6-5.4 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,playlist:m`<path d="M4 6.6h10.2M4 11h10.2M4 15.4h6.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M16.4 11.8l4 2.35-4 2.35z" fill="currentColor"/>`,external:m`<path d="M13.2 5.4h5.4v5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18.2 5.8l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 6.6H7.2c-1 0-1.8.8-1.8 1.8v8.4c0 1 .8 1.8 1.8 1.8h8.4c1 0 1.8-.8 1.8-1.8V14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,folder:m`<path d="M3.6 7.2c0-1 .8-1.8 1.8-1.8h3.4l1.8 2.2h9.8c1 0 1.8.8 1.8 1.8v7.4c0 1-.8 1.8-1.8 1.8H5.4c-1 0-1.8-.8-1.8-1.8V7.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>`,check:m`<path d="M6 12.6l4.2 4.2 7.8-9" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>`};function g(s,t=18){let e=ea[s];return e?m`<svg viewBox="0 0 24 24" width=${t} height=${t} aria-hidden="true" focusable="false">${e}</svg>`:p}var Me="1.1.1",Ce="ha-music",Pe="HA Music",_={PAUSE:1,SEEK:2,VOLUME_SET:4,VOLUME_MUTE:8,PREVIOUS_TRACK:16,NEXT_TRACK:32,TURN_ON:128,TURN_OFF:256,PLAY_MEDIA:512,VOLUME_STEP:1024,SELECT_SOURCE:2048,STOP:4096,CLEAR_PLAYLIST:8192,PLAY:16384,SHUFFLE_SET:32768,SELECT_SOUND_MODE:65536,BROWSE_MEDIA:131072,REPEAT_SET:262144,GROUPING:524288,SELECT:1048576};var Ht="aurora";var Vt={adaptive:{en:"Adaptive",zh:"\u81EA\u9002\u5E94"},full:{en:"Full",zh:"\u5B8C\u6574"},compact:{en:"Compact",zh:"\u7D27\u51D1"},mini:{en:"Mini",zh:"\u8FF7\u4F60"}},jt={ambient:{en:"Ambient blur",zh:"\u73AF\u5883\u6A21\u7CCA"},art:{en:"Cover fill",zh:"\u5C01\u9762\u94FA\u6EE1"},palette:{en:"Palette only",zh:"\u7EAF\u8272\u5F69"},none:{en:"Plain",zh:"\u65E0\u80CC\u666F"}},Bt={bars:{en:"Bars",zh:"\u67F1\u72B6"},wave:{en:"Wave",zh:"\u6CE2\u5F62"},orbit:{en:"Orbit",zh:"\u5149\u73AF"},none:{en:"Off",zh:"\u5173\u95ED"}},Z={aurora:{label:{en:"Aurora",zh:"\u6781\u5149"},accent:["#2ee6c5","#7b5cff"],base:"#050a12",glow:1,grid:!1},cyber:{label:{en:"Cyberpunk",zh:"\u8D5B\u535A\u670B\u514B"},accent:["#ff2fd0","#22e6ff"],base:"#08030f",glow:1.4,grid:!0},liquid:{label:{en:"Liquid Glass",zh:"\u6DB2\u6001\u73BB\u7483"},accent:["#a9d8ff","#cdb6ff"],base:"#090c16",glow:.8,grid:!1,glass:!0},velvet:{label:{en:"Velvet",zh:"\u5929\u9E45\u7ED2"},accent:["#ff7a9c","#a86bff"],base:"#0d050c",glow:1.15,grid:!1},mono:{label:{en:"Monochrome",zh:"\u9ED1\u767D"},accent:["#e9ecf5","#8d95a8"],base:"#08090c",glow:.4,grid:!1}},Se={play:"Play",pause:"Pause",playing:"Now playing",paused:"Paused",idle:"Standby",off:"Off",buffering:"Buffering",previous:"Previous track",next:"Next track",volume:"Volume",mute:"Mute",unmute:"Unmute",shuffle:"Shuffle",repeat:"Repeat",repeatAll:"Repeat all",repeatOne:"Repeat one",repeatOff:"Repeat off",source:"Source",soundMode:"Sound mode",queue:"Queue",library:"Library",assistant:"Music Assistant",playlists:"Playlists",playlistsEmpty:"No playlists found",playlistEmpty:"This playlist is empty or unavailable in Music Assistant",maPlayerRequired:"Playlists need a Music Assistant player",playlistUnavailable:"Unavailable",playingPlaylist:"Playing",openAssistant:"Open Music Assistant",more:"More info",power:"Power",group:"Group",groupLeave:"Leave group",loading:"Loading\u2026",queueEmpty:"Queue is empty",browseFailed:"Media library is unavailable",noMedia:"Nothing is playing",unknownArtist:"Unknown artist",noTitle:"No title",close:"Close",back:"Back",track:"Track",album:"Album",volumeEntityMissing:"Volume entity unavailable",seek:"Seek",remaining:"Toggle remaining time"},aa={play:"\u64AD\u653E",pause:"\u6682\u505C",playing:"\u6B63\u5728\u64AD\u653E",paused:"\u5DF2\u6682\u505C",idle:"\u5F85\u673A",off:"\u5DF2\u5173\u95ED",buffering:"\u7F13\u51B2\u4E2D",previous:"\u4E0A\u4E00\u9996",next:"\u4E0B\u4E00\u9996",volume:"\u97F3\u91CF",mute:"\u9759\u97F3",unmute:"\u53D6\u6D88\u9759\u97F3",shuffle:"\u968F\u673A\u64AD\u653E",repeat:"\u5FAA\u73AF",repeatAll:"\u5217\u8868\u5FAA\u73AF",repeatOne:"\u5355\u66F2\u5FAA\u73AF",repeatOff:"\u5173\u95ED\u5FAA\u73AF",source:"\u97F3\u6E90",soundMode:"\u58F0\u97F3\u6A21\u5F0F",queue:"\u64AD\u653E\u961F\u5217",library:"\u5A92\u4F53\u5E93",assistant:"Music Assistant",playlists:"\u64AD\u653E\u5217\u8868",playlistsEmpty:"\u6CA1\u6709\u627E\u5230\u64AD\u653E\u5217\u8868",playlistEmpty:"\u8BE5\u6B4C\u5355\u4E3A\u7A7A\u6216\u66F2\u76EE\u5728 Music Assistant \u4E2D\u4E0D\u53EF\u7528",maPlayerRequired:"\u5F53\u524D\u64AD\u653E\u5668\u4E0D\u662F Music Assistant \u64AD\u653E\u5668\uFF0C\u8BF7\u5148\u5207\u6362\u5230 MA \u64AD\u653E\u5668",playlistUnavailable:"\u4E0D\u53EF\u7528",playingPlaylist:"\u5F00\u59CB\u64AD\u653E",openAssistant:"\u6253\u5F00 Music Assistant",more:"\u66F4\u591A\u4FE1\u606F",power:"\u5F00\u5173",group:"\u5206\u7EC4",groupLeave:"\u9000\u51FA\u5206\u7EC4",loading:"\u52A0\u8F7D\u4E2D\u2026",queueEmpty:"\u64AD\u653E\u961F\u5217\u4E3A\u7A7A",browseFailed:"\u5A92\u4F53\u5E93\u6682\u4E0D\u53EF\u7528",noMedia:"\u5F53\u524D\u6CA1\u6709\u64AD\u653E\u5185\u5BB9",unknownArtist:"\u672A\u77E5\u827A\u672F\u5BB6",noTitle:"\u672A\u77E5\u66F2\u76EE",close:"\u5173\u95ED",back:"\u8FD4\u56DE",track:"\u66F2\u76EE",album:"\u4E13\u8F91",volumeEntityMissing:"\u97F3\u91CF\u5B9E\u4F53\u4E0D\u53EF\u7528",seek:"\u8FDB\u5EA6",remaining:"\u5207\u6362\u5269\u4F59\u65F6\u95F4"};function $t(s){return/^zh/i.test(s||"")}function E(s){let t=$t(s)?aa:Se;return e=>t[e]??Se[e]??e}var ia={playlist:{en:"Playlist",zh:"\u64AD\u653E\u5217\u8868"},album:{en:"Album",zh:"\u4E13\u8F91"},artist:{en:"Artist",zh:"\u827A\u672F\u5BB6"},track:{en:"Track",zh:"\u66F2\u76EE"},music:{en:"Music",zh:"\u97F3\u4E50"},video:{en:"Video",zh:"\u89C6\u9891"},directory:{en:"Folder",zh:"\u6587\u4EF6\u5939"},image:{en:"Image",zh:"\u56FE\u7247"},url:{en:"Link",zh:"\u94FE\u63A5"},app:{en:"App",zh:"\u5E94\u7528"},genre:{en:"Genre",zh:"\u98CE\u683C"}};function Kt(s,t){if(!s)return"";let e=ia[String(s).toLowerCase()];return e?$t(t)?e.zh:e.en:s}var v=(s,t,e)=>Math.min(e,Math.max(t,s));function ut(s,t="--:--"){if(!Number.isFinite(s)||s<0)return t;let e=Math.round(s),a=Math.floor(e/3600),i=Math.floor(e%3600/60),r=e%60;return a>0?`${a}:${String(i).padStart(2,"0")}:${String(r).padStart(2,"0")}`:`${i}:${String(r).padStart(2,"0")}`}function K(s){let t=String(s??""),e=2166136261;for(let a=0;a<t.length;a+=1)e^=t.charCodeAt(a),e=Math.imul(e,16777619);return e>>>0}function ze(s={}){let t=[s.title,s.artist,s.album].filter(Boolean).join("|")||"ha-music",e=K(t),a=1.7+(e>>>8)%90/100,i=e%360/360*Math.PI*2,r=Number.isFinite(s.position)&&s.position>0?s.position:0,n=r/a*Math.PI*2+i;return{seed:t,hash:e,period:a,phase:i,position:r,pulse:.5+.5*Math.sin(n),low:.5+.5*Math.sin(n+.55),energy:.55+(e>>>16)%100/220}}function sa(s){return K(s)%360}function y(s,t){let e=Number(s?.attributes?.supported_features??0);return!Number.isFinite(e)||!t?!1:(e&t)===t}function ra(s,t){if(!(!s||!t))return s.states?s.states[t]:void 0}function kt(s,t,e=""){return ra(s,t)?.attributes?.friendly_name||t||e}function R(s){let t=s?.attributes??{},e=t.media_metadata??{},a=Number(t.media_duration??e.duration??0),i=Number(t.media_position??0),r=t.media_position_updated_at;if(s?.state==="playing"&&r){let n=(Date.now()-new Date(r).getTime())/1e3;Number.isFinite(n)&&n>0&&(i+=n)}return Number.isFinite(a)&&a>0?i=v(i,0,a):(!Number.isFinite(i)||i<0)&&(i=0),{title:t.media_title||e.title||"",artist:t.media_artist||e.artist||t.media_album_artist||e.album_artist||"",album:t.media_album_name||e.album_name||"",series:t.media_series_title||e.series_title||"",track:t.media_track??e.track_number??"",duration:Number.isFinite(a)?a:0,position:Number.isFinite(i)?i:0,art:e.entity_picture||e.image_url||t.entity_picture||t.media_image_url||"",appName:t.app_name||"",source:t.source||"",soundMode:t.sound_mode||"",shuffle:!!t.shuffle,repeat:t.repeat||"off",volume:Number.isFinite(Number(t.volume_level))?Number(t.volume_level):null,muted:!!t.is_volume_muted,groupMembers:Array.isArray(t.group_members)?t.group_members:[]}}function Wt(s,t=60){let e=s?.attributes?.queue;return Array.isArray(e)?e.slice(0,t).map((a,i)=>({index:i,title:a.title||a.name||a.media_title||"",artist:a.artist||a.subtitle||a.media_artist||"",album:a.album||a.album_name||"",duration:Number(a.duration??a.media_duration??0)||0,art:a.entity_picture||a.thumbnail||a.artwork||"",contentId:a.media_content_id||a.content_id||"",contentType:a.media_content_type||a.content_type||"",active:!!(a.active||a.is_active||a.current||a.playing)})):[]}function O(s,t){return t?/^(https?:|data:|blob:)/.test(t)?t:s?.hassUrl?s.hassUrl(t):t:""}function B(s,t,e){let a=t/100,i=e/100,r=(1-Math.abs(2*i-1))*a,n=(s%360+360)%360/60,l=r*(1-Math.abs(n%2-1)),o=[0,0,0];n<1?o=[r,l,0]:n<2?o=[l,r,0]:n<3?o=[0,r,l]:n<4?o=[0,l,r]:n<5?o=[l,0,r]:o=[r,0,l];let h=i-r/2;return o.map(d=>Math.round(v((d+h)*255,0,255)))}function Te(s){let t=sa(s),e=(t+42+K(s+"2")%40)%360,a=B(t,72,58),i=B(e,68,52);return{a1:`hsl(${t} 72% 58%)`,a2:`hsl(${e} 68% 52%)`,rgb1:a.join(","),rgb2:i.join(",")}}function Ue(s){let t=String(s).replace("#","").trim(),e=t.length===3?t.split("").map(a=>a+a).join(""):t;return/^[0-9a-f]{6}$/i.test(e)?[parseInt(e.slice(0,2),16),parseInt(e.slice(2,4),16),parseInt(e.slice(4,6),16)].join(","):null}function Et(s,t="255,255,255"){let e=String(s||"").trim();if(/^#[0-9a-f]{3,8}$/i.test(e))return Ue(e.slice(0,7))||t;let a=e.match(/hsla?\(\s*([\d.]+)[,\s]+([\d.]+)%[,\s]+([\d.]+)%/i);if(a)return B(Number(a[1]),Number(a[2]),Number(a[3])).join(",");let i=e.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);return i?`${i[1]},${i[2]},${i[3]}`:t}function Yt(s){let t=Ue(s);if(!t)return{h:0,s:0,l:50};let[e,a,i]=t.split(",").map(u=>Number(u)/255),r=Math.max(e,a,i),n=Math.min(e,a,i),l=(r+n)/2,o=r-n,h=0,d=0;return o!==0&&(d=o/(1-Math.abs(2*l-1)),r===e?h=(a-i)/o%6:r===a?h=(i-e)/o+2:h=(e-a)/o+4,h=(h*60+360)%360),{h,s:d*100,l:l*100}}function Gt(s,t,e=.5){let a=(t.h-s.h+540)%360-180,i=(s.h+a*e+360)%360,r=s.s+(t.s-s.s)*e,n=s.l+(t.l-s.l)*e;return{h:i,s:r,l:n,css:`hsl(${Math.round(i)} ${Math.round(v(r,25,92))}% ${Math.round(v(n,38,72))}%)`,rgb:B(i,v(r,25,92),v(n,38,72)).join(",")}}var mt=new Map,na=40;function oa(s,t){let a=document.createElement("canvas");a.width=36,a.height=36;let i=a.getContext("2d",{willReadFrequently:!0});if(!i)return null;i.drawImage(s,0,0,36,36);let r=i.getImageData(0,0,36,36).data,n=new Map;for(let $=0;$<r.length;$+=4){if(r[$+3]<180)continue;let N=r[$],I=r[$+1],q=r[$+2],S=Math.max(N,I,q),J=Math.min(N,I,q),tt=(S+J)/510,bt=S===0?0:(S-J)/S;if(tt<.12||tt>.9||bt<.14)continue;let M=0,D=S-J;D!==0&&(S===N?M=(I-q)/D%6:S===I?M=(q-N)/D+2:M=(N-I)/D+4,M=(M*60+360)%360);let et=Math.floor(M/18),F=n.get(et)||{count:0,sat:0,light:0};F.count+=1,F.sat+=bt,F.light+=tt,n.set(et,F)}if(!n.size)return null;let l=[...n.entries()].map(([$,k])=>({hue:$*18+9,score:k.count*(.45+k.sat/k.count),sat:k.sat/k.count,light:k.light/k.count})).sort(($,k)=>k.score-$.score),o=l[0],h=l.find($=>{let k=Math.abs($.hue-o.hue);return Math.min(k,360-k)>28})||{hue:(o.hue+44)%360,sat:o.sat,light:o.light},d=$=>v(Math.round($*100),42,88),u=Math.round(o.hue),b=Math.round(h.hue),x=d(o.sat+.08),f=d(h.sat+.05),L=v(Math.round(o.light*100)+12,46,66),X=v(Math.round(h.light*100)+8,40,60);return{a1:`hsl(${u} ${x}% ${L}%)`,a2:`hsl(${b} ${f}% ${X}%)`,rgb1:B(u,x,L).join(","),rgb2:B(b,f,X).join(","),h1:u,s1:x,l1:L,h2:b,s2:f,l2:X,seed:K(t||"")}}function Re(s,t=""){if(!s)return Promise.resolve(null);if(mt.has(s))return mt.get(s);let e=new Promise(a=>{let i=new Image;i.crossOrigin="anonymous",i.decoding="async",i.onload=()=>{try{a(oa(i,t))}catch{a(null)}},i.onerror=()=>a(null),i.src=s});return mt.size>na&&mt.clear(),mt.set(s,e),e}var Qt="/ha-music-player",Oe='<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false"><path d="M14.5 5.2l4.6-1v9.1a3 3 0 1 1-1.8-2.7V7.1l-2.8.6v7.7a3 3 0 1 1-1.8-2.7V5.2z" fill="currentColor"/></svg>',la=`
+`;var di={play:m`<path d="M8.2 5.4c0-.7.8-1.1 1.4-.7l9.1 5.8c.6.4.6 1.3 0 1.7l-9.1 6.1c-.6.4-1.4 0-1.4-.7V5.4z" fill="currentColor"/>`,pause:m`<rect x="7" y="5.6" width="3.6" height="12.8" rx="1.2" fill="currentColor"/><rect x="13.4" y="5.6" width="3.6" height="12.8" rx="1.2" fill="currentColor"/>`,previous:m`<path d="M7 6.2v11.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M17.6 6.6c0-.6-.7-1-1.2-.6l-7.1 5.2c-.5.4-.5 1.2 0 1.6l7.1 5.2c.5.4 1.2 0 1.2-.6V6.6z" fill="currentColor"/>`,next:m`<path d="M17 6.2v11.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M6.4 6.6c0-.6.7-1 1.2-.6l7.1 5.2c.5.4.5 1.2 0 1.6l-7.1 5.2c-.5.4-1.2 0-1.2-.6V6.6z" fill="currentColor"/>`,shuffle:m`<path d="M4.5 7.2h3.2c1 0 1.9.5 2.5 1.3l4 5.4c.6.8 1.5 1.3 2.5 1.3h3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M4.5 16.8h3.2c1 0 1.9-.5 2.5-1.3l4-5.4c.6-.8 1.5-1.3 2.5-1.3h3.1" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M16.2 4.6l3 2.6-3 2.6M16.2 12.6l3 2.6-3 2.6" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,repeat:m`<path d="M6.4 9.1V8.3c0-1.5 1.2-2.7 2.7-2.7h8.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.8 5.6l-2.3-2.2M17.8 5.6l-2.3 2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.6 14.9v.8c0 1.5-1.2 2.7-2.7 2.7H6.7" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M6.2 18.4l2.3 2.2M6.2 18.4l2.3-2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,repeatOne:m`<path d="M6.4 9.1V8.3c0-1.5 1.2-2.7 2.7-2.7h8.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.8 5.6l-2.3-2.2M17.8 5.6l-2.3 2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M17.6 14.9v.8c0 1.5-1.2 2.7-2.7 2.7H6.7" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M6.2 18.4l2.3 2.2M6.2 18.4l2.3-2.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M11.2 9.3l1.1-.8v6.1" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M10.6 14.6h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>`,volume:m`<path d="M4.6 9.4h2.7l3.4-2.9c.5-.4 1.2 0 1.2.6v9.8c0 .6-.7 1-1.2.6L7.3 14.6H4.6c-.6 0-1-.4-1-1v-3.2c0-.6.4-1 1-1z" fill="currentColor"/><path d="M15.4 8.6c1.6 1 1.6 5.8 0 6.8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M17.6 6.4c2.9 2 2.9 9.2 0 11.2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,mute:m`<path d="M4.6 9.4h2.7l3.4-2.9c.5-.4 1.2 0 1.2.6v9.8c0 .6-.7 1-1.2.6L7.3 14.6H4.6c-.6 0-1-.4-1-1v-3.2c0-.6.4-1 1-1z" fill="currentColor"/><path d="M15.2 9.6l4.6 4.8M19.8 9.6l-4.6 4.8" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/>`,power:m`<path d="M12 4.2v7" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/><path d="M7.6 6.6a6.9 6.9 0 1 0 8.8 0" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,more:m`<circle cx="6.4" cy="12" r="1.55" fill="currentColor"/><circle cx="12" cy="12" r="1.55" fill="currentColor"/><circle cx="17.6" cy="12" r="1.55" fill="currentColor"/>`,library:m`<rect x="4.4" y="4.4" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13.2" y="4.4" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="4.4" y="13.2" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="13.2" y="13.2" width="6.4" height="6.4" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/>`,queue:m`<path d="M5 7.2h10M5 11.4h7.4M5 15.6h5.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M15.6 12.4c0-.5.5-.8.9-.5l4 2.3c.4.2.4.8 0 1l-4 2.6c-.4.3-.9 0-.9-.5v-5.4z" fill="currentColor"/>`,chevronLeft:m`<path d="M14.6 6l-5.4 6 5.4 6" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,close:m`<path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round"/>`,music:m`<path d="M14.5 5.2l4.6-1v9.1a3 3 0 1 1-1.8-2.7V7.1l-2.8.6v7.7a3 3 0 1 1-1.8-2.7V5.2z" fill="currentColor"/>`,group:m`<circle cx="9" cy="9.3" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.8 18.4c0-2.7 2.3-4.6 5.2-4.6s5.2 1.9 5.2 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16.2 6.4a3 3 0 0 1 0 5.9M18.6 18.4c0-2-1-3.6-2.6-4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,chevronRight:m`<path d="M9.4 6l5.4 6-5.4 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,playlist:m`<path d="M4 6.6h10.2M4 11h10.2M4 15.4h6.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M16.4 11.8l4 2.35-4 2.35z" fill="currentColor"/>`,external:m`<path d="M13.2 5.4h5.4v5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18.2 5.8l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M11 6.6H7.2c-1 0-1.8.8-1.8 1.8v8.4c0 1 .8 1.8 1.8 1.8h8.4c1 0 1.8-.8 1.8-1.8V14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`,folder:m`<path d="M3.6 7.2c0-1 .8-1.8 1.8-1.8h3.4l1.8 2.2h9.8c1 0 1.8.8 1.8 1.8v7.4c0 1-.8 1.8-1.8 1.8H5.4c-1 0-1.8-.8-1.8-1.8V7.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>`,check:m`<path d="M6 12.6l4.2 4.2 7.8-9" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>`};function g(s,t=18){let e=di[s];return e?m`<svg viewBox="0 0 24 24" width=${t} height=${t} aria-hidden="true" focusable="false">${e}</svg>`:d}var Ue="1.1.2",Re="ha-music",Oe="HA Music",_={PAUSE:1,SEEK:2,VOLUME_SET:4,VOLUME_MUTE:8,PREVIOUS_TRACK:16,NEXT_TRACK:32,TURN_ON:128,TURN_OFF:256,PLAY_MEDIA:512,VOLUME_STEP:1024,SELECT_SOURCE:2048,STOP:4096,CLEAR_PLAYLIST:8192,PLAY:16384,SHUFFLE_SET:32768,SELECT_SOUND_MODE:65536,BROWSE_MEDIA:131072,REPEAT_SET:262144,GROUPING:524288,SELECT:1048576};var Kt="aurora";var Wt={adaptive:{en:"Adaptive",zh:"\u81EA\u9002\u5E94"},full:{en:"Full",zh:"\u5B8C\u6574"},compact:{en:"Compact",zh:"\u7D27\u51D1"},mini:{en:"Mini",zh:"\u8FF7\u4F60"}},Yt={ambient:{en:"Ambient blur",zh:"\u73AF\u5883\u6A21\u7CCA"},art:{en:"Cover fill",zh:"\u5C01\u9762\u94FA\u6EE1"},palette:{en:"Palette only",zh:"\u7EAF\u8272\u5F69"},none:{en:"Plain",zh:"\u65E0\u80CC\u666F"}},Gt={bars:{en:"Bars",zh:"\u67F1\u72B6"},wave:{en:"Wave",zh:"\u6CE2\u5F62"},orbit:{en:"Orbit",zh:"\u5149\u73AF"},none:{en:"Off",zh:"\u5173\u95ED"}},J={aurora:{label:{en:"Aurora",zh:"\u6781\u5149"},accent:["#2ee6c5","#7b5cff"],base:"#050a12",glow:1,grid:!1},cyber:{label:{en:"Cyberpunk",zh:"\u8D5B\u535A\u670B\u514B"},accent:["#ff2fd0","#22e6ff"],base:"#08030f",glow:1.4,grid:!0},liquid:{label:{en:"Liquid Glass",zh:"\u6DB2\u6001\u73BB\u7483"},accent:["#a9d8ff","#cdb6ff"],base:"#090c16",glow:.8,grid:!1,glass:!0},velvet:{label:{en:"Velvet",zh:"\u5929\u9E45\u7ED2"},accent:["#ff7a9c","#a86bff"],base:"#0d050c",glow:1.15,grid:!1},mono:{label:{en:"Monochrome",zh:"\u9ED1\u767D"},accent:["#e9ecf5","#8d95a8"],base:"#08090c",glow:.4,grid:!1}},Te={play:"Play",pause:"Pause",playing:"Now playing",paused:"Paused",idle:"Standby",off:"Off",buffering:"Buffering",previous:"Previous track",next:"Next track",volume:"Volume",mute:"Mute",unmute:"Unmute",shuffle:"Shuffle",repeat:"Repeat",repeatAll:"Repeat all",repeatOne:"Repeat one",repeatOff:"Repeat off",source:"Source",soundMode:"Sound mode",queue:"Queue",library:"Library",assistant:"Music Assistant",playlists:"Playlists",playlistsEmpty:"No playlists found",playlistEmpty:"This playlist is empty or unavailable in Music Assistant",maPlayerRequired:"Playlists need a Music Assistant player",playlistUnavailable:"Unavailable",playingPlaylist:"Playing",openAssistant:"Open Music Assistant",more:"More info",power:"Power",group:"Group",groupLeave:"Leave group",loading:"Loading\u2026",queueEmpty:"Queue is empty",browseFailed:"Media library is unavailable",noMedia:"Nothing is playing",unknownArtist:"Unknown artist",noTitle:"No title",close:"Close",back:"Back",track:"Track",album:"Album",volumeEntityMissing:"Volume entity unavailable",seek:"Seek",remaining:"Toggle remaining time"},pi={play:"\u64AD\u653E",pause:"\u6682\u505C",playing:"\u6B63\u5728\u64AD\u653E",paused:"\u5DF2\u6682\u505C",idle:"\u5F85\u673A",off:"\u5DF2\u5173\u95ED",buffering:"\u7F13\u51B2\u4E2D",previous:"\u4E0A\u4E00\u9996",next:"\u4E0B\u4E00\u9996",volume:"\u97F3\u91CF",mute:"\u9759\u97F3",unmute:"\u53D6\u6D88\u9759\u97F3",shuffle:"\u968F\u673A\u64AD\u653E",repeat:"\u5FAA\u73AF",repeatAll:"\u5217\u8868\u5FAA\u73AF",repeatOne:"\u5355\u66F2\u5FAA\u73AF",repeatOff:"\u5173\u95ED\u5FAA\u73AF",source:"\u97F3\u6E90",soundMode:"\u58F0\u97F3\u6A21\u5F0F",queue:"\u64AD\u653E\u961F\u5217",library:"\u5A92\u4F53\u5E93",assistant:"Music Assistant",playlists:"\u64AD\u653E\u5217\u8868",playlistsEmpty:"\u6CA1\u6709\u627E\u5230\u64AD\u653E\u5217\u8868",playlistEmpty:"\u8BE5\u6B4C\u5355\u4E3A\u7A7A\u6216\u66F2\u76EE\u5728 Music Assistant \u4E2D\u4E0D\u53EF\u7528",maPlayerRequired:"\u5F53\u524D\u64AD\u653E\u5668\u4E0D\u662F Music Assistant \u64AD\u653E\u5668\uFF0C\u8BF7\u5148\u5207\u6362\u5230 MA \u64AD\u653E\u5668",playlistUnavailable:"\u4E0D\u53EF\u7528",playingPlaylist:"\u5F00\u59CB\u64AD\u653E",openAssistant:"\u6253\u5F00 Music Assistant",more:"\u66F4\u591A\u4FE1\u606F",power:"\u5F00\u5173",group:"\u5206\u7EC4",groupLeave:"\u9000\u51FA\u5206\u7EC4",loading:"\u52A0\u8F7D\u4E2D\u2026",queueEmpty:"\u64AD\u653E\u961F\u5217\u4E3A\u7A7A",browseFailed:"\u5A92\u4F53\u5E93\u6682\u4E0D\u53EF\u7528",noMedia:"\u5F53\u524D\u6CA1\u6709\u64AD\u653E\u5185\u5BB9",unknownArtist:"\u672A\u77E5\u827A\u672F\u5BB6",noTitle:"\u672A\u77E5\u66F2\u76EE",close:"\u5173\u95ED",back:"\u8FD4\u56DE",track:"\u66F2\u76EE",album:"\u4E13\u8F91",volumeEntityMissing:"\u97F3\u91CF\u5B9E\u4F53\u4E0D\u53EF\u7528",seek:"\u8FDB\u5EA6",remaining:"\u5207\u6362\u5269\u4F59\u65F6\u95F4"};function kt(s){return/^zh/i.test(s||"")}function E(s){let t=kt(s)?pi:Te;return e=>t[e]??Te[e]??e}var ui={playlist:{en:"Playlist",zh:"\u64AD\u653E\u5217\u8868"},album:{en:"Album",zh:"\u4E13\u8F91"},artist:{en:"Artist",zh:"\u827A\u672F\u5BB6"},track:{en:"Track",zh:"\u66F2\u76EE"},music:{en:"Music",zh:"\u97F3\u4E50"},video:{en:"Video",zh:"\u89C6\u9891"},directory:{en:"Folder",zh:"\u6587\u4EF6\u5939"},image:{en:"Image",zh:"\u56FE\u7247"},url:{en:"Link",zh:"\u94FE\u63A5"},app:{en:"App",zh:"\u5E94\u7528"},genre:{en:"Genre",zh:"\u98CE\u683C"}};function Qt(s,t){if(!s)return"";let e=ui[String(s).toLowerCase()];return e?kt(t)?e.zh:e.en:s}var v=(s,t,e)=>Math.min(e,Math.max(t,s));function ut(s,t="--:--"){if(!Number.isFinite(s)||s<0)return t;let e=Math.round(s),i=Math.floor(e/3600),a=Math.floor(e%3600/60),r=e%60;return i>0?`${i}:${String(a).padStart(2,"0")}:${String(r).padStart(2,"0")}`:`${a}:${String(r).padStart(2,"0")}`}function K(s){let t=String(s??""),e=2166136261;for(let i=0;i<t.length;i+=1)e^=t.charCodeAt(i),e=Math.imul(e,16777619);return e>>>0}function Ne(s={}){let t=[s.title,s.artist,s.album].filter(Boolean).join("|")||"ha-music",e=K(t),i=1.7+(e>>>8)%90/100,a=e%360/360*Math.PI*2,r=Number.isFinite(s.position)&&s.position>0?s.position:0,n=r/i*Math.PI*2+a;return{seed:t,hash:e,period:i,phase:a,position:r,pulse:.5+.5*Math.sin(n),low:.5+.5*Math.sin(n+.55),energy:.55+(e>>>16)%100/220}}function mi(s){return K(s)%360}function y(s,t){let e=Number(s?.attributes?.supported_features??0);return!Number.isFinite(e)||!t?!1:(e&t)===t}function gi(s,t){if(!(!s||!t))return s.states?s.states[t]:void 0}function Et(s,t,e=""){return gi(s,t)?.attributes?.friendly_name||t||e}function R(s){let t=s?.attributes??{},e=t.media_metadata??{},i=Number(t.media_duration??e.duration??0),a=Number(t.media_position??0),r=t.media_position_updated_at;if(s?.state==="playing"&&r){let n=(Date.now()-new Date(r).getTime())/1e3;Number.isFinite(n)&&n>0&&(a+=n)}return Number.isFinite(i)&&i>0?a=v(a,0,i):(!Number.isFinite(a)||a<0)&&(a=0),{title:t.media_title||e.title||"",artist:t.media_artist||e.artist||t.media_album_artist||e.album_artist||"",album:t.media_album_name||e.album_name||"",series:t.media_series_title||e.series_title||"",track:t.media_track??e.track_number??"",duration:Number.isFinite(i)?i:0,position:Number.isFinite(a)?a:0,art:e.entity_picture||e.image_url||t.entity_picture||t.media_image_url||"",appName:t.app_name||"",source:t.source||"",soundMode:t.sound_mode||"",shuffle:!!t.shuffle,repeat:t.repeat||"off",volume:Number.isFinite(Number(t.volume_level))?Number(t.volume_level):null,muted:!!t.is_volume_muted,groupMembers:Array.isArray(t.group_members)?t.group_members:[]}}function Jt(s,t=60){let e=s?.attributes?.queue;return Array.isArray(e)?e.slice(0,t).map((i,a)=>({index:a,title:i.title||i.name||i.media_title||"",artist:i.artist||i.subtitle||i.media_artist||"",album:i.album||i.album_name||"",duration:Number(i.duration??i.media_duration??0)||0,art:i.entity_picture||i.thumbnail||i.artwork||"",contentId:i.media_content_id||i.content_id||"",contentType:i.media_content_type||i.content_type||"",active:!!(i.active||i.is_active||i.current||i.playing)})):[]}function O(s,t){return t?/^(https?:|data:|blob:)/.test(t)?t:s?.hassUrl?s.hassUrl(t):t:""}function j(s,t,e){let i=t/100,a=e/100,r=(1-Math.abs(2*a-1))*i,n=(s%360+360)%360/60,l=r*(1-Math.abs(n%2-1)),o=[0,0,0];n<1?o=[r,l,0]:n<2?o=[l,r,0]:n<3?o=[0,r,l]:n<4?o=[0,l,r]:n<5?o=[l,0,r]:o=[r,0,l];let h=a-r/2;return o.map(p=>Math.round(v((p+h)*255,0,255)))}function Le(s){let t=mi(s),e=(t+42+K(s+"2")%40)%360,i=j(t,72,58),a=j(e,68,52);return{a1:`hsl(${t} 72% 58%)`,a2:`hsl(${e} 68% 52%)`,rgb1:i.join(","),rgb2:a.join(",")}}function Ie(s){let t=String(s).replace("#","").trim(),e=t.length===3?t.split("").map(i=>i+i).join(""):t;return/^[0-9a-f]{6}$/i.test(e)?[parseInt(e.slice(0,2),16),parseInt(e.slice(2,4),16),parseInt(e.slice(4,6),16)].join(","):null}function At(s,t="255,255,255"){let e=String(s||"").trim();if(/^#[0-9a-f]{3,8}$/i.test(e))return Ie(e.slice(0,7))||t;let i=e.match(/hsla?\(\s*([\d.]+)[,\s]+([\d.]+)%[,\s]+([\d.]+)%/i);if(i)return j(Number(i[1]),Number(i[2]),Number(i[3])).join(",");let a=e.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);return a?`${a[1]},${a[2]},${a[3]}`:t}function Xt(s){let t=Ie(s);if(!t)return{h:0,s:0,l:50};let[e,i,a]=t.split(",").map(u=>Number(u)/255),r=Math.max(e,i,a),n=Math.min(e,i,a),l=(r+n)/2,o=r-n,h=0,p=0;return o!==0&&(p=o/(1-Math.abs(2*l-1)),r===e?h=(i-a)/o%6:r===i?h=(a-e)/o+2:h=(e-i)/o+4,h=(h*60+360)%360),{h,s:p*100,l:l*100}}function Zt(s,t,e=.5){let i=(t.h-s.h+540)%360-180,a=(s.h+i*e+360)%360,r=s.s+(t.s-s.s)*e,n=s.l+(t.l-s.l)*e;return{h:a,s:r,l:n,css:`hsl(${Math.round(a)} ${Math.round(v(r,25,92))}% ${Math.round(v(n,38,72))}%)`,rgb:j(a,v(r,25,92),v(n,38,72)).join(",")}}var mt=new Map,bi=40;function fi(s,t){let i=document.createElement("canvas");i.width=36,i.height=36;let a=i.getContext("2d",{willReadFrequently:!0});if(!a)return null;a.drawImage(s,0,0,36,36);let r=a.getImageData(0,0,36,36).data,n=new Map;for(let $=0;$<r.length;$+=4){if(r[$+3]<180)continue;let L=r[$],I=r[$+1],q=r[$+2],S=Math.max(L,I,q),Z=Math.min(L,I,q),tt=(S+Z)/510,ft=S===0?0:(S-Z)/S;if(tt<.12||tt>.9||ft<.14)continue;let M=0,D=S-Z;D!==0&&(S===L?M=(I-q)/D%6:S===I?M=(q-L)/D+2:M=(L-I)/D+4,M=(M*60+360)%360);let et=Math.floor(M/18),F=n.get(et)||{count:0,sat:0,light:0};F.count+=1,F.sat+=ft,F.light+=tt,n.set(et,F)}if(!n.size)return null;let l=[...n.entries()].map(([$,k])=>({hue:$*18+9,score:k.count*(.45+k.sat/k.count),sat:k.sat/k.count,light:k.light/k.count})).sort(($,k)=>k.score-$.score),o=l[0],h=l.find($=>{let k=Math.abs($.hue-o.hue);return Math.min(k,360-k)>28})||{hue:(o.hue+44)%360,sat:o.sat,light:o.light},p=$=>v(Math.round($*100),42,88),u=Math.round(o.hue),b=Math.round(h.hue),x=p(o.sat+.08),f=p(h.sat+.05),N=v(Math.round(o.light*100)+12,46,66),X=v(Math.round(h.light*100)+8,40,60);return{a1:`hsl(${u} ${x}% ${N}%)`,a2:`hsl(${b} ${f}% ${X}%)`,rgb1:j(u,x,N).join(","),rgb2:j(b,f,X).join(","),h1:u,s1:x,l1:N,h2:b,s2:f,l2:X,seed:K(t||"")}}function qe(s,t=""){if(!s)return Promise.resolve(null);if(mt.has(s))return mt.get(s);let e=new Promise(i=>{let a=new Image;a.crossOrigin="anonymous",a.decoding="async",a.onload=()=>{try{i(fi(a,t))}catch{i(null)}},a.onerror=()=>i(null),a.src=s});return mt.size>bi&&mt.clear(),mt.set(s,e),e}var St="haMusicMiniPlayer",_i=new Set(["top","sidebar","fab"]),yi='<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M14.5 5.2l4.6-1v9.1a3 3 0 1 1-1.8-2.7V7.1l-2.8.6v7.7a3 3 0 1 1-1.8-2.7V5.2z" fill="currentColor"/></svg>',xi='<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/></svg>',vi='<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z" fill="currentColor"/></svg>',De='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>',wi='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>',$i=`
   :host {
     position: fixed;
     inset: 0;
     z-index: 2147483000;
     pointer-events: none;
+    --hm-accent: #2ee6c5;
+    --hm-accent-2: #7b5cff;
   }
   * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  button {
-    margin: 0;
-    font: inherit;
-    color: #eaf6ff;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
+  .mini {
     pointer-events: auto;
-  }
-  .cap {
     position: fixed;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px 9px;
+    border: 1px solid rgba(46, 230, 197, 0.3);
+    border-radius: 16px;
+    background:
+      linear-gradient(135deg, rgba(46, 230, 197, 0.14), rgba(123, 92, 255, 0.14)),
+      rgba(7, 11, 19, 0.82);
+    box-shadow:
+      0 14px 38px rgba(0, 0, 0, 0.4),
+      0 0 20px -6px rgba(46, 230, 197, 0.4);
+    backdrop-filter: blur(16px) saturate(1.25);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+    color: #eaf6ff;
+    font-family: var(--ha-font-family, "Noto Sans SC", "PingFang SC", system-ui, sans-serif);
+    transition: box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .mini:hover {
+    border-color: rgba(46, 230, 197, 0.5);
+    box-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.46),
+      0 0 26px -6px rgba(46, 230, 197, 0.5);
+  }
+  .mini[data-mode="top"] {
     top: calc(env(safe-area-inset-top, 0px) + 56px);
     right: max(16px, env(safe-area-inset-right, 0px));
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    height: 34px;
-    padding: 0 13px 0 10px;
-    border: 1px solid rgba(46, 230, 197, 0.34);
-    border-radius: 999px;
-    background:
-      linear-gradient(135deg, rgba(46, 230, 197, 0.16), rgba(123, 92, 255, 0.16)),
-      rgba(7, 11, 19, 0.76);
-    box-shadow:
-      0 10px 32px rgba(0, 0, 0, 0.34),
-      0 0 18px -4px rgba(46, 230, 197, 0.36);
-    backdrop-filter: blur(16px) saturate(1.25);
-    -webkit-backdrop-filter: blur(16px) saturate(1.25);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    width: min(420px, calc(100vw - 32px));
   }
-  .cap .icon { display: inline-flex; color: #2ee6c5; }
-  .cap:hover {
-    transform: translateY(-1px);
-    border-color: rgba(46, 230, 197, 0.62);
-    box-shadow:
-      0 12px 34px rgba(0, 0, 0, 0.4),
-      0 0 24px -4px rgba(46, 230, 197, 0.52);
+  .mini[data-mode="sidebar"] {
+    left: max(10px, env(safe-area-inset-left, 0px));
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+    width: 236px;
   }
-  .fab {
-    position: fixed;
-    right: max(18px, env(safe-area-inset-right, 0px));
+  .mini[data-mode="fab"] {
+    right: max(16px, env(safe-area-inset-right, 0px));
     bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
-    width: 52px;
-    height: 52px;
+    width: min(300px, calc(100vw - 32px));
+  }
+  .art {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    overflow: hidden;
     display: grid;
     place-items: center;
-    border: 1px solid rgba(46, 230, 197, 0.42);
-    border-radius: 50%;
-    background:
-      linear-gradient(135deg, rgba(46, 230, 197, 0.22), rgba(123, 92, 255, 0.2)),
-      rgba(7, 11, 19, 0.8);
-    box-shadow:
-      0 14px 38px rgba(0, 0, 0, 0.44),
-      0 0 22px -2px rgba(46, 230, 197, 0.46);
-    backdrop-filter: blur(16px) saturate(1.25);
-    -webkit-backdrop-filter: blur(16px) saturate(1.25);
-    color: #2ee6c5;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    color: var(--hm-accent);
+    background: linear-gradient(135deg, rgba(46, 230, 197, 0.2), rgba(123, 92, 255, 0.26));
   }
-  .fab:hover {
-    transform: translateY(-2px) scale(1.04);
-    box-shadow:
-      0 18px 42px rgba(0, 0, 0, 0.5),
-      0 0 30px -2px rgba(46, 230, 197, 0.62);
+  .art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
   }
-  .cap:active, .fab:active { transform: scale(0.96); }
-  .cap:focus-visible, .fab:focus-visible {
+  .art img[src] { display: block; }
+  .art .fallback { display: grid; place-items: center; }
+  .meta {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.2;
+  }
+  .title {
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #f2f9ff;
+  }
+  .sub {
+    min-width: 0;
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #9fb3c8;
+  }
+  .controls {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+  }
+  .controls button {
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: #c9d9e8;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  }
+  .controls button:hover { background: rgba(46, 230, 197, 0.13); color: var(--hm-accent); }
+  .controls button:active { transform: scale(0.92); }
+  .controls button:focus-visible {
     outline: 2px solid rgba(46, 230, 197, 0.8);
-    outline-offset: 3px;
+    outline-offset: 2px;
   }
-  @media (max-width: 600px) {
-    .cap {
+  .controls button[disabled] { opacity: 0.38; cursor: default; }
+  .controls .toggle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: var(--hm-accent);
+    background: rgba(46, 230, 197, 0.15);
+  }
+  .controls .toggle:hover { background: rgba(46, 230, 197, 0.24); }
+  .progress {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+  .progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--hm-accent), var(--hm-accent-2));
+    transition: width 0.5s linear;
+  }
+  @media (max-width: 700px) {
+    .mini[data-mode="top"] {
       top: calc(env(safe-area-inset-top, 0px) + 58px);
-      right: max(12px, env(safe-area-inset-right, 0px));
-      height: 32px;
-      padding: 0 11px 0 9px;
-      font-size: 10px;
+      left: max(10px, env(safe-area-inset-left, 0px));
+      right: max(10px, env(safe-area-inset-right, 0px));
+      width: auto;
     }
-    .fab {
-      width: 48px;
-      height: 48px;
-      right: max(14px, env(safe-area-inset-right, 0px));
+    .mini[data-mode="sidebar"] {
+      left: max(10px, env(safe-area-inset-left, 0px));
+      right: max(10px, env(safe-area-inset-right, 0px));
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
+      width: auto;
+    }
+    .mini[data-mode="fab"] {
+      right: max(12px, env(safe-area-inset-right, 0px));
       bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+      width: min(300px, calc(100vw - 24px));
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .cap, .fab { transition: none; }
+    .mini, .controls button, .progress span { transition: none; }
   }
-`;function Le(s){return typeof s!="string"||!s.startsWith("/")?Qt:s.trim()||Qt}function ha(s){try{window.history.pushState(null,"",s),window.dispatchEvent(new CustomEvent("location-changed",{bubbles:!0,composed:!0}))}catch{window.location.href=s}}function gt(s={}){if(typeof window>"u"||typeof document>"u")return null;let t={path:Le(s.path),top:s.top!==!1,fab:s.fab!==!1};if(!document.body)return document.addEventListener("DOMContentLoaded",()=>gt(t),{once:!0}),null;if(window.__haMusicDock)return window.__haMusicDock.configure(t),window.__haMusicDock;let e=document.createElement("ha-music-dock");return e.configure(t),document.body.appendChild(e),window.__haMusicDock=e,e}var Zt=class extends HTMLElement{constructor(){super(),this.attachShadow({mode:"open"}),this._config={path:Qt,top:!0,fab:!0},this._onRoute=()=>this._sync()}configure(t){this._config={path:Le(t?.path),top:t?.top!==!1,fab:t?.fab!==!1},this.shadowRoot?.childElementCount&&this._sync()}connectedCallback(){this._render(),window.addEventListener("location-changed",this._onRoute),window.addEventListener("popstate",this._onRoute),this._sync()}disconnectedCallback(){window.removeEventListener("location-changed",this._onRoute),window.removeEventListener("popstate",this._onRoute)}_render(){this.shadowRoot.innerHTML=`
-      <style>${la}</style>
-      <button class="cap" type="button" aria-label="\u6253\u5F00 HA Music" title="\u6253\u5F00 HA Music">
-        <span class="icon">${Oe}</span>
-        <span>HA Music</span>
-      </button>
-      <button class="fab" type="button" aria-label="\u6253\u5F00 HA Music" title="\u6253\u5F00 HA Music">
-        ${Oe}
-      </button>
-    `,this._cap=this.shadowRoot.querySelector(".cap"),this._fab=this.shadowRoot.querySelector(".fab"),this._cap?.addEventListener("click",()=>this._go()),this._fab?.addEventListener("click",()=>this._go())}_isOnPlayer(){let t=(window.location.pathname||"/").replace(/\/+$/,"")||"/",e=this._config.path.replace(/\/+$/,"")||"/";return t===e||t.startsWith(`${e}/`)}_sync(){let t=this._isOnPlayer();this._cap&&(this._cap.hidden=!this._config.top||t),this._fab&&(this._fab.hidden=!this._config.fab||t)}_go(){this._isOnPlayer()||ha(this._config.path)}};customElements.get("ha-music-dock")||customElements.define("ha-music-dock",Zt);var Xt=["off","all","one"],ca=260;function pa(s,t,e){let a=new CustomEvent(t,{bubbles:!0,composed:!0,cancelable:!1,detail:e});return s.dispatchEvent(a),a}function Jt(s,t,e,a,i){let r=[];for(let n=0;n<=s;n+=4){let l=t/2+Math.sin(n/e*Math.PI*2+i)*a+Math.sin(n/(e/2)*Math.PI*2+i*1.7)*(a*.32);r.push(`${n.toFixed(1)},${l.toFixed(2)}`)}return`M${r.join(" L")}`}function da(s){switch(s){case"playing":return"playing";case"buffering":return"buffering";case"paused":return"paused";case"idle":return"idle";case"off":return"off";default:return"idle"}}var te=class extends A{static get styles(){return Ae}static get properties(){return{_config:{state:!0},_width:{state:!1}}}constructor(){super(),this._config={},this._hass=void 0,this._activeEntity="",this._sig="",this._width=0,this._tickTimer=null,this._toast="",this._toastTimer=null,this._menu=null,this._seekPreview=null,this._volumePreview=null,this._showRemaining=!1,this._drawer=this._emptyDrawer(),this._artUrl="",this._artSlot=0,this._palette=null,this._paletteKey="",this._resizeObserver=null}set hass(t){let e=this._hass;if(this._hass=t,!t)return;let a=this._computeSig(t);(a!==this._sig||e===void 0)&&(this._sig=a,this.requestUpdate()),this._syncTimer()}get hass(){return this._hass}setConfig(t){if(!t)throw new Error("ha-music: \u914D\u7F6E\u4E0D\u80FD\u4E3A\u7A7A");let e=Array.isArray(t.entities)&&t.entities.length?t.entities.filter(Boolean):t.entity?[t.entity]:[];if(!e.length)throw new Error("ha-music: \u9700\u8981\u914D\u7F6E entity\uFF08media_player.*\uFF09\u6216 entities \u5217\u8868");this._config={...t},e.includes(this._activeEntity)||(this._activeEntity=e[0],this._palette=null,this._paletteKey="",this._artUrl=""),this._sig="",this._hass&&(this._sig=this._computeSig(this._hass)),this._syncTimer(),this.requestUpdate()}connectedCallback(){super.connectedCallback(),this._onKeyDown=t=>{t.key==="Escape"&&(this._drawer.open?this._closeDrawer():this._menu&&(this._menu=null,this.requestUpdate()))},window.addEventListener("keydown",this._onKeyDown),typeof ResizeObserver<"u"&&(this._resizeObserver=new ResizeObserver(t=>{let e=t[0]?.contentRect?.width||0;if(Math.abs(e-this._width)<1)return;this._width=e,(this._config?.layout||"adaptive")==="adaptive"&&this.requestUpdate()}),this._resizeObserver.observe(this))}disconnectedCallback(){super.disconnectedCallback(),this._onKeyDown&&(window.removeEventListener("keydown",this._onKeyDown),this._onKeyDown=null),this._stopTimer(),this._resizeObserver?.disconnect(),this._resizeObserver=null,this._toastTimer&&clearTimeout(this._toastTimer)}_entities(){let t=this._config||{};return(Array.isArray(t.entities)&&t.entities.length?t.entities:t.entity?[t.entity]:[]).filter(Boolean)}_eid(){let t=this._entities();return this._activeEntity||t[0]||""}_state(t=this._eid()){return this._hass?.states?.[t]}_computeSig(t){let e=this._eid(),a=t.states?.[e],i=a?.attributes||{},r=["media_title","media_artist","media_album_name","media_series_title","entity_picture","media_duration","media_position","media_position_updated_at","media_metadata","media_content_id","volume_level","is_volume_muted","shuffle","repeat","source","source_list","sound_mode","sound_mode_list","supported_features","group_members","app_name","queue","media_track"],n={};for(let d of r)d in i&&(n[d]=i[d]);let l=this._config?.volume_entity,o=l?t.states?.[l]?.state:null,h=this._entities().map(d=>{let u=t.states?.[d];return[d,u?.state,u?.attributes?.entity_picture]});return JSON.stringify([e,a?.state,n,o,h,t.language,this._config,this._menu,this._drawer.open,this._drawer.mode,this._drawer.cursor,this._drawer.items.length,this._drawer.loading,this._drawer.error,this._showRemaining,this._layoutKey()])}_syncTimer(){let t=this._state()?.state,e=t==="playing"||t==="buffering";e&&!this._tickTimer?this._tickTimer=setInterval(()=>this.requestUpdate(),500):e||this._stopTimer()}_stopTimer(){this._tickTimer&&(clearInterval(this._tickTimer),this._tickTimer=null)}_layoutKey(){let t=this._config?.layout||"adaptive";return t==="adaptive"?this._width&&this._width<430?"compact":"full":["full","compact","mini"].includes(t)?t:"full"}_themeKey(){let t=this._config?.theme;return t&&Z[t]?t:Ht}_themeVars(){let t=Z[this._themeKey()],e=this._paletteKey||this._eid()||"ha-music",a=Te(e),i=this._palette,r=this._config?.accent,n=this._config?.palette!==!1,l=t.accent[0],o=t.accent[1],h=Et(l),d=Et(o),u=h,b=Yt(t.accent[1]),x=Yt(a.a2);if(n){if(i){let f=Gt(b,{h:i.h2,s:i.s2,l:i.l2},.5);o=f.css,d=f.rgb,u=i.rgb1}else if(x){let f=Gt(b,x,.35);o=f.css,d=f.rgb}}return r&&(l=r,h=Et(r,h),n||(u=h)),{"--hm-base":t.base,"--hm-a1":l,"--hm-a2":o,"--hm-a1-rgb":h,"--hm-a2-rgb":d,"--hm-glow-rgb":u}}_volumeInfo(t){let e=this._config?.volume_entity,a=e?this._hass?.states?.[e]:void 0;if(a){let n=a.entity_id;if(n.startsWith("media_player."))return{domain:"media_player",entityId:n,level:Number(a.attributes?.volume_level??0),muted:!!a.attributes?.is_volume_muted,supported:!0,external:!0};if(n.startsWith("number.")){let l=Number(a.state);if(Number.isFinite(l))return{domain:"number",entityId:n,level:v(l/(a.attributes?.max||100),0,1),muted:!1,supported:!0,external:!0}}if(n.startsWith("input_number.")){let l=Number(a.state);if(Number.isFinite(l))return{domain:"input_number",entityId:n,level:v(l/(a.attributes?.max||100),0,1),muted:!1,supported:!0,external:!0}}}let i=this._state(),r=Number.isFinite(t.volume)||y(i,_.VOLUME_SET)||y(i,_.VOLUME_MUTE);return{domain:"media_player",entityId:this._eid(),level:Number.isFinite(t.volume)?t.volume:0,muted:t.muted,supported:r,external:!1}}_repeatValue(){let t=this._state()?.attributes?.repeat;return["off","all","one"].includes(t)?t:"off"}_call(t,e,a="media_player",i){let r=this._hass;if(!r?.callService)return Promise.resolve();let n=i??this._eid();try{let l=r.callService(a,t,{entity_id:n,...e});return Promise.resolve(l)}catch(l){return this._notify(l?.message||String(l)),Promise.reject(l)}}_guard(t){Promise.resolve(t).catch(e=>{let a=e?.message||String(e);this._notify(a.length>60?a.slice(0,60):a)})}_notify(t){this._toast=t||"",this.requestUpdate(),this._toastTimer&&clearTimeout(this._toastTimer),t&&(this._toastTimer=setTimeout(()=>{this._toast="",this.requestUpdate()},3600))}_togglePlay(){let t=this._state()?.state,e=t==="playing"||t==="buffering";this._guard(this._call(e?"media_pause":"media_play"))}_power(){let t=this._state()?.state,e=t==="off"||t==="standby";this._guard(this._call(e?"turn_on":"turn_off"))}_shuffle(){let t=!!this._state()?.attributes?.shuffle;this._guard(this._call("shuffle_set",{shuffle:!t}))}_repeat(){let t=this._repeatValue(),e=Xt.indexOf(t),a=Xt[(e+1)%Xt.length];this._guard(this._call("repeat_set",{repeat:a}))}_seekTo(t){Number.isFinite(t)&&this._guard(this._call("media_seek",{seek_position:t}))}_onSeekInput(t){if(!y(this._state(),_.SEEK))return;let e=t.target,a=Number(e.value);this._seekPreview=a;let i=R(this._state()).duration;e.style.setProperty("--pct",`${i?v(a/i*100,0,100):0}%`)}_onSeekCommit(t){if(!y(this._state(),_.SEEK)){this.requestUpdate();return}let e=Number(t.target.value);this._seekPreview=null,this._seekTo(e),this.requestUpdate()}_onVolumeInput(t){let e=Number(t.target.value)/100;this._volumePreview=e,t.target.style.setProperty("--pct",`${e*100}%`)}_onVolumeCommit(t){let e=v(Number(t.target.value)/100,0,1);this._volumePreview=null;let a=this._volumeInfo(R(this._state()));if(a.domain==="media_player")this._guard(this._call("volume_set",{volume_level:e},"media_player",a.entityId));else{let i=this._hass?.states?.[a.entityId],r=Number(i?.attributes?.max??100),n=Number(i?.attributes?.min??0);this._guard(this._call("set_value",{value:Math.round(n+e*(r-n))},a.domain,a.entityId))}this.requestUpdate()}_toggleMute(){let t=R(this._state()),e=this._volumeInfo(t);if(e.external){e.domain==="media_player"?this._guard(this._call("volume_mute",{is_volume_muted:!e.muted},"media_player",e.entityId)):this._notify(E(this._hass?.language)("volumeEntityMissing"));return}this._guard(this._call("volume_mute",{is_volume_muted:!t.muted}))}_selectSource(t){this._menu=null,this._guard(this._call("select_source",{source:t})),this.requestUpdate()}_selectSoundMode(t){this._menu=null,this._guard(this._call("select_sound_mode",{sound_mode:t})),this.requestUpdate()}_leaveGroup(){this._guard(this._call("unjoin"))}_playQueueItem(t){if(!t?.contentId){this._notify(E(this._hass?.language)("queueEmpty"));return}this._guard(this._call("play_media",{media_content_id:t.contentId,media_content_type:t.contentType||"music"}))}_playBrowseItem(t){t?.contentId&&this._guard(this._call("play_media",{media_content_id:t.contentId,media_content_type:t.contentType||"music"}))}_switchEntity(t){t!==this._activeEntity&&(this._activeEntity=t,this._palette=null,this._paletteKey="",this._artUrl="",this._menu=null,this._seekPreview=null,this._syncTimer(),this._sig=this._computeSig(this._hass),this.requestUpdate())}_moreInfo(){pa(this,"hass-more-info",{entityId:this._eid()})}_maEnabled(){let t=this._config?.music_assistant;if(t===!1)return!1;if(t===!0||typeof t=="string"&&t.trim()||this._hass?.services?.music_assistant?.play_media||this._entities().some(i=>{let r=this._hass?.states?.[i]?.attributes||{};return Object.keys(r).some(n=>n.startsWith("mass_"))}))return!0;let a=this._hass?.panels||{};return Object.keys(a).some(i=>{let r=a[i]||{};return r.component_name==="music_assistant"||/music[-_ ]?assistant/i.test(r.url_path||i)||/music\s*assistant/i.test(r.title||"")})}_isMaPlayer(t=this._eid()){let e=this._state(t)?.attributes||{};return Object.keys(e).some(a=>a.startsWith("mass_"))}_maUrl(){let t=this._config?.music_assistant;if(t===!1)return"";if(typeof t=="string"&&t.trim())return t.trim();let e=this._hass?.panels||{};for(let i of Object.keys(e)){let r=e[i]||{},n=r.url_path||i;if(r.component_name==="music_assistant"||/music[-_ ]?assistant/i.test(n)||/music\s*assistant/i.test(r.title||""))return`/${n}`}return this._entities().some(i=>{let r=this._hass?.states?.[i]?.attributes||{};return Object.keys(r).some(n=>n.startsWith("mass_"))})||t===!0?"/music-assistant":""}_openAssistant(){this._drawer?.open&&this._closeDrawer();let t=this._maUrl();if(!t)return;if(/^(https?:)?\/\//i.test(t)){window.open(t,"_blank","noopener");return}let e=t.startsWith("/")?t:`/${t}`;try{window.history.pushState(null,"",e),window.dispatchEvent(new Event("location-changed",{bubbles:!0,composed:!0}))}catch{window.location.href=e}}_onCardClick(t){if(!this._menu)return;(t.composedPath?.()||[]).some(i=>i?.classList?.contains?.("hm-menu")||i?.classList?.contains?.("hm-chip"))||(this._menu=null,this.requestUpdate())}_emptyDrawer(){return{open:!1,mode:null,nodes:[],cursor:-1,items:[],title:"",loading:!1,error:""}}_openQueue(){let t=E(this._hass?.language),e=Wt(this._state(),this._config?.max_queue??40);this._drawer={open:!0,mode:"queue",nodes:[],cursor:-1,items:e,title:t("queue"),loading:!1,error:""},this.requestUpdate()}_openLibrary(){let t=E(this._hass?.language);this._drawer={open:!0,mode:"library",nodes:[],cursor:-1,items:[],title:t("library"),loading:!0,error:"",t},this.requestUpdate(),this._fetchBrowse()}_openPlaylists(){let t=E(this._hass?.language);if(!this._isMaPlayer()){this._notify(t("maPlayerRequired"));return}this._drawer={open:!0,mode:"playlists",nodes:[],cursor:-1,items:[],title:t("playlists"),loading:!0,error:"",maUrl:this._maUrl()},this.requestUpdate(),this._fetchPlaylists()}async _browseMedia(t,e){let a=this._hass?.connection;if(!a?.sendMessagePromise)throw new Error("unsupported");let i={type:"media_player/browse_media",entity_id:this._eid()};return t&&(i.media_content_id=t,e&&(i.media_content_type=e)),a.sendMessagePromise(i)}async _fetchPlaylists(){let t=E(this._hass?.language);try{let a=(await this._browseMedia())?.children||[],i=a.find(l=>l.can_expand&&(/playlist/i.test(l.media_class||"")||/playlist/i.test(l.media_content_type||"")||/播放列表|playlists?/i.test(l.title||""))||!1),r=[];i&&(r=(await this._browseMedia(i.media_content_id,i.media_content_type))?.children||[]),r.length||(r=a.filter(l=>/playlist/i.test(l.media_class||"")));let n=r.map(l=>({title:l.title||"",subtitle:(()=>{let o=Kt(l.media_class,this._hass?.language);return o&&o!==t("playlists")?o:""})(),contentId:l.media_content_id||"",contentType:l.media_content_type||"playlist",thumb:l.thumbnail||""})).filter(l=>l.contentId);if(this._drawer.mode!=="playlists")return;this._drawer={...this._drawer,loading:!1,items:n,error:""}}catch(e){if(this._drawer.mode!=="playlists")return;this._drawer={...this._drawer,loading:!1,items:[],error:e?.message?`${t("browseFailed")} \xB7 ${String(e.message).slice(0,40)}`:t("browseFailed")}}this.requestUpdate()}async _playPlaylistItem(t){if(!t?.contentId)return;let e=E(this._hass?.language),a=this._eid();if(!this._isMaPlayer(a)){this._notify(e("maPlayerRequired"));return}let i=t.contentType||"playlist",r=()=>{this._notify(`${e("playingPlaylist")} \xB7 ${t.title||""}`),this._closeDrawer()},n=!!this._hass?.services?.music_assistant?.play_media,l=o=>{let h=o?.message||String(o);return/nothing to play here/i.test(h)?e("playlistEmpty"):h.length>60?h.slice(0,60):h};if(n)try{await this._hass.callService("music_assistant","play_media",{entity_id:a,media_id:t.contentId,media_type:"playlist",enqueue:"play"}),r();return}catch(o){let h=o?.message||String(o);if(/nothing to play here/i.test(h)){this._markPlaylistEmpty(t),this._notify(l(o));return}if(!/match|target|not a valid|does not support|unsupported/i.test(h)){this._notify(l(o));return}}try{await this._call("play_media",{media_content_id:t.contentId,media_content_type:i}),r()}catch(o){/nothing to play here/i.test(o?.message||"")&&this._markPlaylistEmpty(t),this._notify(l(o)||e("browseFailed"))}}_markPlaylistEmpty(t){this._drawer.mode==="playlists"&&(this._drawer={...this._drawer,items:this._drawer.items.map(e=>e.contentId===t.contentId?{...e,empty:!0}:e)},this.requestUpdate())}_closeDrawer(){this._drawer={...this._drawer,open:!1},this.requestUpdate(),setTimeout(()=>{this._drawer.open||(this._drawer=this._emptyDrawer(),this.requestUpdate())},ca)}async _fetchBrowse(){let t=this._hass,e=t?.connection,a=E(t?.language),i=this._drawer.cursor>=0?this._drawer.nodes[this._drawer.cursor]:null,r={type:"media_player/browse_media",entity_id:this._eid()};if(i&&(r.media_content_id=i.contentId,i.contentType&&(r.media_content_type=i.contentType)),this._drawer={...this._drawer,loading:!0,error:""},this.requestUpdate(),!e?.sendMessagePromise){this._drawer={...this._drawer,loading:!1,error:a("browseFailed")},this.requestUpdate();return}try{let n=await e.sendMessagePromise(r),l=(n?.children||[]).map(o=>({title:o.title||"",subtitle:Kt(o.media_class,this._hass?.language)||o.media_content_type||"",contentId:o.media_content_id||"",contentType:o.media_content_type||"",thumb:o.thumbnail||"",canPlay:!!o.can_play,canExpand:!!o.can_expand,cls:o.media_class||""}));if(this._drawer.mode!=="library")return;this._drawer={...this._drawer,loading:!1,items:l,title:i?.title||n?.title||a("library"),error:""}}catch(n){if(this._drawer.mode!=="library")return;this._drawer={...this._drawer,loading:!1,items:[],error:n?.message?`${a("browseFailed")} \xB7 ${String(n.message).slice(0,40)}`:a("browseFailed")}}this.requestUpdate()}_enterBrowseItem(t){if(!t.canExpand){t.canPlay&&this._playBrowseItem(t);return}let e=this._drawer.nodes.slice(0,this._drawer.cursor+1);e.push({contentId:t.contentId,contentType:t.contentType,title:t.title}),this._drawer={...this._drawer,nodes:e,cursor:e.length-1,title:t.title,items:[]},this.requestUpdate(),this._fetchBrowse()}_browseBack(){this._drawer.cursor<0||(this._drawer={...this._drawer,cursor:this._drawer.cursor-1,items:[]},this.requestUpdate(),this._fetchBrowse())}updated(){let t=this.renderRoot?.querySelector?.(".hm-card");if(!t)return;let e=this._artUrlFor();e!==this._artUrl&&(this._artUrl=e,this._crossFadeArt(t,e)),this._syncRangeValues(),this._installDock()}_isPreviewContext(){let t=this.getRootNode?.();for(;t;){let e=t.host;if(!e)break;let a=String(e.tagName||"").toLowerCase();if(a==="hui-card-preview"||a==="hui-card-options"||a==="hui-dialog-edit-card"||a==="ha-dialog")return!0;t=e.getRootNode?.()}return!!this.closest?.("hui-card-preview, hui-card-options")}_installDock(){!this._config?.dock||!this._hass||!this.isConnected||this._isPreviewContext()||gt({path:this._config.dock_path||"/ha-music-player"})}_artUrlFor(){let t=R(this._state());return O(this._hass,t.art)}_crossFadeArt(t,e){let a=t.querySelectorAll(".hm-bg-art");if(!a.length)return;let i=a.length>1?(this._artSlot+1)%2:0,r=a[i],n=a[this._artSlot];if(!e){a.forEach(o=>{o.classList.remove("on"),o.style.backgroundImage=""}),this._artSlot=0,this._maybePalette("");return}let l=new Image;l.decoding="async",l.onload=()=>{r.style.backgroundImage=`url("${e}")`,r.classList.add("on"),n?.classList.remove("on"),this._artSlot=i,this._maybePalette(e)},l.onerror=()=>{this._maybePalette("")},l.src=e}_maybePalette(t){let e=R(this._state()),a=t||`${e.title}|${e.artist}|${this._eid()}`;if(this._paletteKey!==a){if(this._paletteKey=a,!t){this._palette=null,this.requestUpdate();return}Re(t,a).then(i=>{this._paletteKey===a&&(this._palette=i,this.requestUpdate())})}}_syncRangeValues(){let t=this.renderRoot;if(!t)return;let e=t.querySelector?.('input.hm-range[data-role="seek"]'),a=t.querySelector?.('input.hm-range[data-role="volume"]'),i=R(this._state());if(e&&this._seekPreview===null){let r=i.duration||0,n=v(i.position,0,r||i.position);e.value=String(n),e.max=String(r||0),e.style.setProperty("--pct",`${r?v(n/r*100,0,100):0}%`)}if(a&&this._volumePreview===null){let r=this._volumeInfo(i);a.value=String(Math.round(r.level*100)),a.style.setProperty("--pct",`${r.level*100}%`),a.setAttribute("data-disabled",String(!r.supported))}}getCardSize(){let t=this._layoutKey();return t==="mini"?1:t==="compact"?3:6}render(){let t=this._hass,e=this._config||{},a=E(t?.language),i=this._layoutKey(),r=this._themeKey();if(!t)return c`
-        <div class="hm-card" data-layout=${i} data-theme=${r} style=${z(this._themeVars())}>
+`;function Ct(s){return s===!0||s==="1"?"top":_i.has(s)?s:"none"}function Pt(s){return typeof s=="string"&&s.startsWith("media_player.")?s:""}function Mt(){if(typeof document>"u")return null;let s=document.querySelector("home-assistant");if(s?.hass?.states)return s.hass;let t=s?.shadowRoot?.querySelector("home-assistant-main");if(t?.hass?.states)return t.hass;let e=document.querySelector("ha-music");return e?.hass?.states?e.hass:null}function gt(){try{let s=window.localStorage.getItem(St);if(!s)return null;let t=JSON.parse(s),e=Ct(t?.mode),i=Pt(t?.entity);return e==="none"||!i?null:{mode:e,entity:i}}catch{return null}}function Fe({mode:s,entity:t}){try{let e=Ct(s),i=Pt(t);if(e==="none"||!i){window.localStorage.removeItem(St);return}let a=gt();if(a?.mode===e&&a?.entity===i)return;window.localStorage.setItem(St,JSON.stringify({mode:e,entity:i}))}catch{}}function He(){try{window.localStorage.removeItem(St)}catch{}}function ee(){typeof document>"u"||(window.__haMusicDock?.remove(),window.__haMusicDock=null)}function bt(s={}){if(typeof window>"u"||typeof document>"u")return null;let t=Ct(s.mode);if(t==="none")return ee(),null;let e={mode:t,entity:Pt(s.entity),hass:s.hass||null};if(!document.body)return document.addEventListener("DOMContentLoaded",()=>bt(e),{once:!0}),null;if(window.__haMusicDock)return window.__haMusicDock.update(e),window.__haMusicDock;let i=document.createElement("ha-music-mini");return i.update(e),document.body.appendChild(i),window.__haMusicDock=i,i}var te=class extends HTMLElement{constructor(){super(),this.attachShadow({mode:"open"}),this._mode="top",this._entity="",this._hass=null,this._poll=null,this._onClick=t=>this._handleClick(t),this._onRoute=()=>this._sync(),this._sync=this._sync.bind(this)}update(t={}){let e=Ct(t.mode),i=Pt(t.entity),a=e!==this._mode;this._mode=e,this._entity=i,t.hass?.states&&(this._hass=t.hass),(!this.shadowRoot.childElementCount||a)&&this._render(),this._sync()}connectedCallback(){this.shadowRoot.childElementCount||this._render(),this.shadowRoot.addEventListener("click",this._onClick),window.addEventListener("location-changed",this._onRoute),this._startPolling(),this._sync()}disconnectedCallback(){this.shadowRoot.removeEventListener("click",this._onClick),window.removeEventListener("location-changed",this._onRoute),this._poll&&clearInterval(this._poll),this._poll=null}_startPolling(){this._poll||(this._poll=window.setInterval(()=>{let t=Mt()||this._hass;t?.states&&(this._hass=t,this._sync())},1e3))}_render(){this.shadowRoot.innerHTML=`
+      <style>${$i}</style>
+      <div class="mini" data-mode="${this._mode}" role="region" aria-label="HA Music \u8FF7\u4F60\u64AD\u653E\u5668">
+        <div class="art">
+          <img alt="" />
+          <span class="fallback">${yi}</span>
+        </div>
+        <div class="meta">
+          <div class="title">\u9009\u62E9\u64AD\u653E\u5668</div>
+          <div class="sub">\u5728\u5361\u7247\u7F16\u8F91\u5668\u4E2D\u9009\u62E9\u4F4D\u7F6E</div>
+        </div>
+        <div class="controls">
+          <button data-act="prev" type="button" aria-label="\u4E0A\u4E00\u9996">${xi}</button>
+          <button class="toggle" data-act="toggle" type="button" aria-label="\u64AD\u653E">${De}</button>
+          <button data-act="next" type="button" aria-label="\u4E0B\u4E00\u9996">${vi}</button>
+        </div>
+        <div class="progress"><span></span></div>
+      </div>
+    `,this._mini=this.shadowRoot.querySelector(".mini"),this._art=this.shadowRoot.querySelector(".art img"),this._fallback=this.shadowRoot.querySelector(".fallback"),this._title=this.shadowRoot.querySelector(".title"),this._sub=this.shadowRoot.querySelector(".sub"),this._toggle=this.shadowRoot.querySelector(".toggle"),this._prev=this.shadowRoot.querySelector('[data-act="prev"]'),this._next=this.shadowRoot.querySelector('[data-act="next"]'),this._progress=this.shadowRoot.querySelector(".progress span"),this._art.addEventListener("error",()=>{this._art.removeAttribute("src"),this._fallback.style.display="grid"})}_stateLabel(t){let e=!this._hass?.language||String(this._hass.language).startsWith("zh");return{playing:e?"\u64AD\u653E\u4E2D":"Playing",paused:e?"\u5DF2\u6682\u505C":"Paused",idle:e?"\u7A7A\u95F2":"Idle",off:e?"\u5DF2\u5173\u95ED":"Off",unavailable:e?"\u4E0D\u53EF\u7528":"Unavailable",unknown:e?"\u672A\u77E5":"Unknown"}[t]||t}_sync(){if(!this._mini)return;if(this._mini.dataset.mode=this._mode,!this._entity){this._title.textContent="\u9009\u62E9\u64AD\u653E\u5668",this._sub.textContent="\u5728\u5361\u7247\u7F16\u8F91\u5668\u4E2D\u9009\u62E9\u4F4D\u7F6E",this._setDisabled(!0),this._progress.style.width="0%",this._setArt(null);return}let t=Mt()||this._hass;t?.states&&(this._hass=t);let e=this._hass?.states?.[this._entity];if(!e){this._title.textContent=this._entity,this._sub.textContent="\u5B9E\u4F53\u4E0D\u53EF\u7528",this._setDisabled(!0),this._progress.style.width="0%",this._setArt(null);return}let i=e.attributes||{};this._title.textContent=i.media_title||i.friendly_name||this._entity;let a=i.media_artist||i.media_album_name||"",r=this._stateLabel(e.state);this._sub.textContent=a?`${a} \xB7 ${r}`:r,this._setDisabled(!1);let n=e.state==="playing";this._toggle.innerHTML=n?wi:De,this._toggle.setAttribute("aria-label",n?"\u6682\u505C":"\u64AD\u653E"),this._setArt(i.entity_picture);let l=Number(i.media_duration||0),o=Number(i.media_position||0),h=l>0?Math.min(100,Math.max(0,o/l*100)):0;this._progress.style.width=`${h}%`}_setArt(t){if(this._art)if(t){let e=new URL(t,window.location.href).href;this._art.getAttribute("src")!==e&&(this._art.src=e),this._fallback.style.display="none"}else this._art.removeAttribute("src"),this._fallback.style.display="grid"}_setDisabled(t){for(let e of[this._prev,this._toggle,this._next])e&&(e.disabled=t)}_handleClick(t){let e=t.target.closest?.("button[data-act]");if(!e||e.disabled)return;t.preventDefault(),t.stopPropagation();let i=e.dataset.act;i==="toggle"?this._call("media_play_pause"):i==="prev"?this._call("media_previous_track"):i==="next"&&this._call("media_next_track")}_call(t){if(!this._hass||!this._entity)return;let e=this._hass.callService("media_player",t,{entity_id:this._entity});e?.catch&&e.catch(i=>console.warn("ha-music mini player:",i))}};customElements.get("ha-music-mini")||customElements.define("ha-music-mini",te);var ie=["off","all","one"],ki=260;function Ei(s,t,e){let i=new CustomEvent(t,{bubbles:!0,composed:!0,cancelable:!1,detail:e});return s.dispatchEvent(i),i}function ae(s,t,e,i,a){let r=[];for(let n=0;n<=s;n+=4){let l=t/2+Math.sin(n/e*Math.PI*2+a)*i+Math.sin(n/(e/2)*Math.PI*2+a*1.7)*(i*.32);r.push(`${n.toFixed(1)},${l.toFixed(2)}`)}return`M${r.join(" L")}`}function Ai(s){switch(s){case"playing":return"playing";case"buffering":return"buffering";case"paused":return"paused";case"idle":return"idle";case"off":return"off";default:return"idle"}}var se=class extends A{static get styles(){return ze}static get properties(){return{_config:{state:!0},_width:{state:!1}}}constructor(){super(),this._config={},this._hass=void 0,this._activeEntity="",this._sig="",this._width=0,this._tickTimer=null,this._toast="",this._toastTimer=null,this._menu=null,this._seekPreview=null,this._volumePreview=null,this._showRemaining=!1,this._drawer=this._emptyDrawer(),this._artUrl="",this._artSlot=0,this._palette=null,this._paletteKey="",this._resizeObserver=null}set hass(t){let e=this._hass;if(this._hass=t,!t)return;let i=this._computeSig(t);(i!==this._sig||e===void 0)&&(this._sig=i,this.requestUpdate()),this._syncTimer()}get hass(){return this._hass}setConfig(t){if(!t)throw new Error("ha-music: \u914D\u7F6E\u4E0D\u80FD\u4E3A\u7A7A");let e=Array.isArray(t.entities)&&t.entities.length?t.entities.filter(Boolean):t.entity?[t.entity]:[];if(!e.length)throw new Error("ha-music: \u9700\u8981\u914D\u7F6E entity\uFF08media_player.*\uFF09\u6216 entities \u5217\u8868");this._config={...t},e.includes(this._activeEntity)||(this._activeEntity=e[0],this._palette=null,this._paletteKey="",this._artUrl=""),this._sig="",this._hass&&(this._sig=this._computeSig(this._hass)),this._syncTimer(),this.requestUpdate()}connectedCallback(){super.connectedCallback(),this._onKeyDown=t=>{t.key==="Escape"&&(this._drawer.open?this._closeDrawer():this._menu&&(this._menu=null,this.requestUpdate()))},window.addEventListener("keydown",this._onKeyDown),typeof ResizeObserver<"u"&&(this._resizeObserver=new ResizeObserver(t=>{let e=t[0]?.contentRect?.width||0;if(Math.abs(e-this._width)<1)return;this._width=e,(this._config?.layout||"adaptive")==="adaptive"&&this.requestUpdate()}),this._resizeObserver.observe(this))}disconnectedCallback(){super.disconnectedCallback(),this._onKeyDown&&(window.removeEventListener("keydown",this._onKeyDown),this._onKeyDown=null),this._stopTimer(),this._resizeObserver?.disconnect(),this._resizeObserver=null,this._toastTimer&&clearTimeout(this._toastTimer)}_entities(){let t=this._config||{};return(Array.isArray(t.entities)&&t.entities.length?t.entities:t.entity?[t.entity]:[]).filter(Boolean)}_eid(){let t=this._entities();return this._activeEntity||t[0]||""}_state(t=this._eid()){return this._hass?.states?.[t]}_computeSig(t){let e=this._eid(),i=t.states?.[e],a=i?.attributes||{},r=["media_title","media_artist","media_album_name","media_series_title","entity_picture","media_duration","media_position","media_position_updated_at","media_metadata","media_content_id","volume_level","is_volume_muted","shuffle","repeat","source","source_list","sound_mode","sound_mode_list","supported_features","group_members","app_name","queue","media_track"],n={};for(let p of r)p in a&&(n[p]=a[p]);let l=this._config?.volume_entity,o=l?t.states?.[l]?.state:null,h=this._entities().map(p=>{let u=t.states?.[p];return[p,u?.state,u?.attributes?.entity_picture]});return JSON.stringify([e,i?.state,n,o,h,t.language,this._config,this._menu,this._drawer.open,this._drawer.mode,this._drawer.cursor,this._drawer.items.length,this._drawer.loading,this._drawer.error,this._showRemaining,this._layoutKey()])}_syncTimer(){let t=this._state()?.state,e=t==="playing"||t==="buffering";e&&!this._tickTimer?this._tickTimer=setInterval(()=>this.requestUpdate(),500):e||this._stopTimer()}_stopTimer(){this._tickTimer&&(clearInterval(this._tickTimer),this._tickTimer=null)}_layoutKey(){let t=this._config?.layout||"adaptive";return t==="adaptive"?this._width&&this._width<430?"compact":"full":["full","compact","mini"].includes(t)?t:"full"}_themeKey(){let t=this._config?.theme;return t&&J[t]?t:Kt}_themeVars(){let t=J[this._themeKey()],e=this._paletteKey||this._eid()||"ha-music",i=Le(e),a=this._palette,r=this._config?.accent,n=this._config?.palette!==!1,l=t.accent[0],o=t.accent[1],h=At(l),p=At(o),u=h,b=Xt(t.accent[1]),x=Xt(i.a2);if(n){if(a){let f=Zt(b,{h:a.h2,s:a.s2,l:a.l2},.5);o=f.css,p=f.rgb,u=a.rgb1}else if(x){let f=Zt(b,x,.35);o=f.css,p=f.rgb}}return r&&(l=r,h=At(r,h),n||(u=h)),{"--hm-base":t.base,"--hm-a1":l,"--hm-a2":o,"--hm-a1-rgb":h,"--hm-a2-rgb":p,"--hm-glow-rgb":u}}_volumeInfo(t){let e=this._config?.volume_entity,i=e?this._hass?.states?.[e]:void 0;if(i){let n=i.entity_id;if(n.startsWith("media_player."))return{domain:"media_player",entityId:n,level:Number(i.attributes?.volume_level??0),muted:!!i.attributes?.is_volume_muted,supported:!0,external:!0};if(n.startsWith("number.")){let l=Number(i.state);if(Number.isFinite(l))return{domain:"number",entityId:n,level:v(l/(i.attributes?.max||100),0,1),muted:!1,supported:!0,external:!0}}if(n.startsWith("input_number.")){let l=Number(i.state);if(Number.isFinite(l))return{domain:"input_number",entityId:n,level:v(l/(i.attributes?.max||100),0,1),muted:!1,supported:!0,external:!0}}}let a=this._state(),r=Number.isFinite(t.volume)||y(a,_.VOLUME_SET)||y(a,_.VOLUME_MUTE);return{domain:"media_player",entityId:this._eid(),level:Number.isFinite(t.volume)?t.volume:0,muted:t.muted,supported:r,external:!1}}_repeatValue(){let t=this._state()?.attributes?.repeat;return["off","all","one"].includes(t)?t:"off"}_call(t,e,i="media_player",a){let r=this._hass;if(!r?.callService)return Promise.resolve();let n=a??this._eid();try{let l=r.callService(i,t,{entity_id:n,...e});return Promise.resolve(l)}catch(l){return this._notify(l?.message||String(l)),Promise.reject(l)}}_guard(t){Promise.resolve(t).catch(e=>{let i=e?.message||String(e);this._notify(i.length>60?i.slice(0,60):i)})}_notify(t){this._toast=t||"",this.requestUpdate(),this._toastTimer&&clearTimeout(this._toastTimer),t&&(this._toastTimer=setTimeout(()=>{this._toast="",this.requestUpdate()},3600))}_togglePlay(){let t=this._state()?.state,e=t==="playing"||t==="buffering";this._guard(this._call(e?"media_pause":"media_play"))}_power(){let t=this._state()?.state,e=t==="off"||t==="standby";this._guard(this._call(e?"turn_on":"turn_off"))}_shuffle(){let t=!!this._state()?.attributes?.shuffle;this._guard(this._call("shuffle_set",{shuffle:!t}))}_repeat(){let t=this._repeatValue(),e=ie.indexOf(t),i=ie[(e+1)%ie.length];this._guard(this._call("repeat_set",{repeat:i}))}_seekTo(t){Number.isFinite(t)&&this._guard(this._call("media_seek",{seek_position:t}))}_onSeekInput(t){if(!y(this._state(),_.SEEK))return;let e=t.target,i=Number(e.value);this._seekPreview=i;let a=R(this._state()).duration;e.style.setProperty("--pct",`${a?v(i/a*100,0,100):0}%`)}_onSeekCommit(t){if(!y(this._state(),_.SEEK)){this.requestUpdate();return}let e=Number(t.target.value);this._seekPreview=null,this._seekTo(e),this.requestUpdate()}_onVolumeInput(t){let e=Number(t.target.value)/100;this._volumePreview=e,t.target.style.setProperty("--pct",`${e*100}%`)}_onVolumeCommit(t){let e=v(Number(t.target.value)/100,0,1);this._volumePreview=null;let i=this._volumeInfo(R(this._state()));if(i.domain==="media_player")this._guard(this._call("volume_set",{volume_level:e},"media_player",i.entityId));else{let a=this._hass?.states?.[i.entityId],r=Number(a?.attributes?.max??100),n=Number(a?.attributes?.min??0);this._guard(this._call("set_value",{value:Math.round(n+e*(r-n))},i.domain,i.entityId))}this.requestUpdate()}_toggleMute(){let t=R(this._state()),e=this._volumeInfo(t);if(e.external){e.domain==="media_player"?this._guard(this._call("volume_mute",{is_volume_muted:!e.muted},"media_player",e.entityId)):this._notify(E(this._hass?.language)("volumeEntityMissing"));return}this._guard(this._call("volume_mute",{is_volume_muted:!t.muted}))}_selectSource(t){this._menu=null,this._guard(this._call("select_source",{source:t})),this.requestUpdate()}_selectSoundMode(t){this._menu=null,this._guard(this._call("select_sound_mode",{sound_mode:t})),this.requestUpdate()}_leaveGroup(){this._guard(this._call("unjoin"))}_playQueueItem(t){if(!t?.contentId){this._notify(E(this._hass?.language)("queueEmpty"));return}this._guard(this._call("play_media",{media_content_id:t.contentId,media_content_type:t.contentType||"music"}))}_playBrowseItem(t){t?.contentId&&this._guard(this._call("play_media",{media_content_id:t.contentId,media_content_type:t.contentType||"music"}))}_switchEntity(t){t!==this._activeEntity&&(this._activeEntity=t,this._palette=null,this._paletteKey="",this._artUrl="",this._menu=null,this._seekPreview=null,this._syncTimer(),this._sig=this._computeSig(this._hass),this.requestUpdate())}_moreInfo(){Ei(this,"hass-more-info",{entityId:this._eid()})}_maEnabled(){let t=this._config?.music_assistant;if(t===!1)return!1;if(t===!0||typeof t=="string"&&t.trim()||this._hass?.services?.music_assistant?.play_media||this._entities().some(a=>{let r=this._hass?.states?.[a]?.attributes||{};return Object.keys(r).some(n=>n.startsWith("mass_"))}))return!0;let i=this._hass?.panels||{};return Object.keys(i).some(a=>{let r=i[a]||{};return r.component_name==="music_assistant"||/music[-_ ]?assistant/i.test(r.url_path||a)||/music\s*assistant/i.test(r.title||"")})}_isMaPlayer(t=this._eid()){let e=this._state(t)?.attributes||{};return Object.keys(e).some(i=>i.startsWith("mass_"))}_maUrl(){let t=this._config?.music_assistant;if(t===!1)return"";if(typeof t=="string"&&t.trim())return t.trim();let e=this._hass?.panels||{};for(let a of Object.keys(e)){let r=e[a]||{},n=r.url_path||a;if(r.component_name==="music_assistant"||/music[-_ ]?assistant/i.test(n)||/music\s*assistant/i.test(r.title||""))return`/${n}`}return this._entities().some(a=>{let r=this._hass?.states?.[a]?.attributes||{};return Object.keys(r).some(n=>n.startsWith("mass_"))})||t===!0?"/music-assistant":""}_openAssistant(){this._drawer?.open&&this._closeDrawer();let t=this._maUrl();if(!t)return;if(/^(https?:)?\/\//i.test(t)){window.open(t,"_blank","noopener");return}let e=t.startsWith("/")?t:`/${t}`;try{window.history.pushState(null,"",e),window.dispatchEvent(new Event("location-changed",{bubbles:!0,composed:!0}))}catch{window.location.href=e}}_onCardClick(t){if(!this._menu)return;(t.composedPath?.()||[]).some(a=>a?.classList?.contains?.("hm-menu")||a?.classList?.contains?.("hm-chip"))||(this._menu=null,this.requestUpdate())}_emptyDrawer(){return{open:!1,mode:null,nodes:[],cursor:-1,items:[],title:"",loading:!1,error:""}}_openQueue(){let t=E(this._hass?.language),e=Jt(this._state(),this._config?.max_queue??40);this._drawer={open:!0,mode:"queue",nodes:[],cursor:-1,items:e,title:t("queue"),loading:!1,error:""},this.requestUpdate()}_openLibrary(){let t=E(this._hass?.language);this._drawer={open:!0,mode:"library",nodes:[],cursor:-1,items:[],title:t("library"),loading:!0,error:"",t},this.requestUpdate(),this._fetchBrowse()}_openPlaylists(){let t=E(this._hass?.language);if(!this._isMaPlayer()){this._notify(t("maPlayerRequired"));return}this._drawer={open:!0,mode:"playlists",nodes:[],cursor:-1,items:[],title:t("playlists"),loading:!0,error:"",maUrl:this._maUrl()},this.requestUpdate(),this._fetchPlaylists()}async _browseMedia(t,e){let i=this._hass?.connection;if(!i?.sendMessagePromise)throw new Error("unsupported");let a={type:"media_player/browse_media",entity_id:this._eid()};return t&&(a.media_content_id=t,e&&(a.media_content_type=e)),i.sendMessagePromise(a)}async _fetchPlaylists(){let t=E(this._hass?.language);try{let i=(await this._browseMedia())?.children||[],a=i.find(l=>l.can_expand&&(/playlist/i.test(l.media_class||"")||/playlist/i.test(l.media_content_type||"")||/播放列表|playlists?/i.test(l.title||""))||!1),r=[];a&&(r=(await this._browseMedia(a.media_content_id,a.media_content_type))?.children||[]),r.length||(r=i.filter(l=>/playlist/i.test(l.media_class||"")));let n=r.map(l=>({title:l.title||"",subtitle:(()=>{let o=Qt(l.media_class,this._hass?.language);return o&&o!==t("playlists")?o:""})(),contentId:l.media_content_id||"",contentType:l.media_content_type||"playlist",thumb:l.thumbnail||""})).filter(l=>l.contentId);if(this._drawer.mode!=="playlists")return;this._drawer={...this._drawer,loading:!1,items:n,error:""}}catch(e){if(this._drawer.mode!=="playlists")return;this._drawer={...this._drawer,loading:!1,items:[],error:e?.message?`${t("browseFailed")} \xB7 ${String(e.message).slice(0,40)}`:t("browseFailed")}}this.requestUpdate()}async _playPlaylistItem(t){if(!t?.contentId)return;let e=E(this._hass?.language),i=this._eid();if(!this._isMaPlayer(i)){this._notify(e("maPlayerRequired"));return}let a=t.contentType||"playlist",r=()=>{this._notify(`${e("playingPlaylist")} \xB7 ${t.title||""}`),this._closeDrawer()},n=!!this._hass?.services?.music_assistant?.play_media,l=o=>{let h=o?.message||String(o);return/nothing to play here/i.test(h)?e("playlistEmpty"):h.length>60?h.slice(0,60):h};if(n)try{await this._hass.callService("music_assistant","play_media",{entity_id:i,media_id:t.contentId,media_type:"playlist",enqueue:"play"}),r();return}catch(o){let h=o?.message||String(o);if(/nothing to play here/i.test(h)){this._markPlaylistEmpty(t),this._notify(l(o));return}if(!/match|target|not a valid|does not support|unsupported/i.test(h)){this._notify(l(o));return}}try{await this._call("play_media",{media_content_id:t.contentId,media_content_type:a}),r()}catch(o){/nothing to play here/i.test(o?.message||"")&&this._markPlaylistEmpty(t),this._notify(l(o)||e("browseFailed"))}}_markPlaylistEmpty(t){this._drawer.mode==="playlists"&&(this._drawer={...this._drawer,items:this._drawer.items.map(e=>e.contentId===t.contentId?{...e,empty:!0}:e)},this.requestUpdate())}_closeDrawer(){this._drawer={...this._drawer,open:!1},this.requestUpdate(),setTimeout(()=>{this._drawer.open||(this._drawer=this._emptyDrawer(),this.requestUpdate())},ki)}async _fetchBrowse(){let t=this._hass,e=t?.connection,i=E(t?.language),a=this._drawer.cursor>=0?this._drawer.nodes[this._drawer.cursor]:null,r={type:"media_player/browse_media",entity_id:this._eid()};if(a&&(r.media_content_id=a.contentId,a.contentType&&(r.media_content_type=a.contentType)),this._drawer={...this._drawer,loading:!0,error:""},this.requestUpdate(),!e?.sendMessagePromise){this._drawer={...this._drawer,loading:!1,error:i("browseFailed")},this.requestUpdate();return}try{let n=await e.sendMessagePromise(r),l=(n?.children||[]).map(o=>({title:o.title||"",subtitle:Qt(o.media_class,this._hass?.language)||o.media_content_type||"",contentId:o.media_content_id||"",contentType:o.media_content_type||"",thumb:o.thumbnail||"",canPlay:!!o.can_play,canExpand:!!o.can_expand,cls:o.media_class||""}));if(this._drawer.mode!=="library")return;this._drawer={...this._drawer,loading:!1,items:l,title:a?.title||n?.title||i("library"),error:""}}catch(n){if(this._drawer.mode!=="library")return;this._drawer={...this._drawer,loading:!1,items:[],error:n?.message?`${i("browseFailed")} \xB7 ${String(n.message).slice(0,40)}`:i("browseFailed")}}this.requestUpdate()}_enterBrowseItem(t){if(!t.canExpand){t.canPlay&&this._playBrowseItem(t);return}let e=this._drawer.nodes.slice(0,this._drawer.cursor+1);e.push({contentId:t.contentId,contentType:t.contentType,title:t.title}),this._drawer={...this._drawer,nodes:e,cursor:e.length-1,title:t.title,items:[]},this.requestUpdate(),this._fetchBrowse()}_browseBack(){this._drawer.cursor<0||(this._drawer={...this._drawer,cursor:this._drawer.cursor-1,items:[]},this.requestUpdate(),this._fetchBrowse())}updated(){let t=this.renderRoot?.querySelector?.(".hm-card");if(!t)return;let e=this._artUrlFor();e!==this._artUrl&&(this._artUrl=e,this._crossFadeArt(t,e)),this._syncRangeValues(),this._installDock()}_isPreviewContext(){let t=this.getRootNode?.();for(;t;){let e=t.host;if(!e)break;let i=String(e.tagName||"").toLowerCase();if(i==="hui-card-preview"||i==="hui-card-options"||i==="hui-dialog-edit-card"||i==="ha-dialog")return!0;t=e.getRootNode?.()}return!!this.closest?.("hui-card-preview, hui-card-options")}_installDock(){let t=this._config?.dock,e=this._eid?.()||this._config?.entity||(Array.isArray(this._config?.entities)?this._config.entities[0]:"");if(t==="none"){let i=gt();i&&(!e||i.entity===e)&&(He(),ee());return}!t||!this._hass||!this.isConnected||!e||this._isPreviewContext()||(bt({mode:t,entity:e,hass:this._hass}),Fe({mode:t,entity:e}))}_artUrlFor(){let t=R(this._state());return O(this._hass,t.art)}_crossFadeArt(t,e){let i=t.querySelectorAll(".hm-bg-art");if(!i.length)return;let a=i.length>1?(this._artSlot+1)%2:0,r=i[a],n=i[this._artSlot];if(!e){i.forEach(o=>{o.classList.remove("on"),o.style.backgroundImage=""}),this._artSlot=0,this._maybePalette("");return}let l=new Image;l.decoding="async",l.onload=()=>{r.style.backgroundImage=`url("${e}")`,r.classList.add("on"),n?.classList.remove("on"),this._artSlot=a,this._maybePalette(e)},l.onerror=()=>{this._maybePalette("")},l.src=e}_maybePalette(t){let e=R(this._state()),i=t||`${e.title}|${e.artist}|${this._eid()}`;if(this._paletteKey!==i){if(this._paletteKey=i,!t){this._palette=null,this.requestUpdate();return}qe(t,i).then(a=>{this._paletteKey===i&&(this._palette=a,this.requestUpdate())})}}_syncRangeValues(){let t=this.renderRoot;if(!t)return;let e=t.querySelector?.('input.hm-range[data-role="seek"]'),i=t.querySelector?.('input.hm-range[data-role="volume"]'),a=R(this._state());if(e&&this._seekPreview===null){let r=a.duration||0,n=v(a.position,0,r||a.position);e.value=String(n),e.max=String(r||0),e.style.setProperty("--pct",`${r?v(n/r*100,0,100):0}%`)}if(i&&this._volumePreview===null){let r=this._volumeInfo(a);i.value=String(Math.round(r.level*100)),i.style.setProperty("--pct",`${r.level*100}%`),i.setAttribute("data-disabled",String(!r.supported))}}getCardSize(){let t=this._layoutKey();return t==="mini"?1:t==="compact"?3:6}render(){let t=this._hass,e=this._config||{},i=E(t?.language),a=this._layoutKey(),r=this._themeKey();if(!t)return c`
+        <div class="hm-card" data-layout=${a} data-theme=${r} style=${z(this._themeVars())}>
           <div class="hm-body">
-            <div class="hm-empty">${a("loading")}</div>
+            <div class="hm-empty">${i("loading")}</div>
           </div>
         </div>
       `;let n=this._eid(),l=t.states?.[n];if(!l)return c`
-        <div class="hm-card" data-layout=${i} data-theme=${r} style=${z(this._themeVars())}>
+        <div class="hm-card" data-layout=${a} data-theme=${r} style=${z(this._themeVars())}>
           <div class="hm-body">
             <div class="hm-empty">
               ${n?`\u5B9E\u4F53\u672A\u627E\u5230\uFF1A${n}`:"ha-music: entity \u672A\u914D\u7F6E"}
             </div>
           </div>
         </div>
-      `;let o=R(l),h=Wt(l,e.max_queue??40),d=l.state==="playing"||l.state==="buffering",u=da(l.state),b=a(u),x=o.album||o.series||o.appName||(u==="playing"?a("playing"):b),f=this._volumeInfo(o),L=e.show_volume!==!1&&f.supported,X=y(l,_.SHUFFLE_SET),$=y(l,_.REPEAT_SET),k=y(l,_.PREVIOUS_TRACK),N=y(l,_.NEXT_TRACK),I=y(l,_.PLAY)||y(l,_.PAUSE),q=l.state==="off"||l.state==="standby",S=q?y(l,_.TURN_ON):y(l,_.TURN_OFF),J=y(l,_.BROWSE_MEDIA),tt=this._maEnabled()&&this._isMaPlayer(n),bt=y(l,_.SEEK),M=Array.isArray(l.attributes?.source_list)?l.attributes.source_list:[],D=Array.isArray(l.attributes?.sound_mode_list)?l.attributes.sound_mode_list:[],et=e.show_source!==!1&&M.length>0&&y(l,_.SELECT_SOURCE),F=D.length>0&&y(l,_.SELECT_SOUND_MODE),St=o.groupMembers.filter(w=>w&&w!==n),ae=e.show_group!==!1&&o.groupMembers.length>1,Ne=e.show_queue!==!1&&h.length>0,Ie=e.show_library!==!1&&J,Mt=e.visualizer||"bars",qe=e.cover||"ambient",W=o.duration,ft=this._seekPreview??o.position,De=W?v(ft/W*100,0,100):0,Ct=Math.round(f.level*100),Y=this._repeatValue(),_t=o.title||"",ie=this._entities(),se=O(t,o.art);return c`
+      `;let o=R(l),h=Jt(l,e.max_queue??40),p=l.state==="playing"||l.state==="buffering",u=Ai(l.state),b=i(u),x=o.album||o.series||o.appName||(u==="playing"?i("playing"):b),f=this._volumeInfo(o),N=e.show_volume!==!1&&f.supported,X=y(l,_.SHUFFLE_SET),$=y(l,_.REPEAT_SET),k=y(l,_.PREVIOUS_TRACK),L=y(l,_.NEXT_TRACK),I=y(l,_.PLAY)||y(l,_.PAUSE),q=l.state==="off"||l.state==="standby",S=q?y(l,_.TURN_ON):y(l,_.TURN_OFF),Z=y(l,_.BROWSE_MEDIA),tt=this._maEnabled()&&this._isMaPlayer(n),ft=y(l,_.SEEK),M=Array.isArray(l.attributes?.source_list)?l.attributes.source_list:[],D=Array.isArray(l.attributes?.sound_mode_list)?l.attributes.sound_mode_list:[],et=e.show_source!==!1&&M.length>0&&y(l,_.SELECT_SOURCE),F=D.length>0&&y(l,_.SELECT_SOUND_MODE),zt=o.groupMembers.filter(w=>w&&w!==n),oe=e.show_group!==!1&&o.groupMembers.length>1,We=e.show_queue!==!1&&h.length>0,Ye=e.show_library!==!1&&Z,Tt=e.visualizer||"bars",Ge=e.cover||"ambient",W=o.duration,_t=this._seekPreview??o.position,Qe=W?v(_t/W*100,0,100):0,Ut=Math.round(f.level*100),Y=this._repeatValue(),yt=o.title||"",le=this._entities(),he=O(t,o.art);return c`
       <div
         class="hm-card"
         data-theme=${r}
-        data-layout=${i}
-        data-playing=${d?"true":"false"}
-        data-cover=${qe}
+        data-layout=${a}
+        data-playing=${p?"true":"false"}
+        data-cover=${Ge}
         style=${z(this._themeVars())}
         @click=${this._onCardClick}
       >
@@ -1960,47 +2042,47 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               <span class="hm-dot"></span>
               <span class="hm-status-text">${b}</span>
               <span class="hm-kicker-sep">·</span>
-              <span class="hm-status-text hm-status-player">${e.name||kt(t,n,n)}</span>
+              <span class="hm-status-text hm-status-player">${e.name||Et(t,n,n)}</span>
             </div>
             <div class="hm-top-actions">
               ${tt?c`<button
                     class="hm-icon-btn hm-ma"
-                    aria-label=${a("playlists")}
-                    title=${a("playlists")}
+                    aria-label=${i("playlists")}
+                    title=${i("playlists")}
                     @click=${()=>this._openPlaylists()}
                   >
                     ${g("playlist",16)}
-                  </button>`:p}
-              ${Ne?c`<button
+                  </button>`:d}
+              ${We?c`<button
                     class="hm-icon-btn"
-                    aria-label=${a("queue")}
-                    title=${a("queue")}
+                    aria-label=${i("queue")}
+                    title=${i("queue")}
                     @click=${()=>this._openQueue()}
                   >
                     ${g("queue",16)}
-                  </button>`:p}
-              ${Ie?c`<button
+                  </button>`:d}
+              ${Ye?c`<button
                     class="hm-icon-btn"
-                    aria-label=${a("library")}
-                    title=${a("library")}
+                    aria-label=${i("library")}
+                    title=${i("library")}
                     @click=${()=>this._openLibrary()}
                   >
                     ${g("library",16)}
-                  </button>`:p}
+                  </button>`:d}
               ${S?c`<button
                     class="hm-icon-btn"
                     data-role="power"
-                    aria-label=${a("power")}
-                    title=${a("power")}
+                    aria-label=${i("power")}
+                    title=${i("power")}
                     @click=${()=>this._power()}
                   >
                     ${g("power",16)}
-                  </button>`:p}
+                  </button>`:d}
               <button
                 class="hm-icon-btn"
                 data-role="more"
-                aria-label=${a("more")}
-                title=${a("more")}
+                aria-label=${i("more")}
+                title=${i("more")}
                 @click=${()=>this._moreInfo()}
               >
                 ${g("more",16)}
@@ -2008,91 +2090,91 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
             </div>
           </header>
 
-          ${ie.length>1?c`
+          ${le.length>1?c`
                 <div class="hm-entities">
-                  ${ie.map(w=>{let Pt=t.states?.[w],at=O(t,Pt?.attributes?.entity_picture);return c`<button
+                  ${le.map(w=>{let Rt=t.states?.[w],it=O(t,Rt?.attributes?.entity_picture);return c`<button
                       class="hm-entity-chip"
                       data-active=${w===n?"true":"false"}
                       @click=${()=>this._switchEntity(w)}
                     >
                       <span
                         class="hm-entity-dot"
-                        style=${at?`background-image:url("${at}")`:""}
+                        style=${it?`background-image:url("${it}")`:""}
                       ></span>
-                      <span class="hm-entity-name">${kt(t,w,w)}</span>
+                      <span class="hm-entity-name">${Et(t,w,w)}</span>
                     </button>`})}
-                </div>`:p}
+                </div>`:d}
 
           <section class="hm-main">
             <div class="hm-cover-wrap">
               <button
                 class="hm-cover"
-                data-playing=${d?"true":"false"}
-                aria-label=${a("more")}
-                title=${_t||a("noMedia")}
+                data-playing=${p?"true":"false"}
+                aria-label=${i("more")}
+                title=${yt||i("noMedia")}
                 @click=${()=>this._moreInfo()}
               >
-                ${se?c`<img src=${se} alt=${_t||""} />`:c`<span class="hm-cover-ph">${g("music",40)}</span>`}
+                ${he?c`<img src=${he} alt=${yt||""} />`:c`<span class="hm-cover-ph">${g("music",40)}</span>`}
               </button>
               <div class="hm-cover-halo"></div>
             </div>
 
             <div class="hm-meta">
               <div class="hm-kicker">
-                ${x||a("noMedia")}
+                ${x||i("noMedia")}
                 ${o.track?c`<span class="hm-kicker-sep">·</span>
-                      <span>${a("track")} ${o.track}</span>`:p}
+                      <span>${i("track")} ${o.track}</span>`:d}
               </div>
-              <h2 class="hm-title ${_t?"":"placeholder"}">
-                ${_t||a("noTitle")}
+              <h2 class="hm-title ${yt?"":"placeholder"}">
+                ${yt||i("noTitle")}
               </h2>
               <div class="hm-artist">
                 ${o.artist||(o.album?o.album:b)}
               </div>
-              ${et||F||ae?c`<div class="hm-tags">
+              ${et||F||oe?c`<div class="hm-tags">
                     ${et?c`<button
                           class="hm-chip interactive"
                           @click=${()=>{this._menu=this._menu==="source"?null:"source",this.requestUpdate()}}
                         >
-                          <span class="hm-chip-label">${a("source")}</span>
+                          <span class="hm-chip-label">${i("source")}</span>
                           <span class="hm-chip-value">${o.source||"\u2014"}</span>
-                        </button>`:p}
+                        </button>`:d}
                     ${F?c`<button
                           class="hm-chip interactive"
                           @click=${()=>{this._menu=this._menu==="sound"?null:"sound",this.requestUpdate()}}
                         >
-                          <span class="hm-chip-label">${a("soundMode")}</span>
+                          <span class="hm-chip-label">${i("soundMode")}</span>
                           <span class="hm-chip-value">${o.soundMode||"\u2014"}</span>
-                        </button>`:p}
-                    ${ae?c`<span
+                        </button>`:d}
+                    ${oe?c`<span
                           class="hm-chip ${y(l,_.GROUPING)?"interactive":""}"
-                          title=${y(l,_.GROUPING)?`${a("group")} \xB7 ${a("groupLeave")}`:a("group")}
+                          title=${y(l,_.GROUPING)?`${i("group")} \xB7 ${i("groupLeave")}`:i("group")}
                           @click=${()=>{y(l,_.GROUPING)&&this._leaveGroup()}}
                         >
                           ${g("group",13)}
                           <span class="hm-group">
-                            ${St.slice(0,3).map(w=>{let Pt=t.states?.[w],at=O(t,Pt?.attributes?.entity_picture);return c`<span
+                            ${zt.slice(0,3).map(w=>{let Rt=t.states?.[w],it=O(t,Rt?.attributes?.entity_picture);return c`<span
                                 class="hm-group-avatar"
-                                title=${kt(t,w,w)}
-                                style=${at?`background-image:url("${at}")`:""}
+                                title=${Et(t,w,w)}
+                                style=${it?`background-image:url("${it}")`:""}
                               ></span>`})}
-                            ${St.length>3?c`<span class="hm-group-more">+${St.length-3}</span>`:p}
+                            ${zt.length>3?c`<span class="hm-group-more">+${zt.length-3}</span>`:d}
                           </span>
-                        </span>`:p}
-                  </div>`:p}
+                        </span>`:d}
+                  </div>`:d}
             </div>
           </section>
 
-          ${Mt!=="none"?c`<div
+          ${Tt!=="none"?c`<div
                 class="hm-vis"
-                data-playing=${d?"true":"false"}
-                data-style=${Mt}
+                data-playing=${p?"true":"false"}
+                data-style=${Tt}
               >
-                ${this._renderVisualizer(Mt,o)}
-              </div>`:p}
+                ${this._renderVisualizer(Tt,o)}
+              </div>`:d}
 
           ${W>0?c`<section class="hm-progress">
-                <span class="hm-time">${ut(ft)}</span>
+                <span class="hm-time">${ut(_t)}</span>
                 <input
                   class="hm-range"
                   data-role="seek"
@@ -2100,21 +2182,21 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
                   min="0"
                   max=${W}
                   step="0.5"
-                  .value=${String(ft)}
-                  data-disabled=${bt?"false":"true"}
-                  style=${z({"--pct":`${De}%`})}
+                  .value=${String(_t)}
+                  data-disabled=${ft?"false":"true"}
+                  style=${z({"--pct":`${Qe}%`})}
                   @input=${this._onSeekInput}
                   @change=${this._onSeekCommit}
-                  aria-label=${a("seek")}
+                  aria-label=${i("seek")}
                 />
                 <span
                   class="hm-time end hoverable"
-                  title=${a("remaining")}
+                  title=${i("remaining")}
                   @click=${()=>{this._showRemaining=!this._showRemaining,this.requestUpdate()}}
                 >
-                  ${this._showRemaining?`-${ut(Math.max(W-ft,0))}`:ut(W)}
+                  ${this._showRemaining?`-${ut(Math.max(W-_t,0))}`:ut(W)}
                 </span>
-              </section>`:p}
+              </section>`:d}
 
           <section class="hm-controls">
             <div class="hm-transport">
@@ -2122,54 +2204,54 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
                     class="hm-btn"
                     data-role="shuffle"
                     data-on=${o.shuffle?"true":"false"}
-                    aria-label=${a("shuffle")}
-                    title=${a("shuffle")}
+                    aria-label=${i("shuffle")}
+                    title=${i("shuffle")}
                     @click=${()=>this._shuffle()}
                   >
                     ${g("shuffle",18)}
-                  </button>`:p}
+                  </button>`:d}
               ${k?c`<button
                     class="hm-btn"
                     data-role="previous"
-                    aria-label=${a("previous")}
-                    title=${a("previous")}
+                    aria-label=${i("previous")}
+                    title=${i("previous")}
                     @click=${()=>this._guard(this._call("media_previous_track"))}
                   >
                     ${g("previous",18)}
-                  </button>`:p}
+                  </button>`:d}
               ${I?c`<button
-                    class="hm-play ${d?"is-playing":""}"
-                    aria-label=${a(d?"pause":"play")}
-                    title=${a(d?"pause":"play")}
+                    class="hm-play ${p?"is-playing":""}"
+                    aria-label=${i(p?"pause":"play")}
+                    title=${i(p?"pause":"play")}
                     @click=${()=>this._togglePlay()}
                   >
-                    ${d?g("pause",26):g("play",26)}
-                  </button>`:p}
-              ${N?c`<button
+                    ${p?g("pause",26):g("play",26)}
+                  </button>`:d}
+              ${L?c`<button
                     class="hm-btn"
-                    aria-label=${a("next")}
-                    title=${a("next")}
+                    aria-label=${i("next")}
+                    title=${i("next")}
                     @click=${()=>this._guard(this._call("media_next_track"))}
                   >
                     ${g("next",18)}
-                  </button>`:p}
+                  </button>`:d}
               ${$?c`<button
                     class="hm-btn"
                     data-role="repeat"
                     data-on=${Y!=="off"?"true":"false"}
-                    aria-label=${a(Y==="one"?"repeatOne":Y==="all"?"repeatAll":"repeatOff")}
-                    title=${a(Y==="one"?"repeatOne":Y==="all"?"repeatAll":"repeatOff")}
+                    aria-label=${i(Y==="one"?"repeatOne":Y==="all"?"repeatAll":"repeatOff")}
+                    title=${i(Y==="one"?"repeatOne":Y==="all"?"repeatAll":"repeatOff")}
                     @click=${()=>this._repeat()}
                   >
                     ${g(Y==="one"?"repeatOne":"repeat",18)}
-                  </button>`:p}
+                  </button>`:d}
             </div>
 
-            ${L?c`<div class="hm-volume">
+            ${N?c`<div class="hm-volume">
                   <button
                     class="hm-icon-btn"
-                    aria-label=${f.muted?a("unmute"):a("mute")}
-                    title=${f.muted?a("unmute"):a("mute")}
+                    aria-label=${f.muted?i("unmute"):i("mute")}
+                    title=${f.muted?i("unmute"):i("mute")}
                     @click=${()=>this._toggleMute()}
                   >
                     ${g(f.muted?"mute":"volume",16)}
@@ -2181,20 +2263,20 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
                     min="0"
                     max="100"
                     step="1"
-                    .value=${String(Ct)}
-                    style=${z({"--pct":`${Ct}%`})}
+                    .value=${String(Ut)}
+                    style=${z({"--pct":`${Ut}%`})}
                     @input=${this._onVolumeInput}
                     @change=${this._onVolumeCommit}
-                    aria-label=${a("volume")}
+                    aria-label=${i("volume")}
                   />
-                  <span class="hm-vol-pct">${Ct}%</span>
-                </div>`:p}
+                  <span class="hm-vol-pct">${Ut}%</span>
+                </div>`:d}
           </section>
         </div>
 
         ${this._menu?c`<div class="hm-menu">
               <div class="hm-menu-head">
-                ${this._menu==="source"?a("source"):a("soundMode")}
+                ${this._menu==="source"?i("source"):i("soundMode")}
               </div>
               ${(this._menu==="source"?M:D).map(w=>c`<button
                   class="hm-menu-item"
@@ -2204,13 +2286,13 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
                   <span>${w}</span>
                   <span class="hm-menu-check">${g("check",13)}</span>
                 </button>`)}
-            </div>`:p}
+            </div>`:d}
 
         ${this._renderDrawer()}
 
         <div class="hm-toast ${this._toast?"show":""}">${this._toast}</div>
       </div>
-    `}_renderVisualizer(t,e){let a=ze(e);if(t==="wave"){let r=7+a.energy*6+a.low*7,n=4.5+a.pulse*5.5,l=2.2+a.pulse*3.2,o=a.phase,h=`${(a.period*2.4).toFixed(2)}s`;return c`<div class="hm-wave-wrap">
+    `}_renderVisualizer(t,e){let i=Ne(e);if(t==="wave"){let r=7+i.energy*6+i.low*7,n=4.5+i.pulse*5.5,l=2.2+i.pulse*3.2,o=i.phase,h=`${(i.period*2.4).toFixed(2)}s`;return c`<div class="hm-wave-wrap">
         <svg
           viewBox="0 0 600 40"
           preserveAspectRatio="none"
@@ -2218,58 +2300,58 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
           style=${z({animationDuration:h})}
         >
           <path
-            d=${Jt(600,40,150,r,o)}
+            d=${ae(600,40,150,r,o)}
             fill="none"
             stroke="rgba(var(--hm-a1-rgb), 0.85)"
             stroke-width="1.4"
           ></path>
           <path
-            d=${Jt(600,40,150,n,o*1.35+1.9)}
+            d=${ae(600,40,150,n,o*1.35+1.9)}
             fill="none"
             stroke="rgba(var(--hm-a2-rgb), 0.6)"
             stroke-width="1.2"
           ></path>
           <path
-            d=${Jt(600,40,75,l,o*1.7+3.2)}
+            d=${ae(600,40,75,l,o*1.7+3.2)}
             fill="none"
             stroke="rgba(var(--hm-a1-rgb), 0.35)"
             stroke-width="0.9"
           ></path>
         </svg>
       </div>`}return t==="orbit"?c`<div class="hm-orbit-wrap">
-        ${[1,.58,.34].map((n,l)=>{let o=l===0?a.low:a.pulse;return c`<span
+        ${[1,.58,.34].map((n,l)=>{let o=l===0?i.low:i.pulse;return c`<span
             class="hm-orbit-ring"
-            style=${z({"--react":String(n),"--drive":o.toFixed(3),animationDuration:`${(a.period*(1.8+l*.25)).toFixed(2)}s`,animationDelay:`${(l*a.period*.55).toFixed(2)}s`})}
+            style=${z({"--react":String(n),"--drive":o.toFixed(3),animationDuration:`${(i.period*(1.8+l*.25)).toFixed(2)}s`,animationDelay:`${(l*i.period*.55).toFixed(2)}s`})}
           ></span>`})}
       </div>`:c`<div class="hm-bars">
-      ${Array.from({length:36},(r,n)=>{let l=K(`${a.seed}#${n}`),o=.14+l%100/135,h=n<12?0:n<24?1:2,d=[1,.62,.34][h],u=h===0?a.low:a.pulse,b=h===0?1+.12*u:1,x=v(o*(.55+d*.55*u)*b,.08,1),f=.9+(l>>8)%100/90,L=-((l>>16)%100/45);return c`<span
+      ${Array.from({length:36},(r,n)=>{let l=K(`${i.seed}#${n}`),o=.14+l%100/135,h=n<12?0:n<24?1:2,p=[1,.62,.34][h],u=h===0?i.low:i.pulse,b=h===0?1+.12*u:1,x=v(o*(.55+p*.55*u)*b,.08,1),f=.9+(l>>8)%100/90,N=-((l>>16)%100/45);return c`<span
           class="hm-bar"
-          style=${z({"--h":x.toFixed(3),"--dur":`${f.toFixed(2)}s`,"--delay":`${L.toFixed(2)}s`})}
+          style=${z({"--h":x.toFixed(3),"--dur":`${f.toFixed(2)}s`,"--delay":`${N.toFixed(2)}s`})}
         ></span>`})}
-    </div>`}_renderDrawer(){let t=this._drawer,e=E(this._hass?.language),a=t.mode==="library",i=t.mode==="playlists";return c`
+    </div>`}_renderDrawer(){let t=this._drawer,e=E(this._hass?.language),i=t.mode==="library",a=t.mode==="playlists";return c`
       <div
         class="hm-drawer ${t.open?"open":""}"
         role="dialog"
         aria-hidden=${t.open?"false":"true"}
       >
         <div class="hm-drawer-head">
-          ${a&&t.cursor>=0?c`<button
+          ${i&&t.cursor>=0?c`<button
                 class="hm-icon-btn"
                 aria-label=${e("back")}
                 title=${e("back")}
                 @click=${()=>this._browseBack()}
               >
                 ${g("chevronLeft",16)}
-              </button>`:p}
-          <div class="hm-drawer-title">${t.title||(a?e("library"):"")}</div>
-          ${i&&t.maUrl?c`<button
+              </button>`:d}
+          <div class="hm-drawer-title">${t.title||(i?e("library"):"")}</div>
+          ${a&&t.maUrl?c`<button
                 class="hm-icon-btn hm-ma"
                 aria-label=${e("openAssistant")}
                 title=${e("openAssistant")}
                 @click=${()=>this._openAssistant()}
               >
                 ${g("external",15)}
-              </button>`:p}
+              </button>`:d}
           <button
             class="hm-icon-btn"
             aria-label=${e("close")}
@@ -2281,11 +2363,11 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
         </div>
         <div class="hm-drawer-body">
           ${t.loading?c`<div class="hm-empty"><span class="hm-spinner"></span></div>`:t.error?c`<div class="hm-empty">${t.error}</div>`:t.items.length?this._renderDrawerItems(t.items,t.mode):c`<div class="hm-empty">
-                    ${e(a?"browseFailed":i?"playlistsEmpty":"queueEmpty")}
+                    ${e(i?"browseFailed":a?"playlistsEmpty":"queueEmpty")}
                   </div>`}
         </div>
       </div>
-    `}_renderDrawerItems(t,e){let a=E(this._hass?.language),i=e==="library",r=e==="playlists";return t.map(n=>{if(r){let o=O(this._hass,n.thumb);return c`<button
+    `}_renderDrawerItems(t,e){let i=E(this._hass?.language),a=e==="library",r=e==="playlists";return t.map(n=>{if(r){let o=O(this._hass,n.thumb);return c`<button
           class="hm-list-item"
           data-empty=${n.empty?"true":"false"}
           @click=${()=>this._playPlaylistItem(n)}
@@ -2294,14 +2376,14 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
             class="hm-list-thumb"
             style=${o?`background-image:url("${o}")`:""}
           >
-            ${o?p:g("playlist",16)}
+            ${o?d:g("playlist",16)}
           </span>
           <span class="hm-list-text">
             <span class="hm-list-name">${n.title||"\u2014"}</span>
-            <span class="hm-list-sub">${n.empty?a("playlistUnavailable"):n.subtitle}</span>
+            <span class="hm-list-sub">${n.empty?i("playlistUnavailable"):n.subtitle}</span>
           </span>
           <span class="hm-list-tail">${g("play",14)}</span>
-        </button>`}if(i){let o=O(this._hass,n.thumb);return c`<button
+        </button>`}if(a){let o=O(this._hass,n.thumb);return c`<button
           class="hm-list-item"
           @click=${()=>this._enterBrowseItem(n)}
         >
@@ -2309,14 +2391,14 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
             class="hm-list-thumb"
             style=${o?`background-image:url("${o}")`:""}
           >
-            ${o?p:g(n.canExpand?"library":"music",16)}
+            ${o?d:g(n.canExpand?"library":"music",16)}
           </span>
           <span class="hm-list-text">
             <span class="hm-list-name">${n.title||"\u2014"}</span>
             <span class="hm-list-sub">${n.subtitle}</span>
           </span>
           <span class="hm-list-tail">
-            ${n.canExpand?g("chevronRight",14):p}
+            ${n.canExpand?g("chevronRight",14):d}
           </span>
         </button>`}let l=O(this._hass,n.art);return c`<button
         class="hm-list-item"
@@ -2327,14 +2409,14 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
           class="hm-list-thumb"
           style=${l?`background-image:url("${l}")`:""}
         >
-          ${l?p:g("music",16)}
+          ${l?d:g("music",16)}
         </span>
         <span class="hm-list-text">
-          <span class="hm-list-name">${n.title||a("noTitle")}</span>
+          <span class="hm-list-name">${n.title||i("noTitle")}</span>
           <span class="hm-list-sub">${n.artist||n.album||""}</span>
         </span>
         <span class="hm-list-tail">${n.duration?ut(n.duration):""}</span>
-      </button>`})}static getStubConfig(t){let e=t?.states||{};return{entity:Object.keys(e).find(i=>i.startsWith("media_player.")&&e[i]?.attributes?.supported_features!==void 0)||"",theme:Ht}}static getConfigElement(){return document.createElement("ha-music-editor")}};customElements.get("ha-music")||(customElements.define("ha-music",te),window.customCards=window.customCards||[],window.customCards.push({type:Ce,name:Pe,description:"\u73B0\u4EE3\u70AB\u9177\u914D\u8272\u7684\u5168\u529F\u80FD\u97F3\u4E50\u64AD\u653E\u5668\u5361\u7247\uFF1A\u5C01\u9762\u53D6\u8272\u3001\u9891\u8C31\u53EF\u89C6\u5316\u3001\u5A92\u4F53\u5E93\u6D4F\u89C8\u3001\u64AD\u653E\u961F\u5217\u3001\u591A\u8BBE\u5907\u5207\u6362\u3002",preview:!0,documentationURL:"https://github.com/RockJesus/ha-music"}),console.info(`%c HA-MUSIC %c v${Me} `,"background:#2ee6c5;color:#04121a;font-weight:700;border-radius:4px 0 0 4px","background:#7b5cff;color:#fff;border-radius:0 4px 4px 0"));function ua(s,t){s.dispatchEvent(new CustomEvent("config-changed",{detail:{config:t},bubbles:!0,composed:!0}))}var ee=class extends A{static get properties(){return{hass:{attribute:!1},_config:{state:!0}}}static get styles(){return st`
+      </button>`})}static getStubConfig(t){let e=t?.states||{};return{entity:Object.keys(e).find(a=>a.startsWith("media_player.")&&e[a]?.attributes?.supported_features!==void 0)||"",theme:Kt}}static getConfigElement(){return document.createElement("ha-music-editor")}};customElements.get("ha-music")||(customElements.define("ha-music",se),window.customCards=window.customCards||[],window.customCards.push({type:Re,name:Oe,description:"\u73B0\u4EE3\u70AB\u9177\u914D\u8272\u7684\u5168\u529F\u80FD\u97F3\u4E50\u64AD\u653E\u5668\u5361\u7247\uFF1A\u5C01\u9762\u53D6\u8272\u3001\u9891\u8C31\u53EF\u89C6\u5316\u3001\u5A92\u4F53\u5E93\u6D4F\u89C8\u3001\u64AD\u653E\u961F\u5217\u3001\u591A\u8BBE\u5907\u5207\u6362\u3002",preview:!0,documentationURL:"https://github.com/RockJesus/ha-music"}),console.info(`%c HA-MUSIC %c v${Ue} `,"background:#2ee6c5;color:#04121a;font-weight:700;border-radius:4px 0 0 4px","background:#7b5cff;color:#fff;border-radius:0 4px 4px 0"));function Si(s,t){s.dispatchEvent(new CustomEvent("config-changed",{detail:{config:t},bubbles:!0,composed:!0}))}var re=class extends A{static get properties(){return{hass:{attribute:!1},_config:{state:!0}}}static get styles(){return st`
       :host {
         display: block;
       }
@@ -2473,10 +2555,10 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
           height: 24px;
         }
       }
-    `}constructor(){super(),this._config={},this._lang="en"}setConfig(t){this._config={...t},typeof t?.music_assistant=="string"&&(this._maUrlDraft=t.music_assistant)}get _zh(){return $t(this._lang||this.hass?.language)}_update(t){let e={...this._config,...t};Object.keys(e).forEach(a=>{e[a]===void 0&&delete e[a]}),this._config=e,ua(this,e)}_optionLabel(t){return this._zh?t.zh:t.en}_entities(){return Array.isArray(this._config.entities)&&this._config.entities.length?this._config.entities:[]}_setEntity(t,e){let a=this._entities();if(!a.length){this._update({entity:e||void 0});return}let i=[...a];i[t]=e,this._update({entities:i})}_addEntity(){let t=this._entities();if(t.length){this._update({entities:[...t,""]});return}let e=this._config.entity?[this._config.entity,""]:["",""];this._update({entities:e,entity:void 0})}_removeEntity(t){let e=this._entities().filter((a,i)=>i!==t);if(e.length<=1){this._update({entity:e[0]||void 0,entities:void 0});return}this._update({entities:e})}updated(){this._lang=this.hass?.language||this._lang}render(){let t=this._config||{},e=this._entities(),a=(i,r,n)=>c`
+    `}constructor(){super(),this._config={},this._lang="en"}setConfig(t){this._config={...t},typeof t?.music_assistant=="string"&&(this._maUrlDraft=t.music_assistant)}get _zh(){return kt(this._lang||this.hass?.language)}_update(t){let e={...this._config,...t};Object.keys(e).forEach(i=>{e[i]===void 0&&delete e[i]}),this._config=e,Si(this,e)}_optionLabel(t){return this._zh?t.zh:t.en}_entities(){return Array.isArray(this._config.entities)&&this._config.entities.length?this._config.entities:[]}_setEntity(t,e){let i=this._entities();if(!i.length){this._update({entity:e||void 0});return}let a=[...i];a[t]=e,this._update({entities:a})}_addEntity(){let t=this._entities();if(t.length){this._update({entities:[...t,""]});return}let e=this._config.entity?[this._config.entity,""]:["",""];this._update({entities:e,entity:void 0})}_removeEntity(t){let e=this._entities().filter((i,a)=>a!==t);if(e.length<=1){this._update({entity:e[0]||void 0,entities:void 0});return}this._update({entities:e})}updated(){this._lang=this.hass?.language||this._lang}render(){let t=this._config||{},e=this._entities(),i=(a,r,n)=>c`
       <ha-entity-picker
         .hass=${this.hass}
-        .value=${i||""}
+        .value=${a||""}
         .includeDomains=${["media_player"]}
         .allowCustomEntity=${!1}
         .label=${n}
@@ -2486,9 +2568,9 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
       <div class="wrap">
         <div class="section">
           <div class="section-title">${this._zh?"\u64AD\u653E\u5668":"Player"}</div>
-          ${e.length?e.map((i,r)=>c`
+          ${e.length?e.map((a,r)=>c`
                   <div class="entity-row">
-                    ${a(i,r,r===0?this._zh?"\u64AD\u653E\u5668":"Player":this._zh?"\u8BBE\u5907":"Player")}
+                    ${i(a,r,r===0?this._zh?"\u64AD\u653E\u5668":"Player":this._zh?"\u8BBE\u5907":"Player")}
                     <button
                       class="mini-btn"
                       @click=${()=>this._removeEntity(r)}
@@ -2498,14 +2580,14 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
                     </button>
                   </div>
                 `):c`<div class="entity-row">
-                ${a(t.entity||"",0,this._zh?"\u64AD\u653E\u5668":"Player")}
+                ${i(t.entity||"",0,this._zh?"\u64AD\u653E\u5668":"Player")}
               </div>`}
           <button class="mini-btn add" @click=${()=>this._addEntity()}>
             ${this._zh?"\uFF0B \u6DFB\u52A0\u64AD\u653E\u5668":"\uFF0B Add player"}
           </button>
           ${e.length?c`<div class="hint">
                 ${this._zh?"\u591A\u8BBE\u5907\u6A21\u5F0F\uFF1A\u5361\u7247\u9876\u90E8\u4F1A\u51FA\u73B0\u8BBE\u5907\u5207\u6362\u6807\u7B7E\u3002":"Multi-player mode adds switching chips on top of the card."}
-              </div>`:p}
+              </div>`:d}
         </div>
 
         <div class="section">
@@ -2515,10 +2597,10 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               <span class="label">${this._zh?"\u5E03\u5C40":"Layout"}</span>
               <select
                 .value=${t.layout||"adaptive"}
-                @change=${i=>this._update({layout:i.target.value})}
+                @change=${a=>this._update({layout:a.target.value})}
               >
-                ${Object.keys(Vt).map(i=>c`<option value=${i} ?selected=${t.layout===i}>
-                      ${this._optionLabel(Vt[i])}
+                ${Object.keys(Wt).map(a=>c`<option value=${a} ?selected=${t.layout===a}>
+                      ${this._optionLabel(Wt[a])}
                     </option>`)}
               </select>
             </label>
@@ -2526,10 +2608,10 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               <span class="label">${this._zh?"\u4E3B\u9898":"Theme"}</span>
               <select
                 .value=${t.theme||"aurora"}
-                @change=${i=>this._update({theme:i.target.value})}
+                @change=${a=>this._update({theme:a.target.value})}
               >
-                ${Object.keys(Z).map(i=>c`<option value=${i} ?selected=${t.theme===i}>
-                      ${this._optionLabel(Z[i].label)}
+                ${Object.keys(J).map(a=>c`<option value=${a} ?selected=${t.theme===a}>
+                      ${this._optionLabel(J[a].label)}
                     </option>`)}
               </select>
             </label>
@@ -2537,10 +2619,10 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               <span class="label">${this._zh?"\u80CC\u666F":"Background"}</span>
               <select
                 .value=${t.cover||"ambient"}
-                @change=${i=>this._update({cover:i.target.value})}
+                @change=${a=>this._update({cover:a.target.value})}
               >
-                ${Object.keys(jt).map(i=>c`<option value=${i} ?selected=${t.cover===i}>
-                      ${this._optionLabel(jt[i])}
+                ${Object.keys(Yt).map(a=>c`<option value=${a} ?selected=${t.cover===a}>
+                      ${this._optionLabel(Yt[a])}
                     </option>`)}
               </select>
             </label>
@@ -2548,10 +2630,10 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               <span class="label">${this._zh?"\u9891\u8C31\u52A8\u6548":"Visualizer"}</span>
               <select
                 .value=${t.visualizer||"bars"}
-                @change=${i=>this._update({visualizer:i.target.value})}
+                @change=${a=>this._update({visualizer:a.target.value})}
               >
-                ${Object.keys(Bt).map(i=>c`<option value=${i} ?selected=${t.visualizer===i}>
-                      ${this._optionLabel(Bt[i])}
+                ${Object.keys(Gt).map(a=>c`<option value=${a} ?selected=${t.visualizer===a}>
+                      ${this._optionLabel(Gt[a])}
                     </option>`)}
               </select>
             </label>
@@ -2561,7 +2643,7 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
             <input
               type="text"
               .value=${t.name||""}
-              @input=${i=>this._update({name:i.target.value||void 0})}
+              @input=${a=>this._update({name:a.target.value||void 0})}
             />
           </label>
           <label class="field">
@@ -2569,7 +2651,7 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
             <input
               type="color"
               .value=${t.accent||"#2ee6c5"}
-              @input=${i=>this._update({accent:i.target.value})}
+              @input=${a=>this._update({accent:a.target.value})}
             />
           </label>
           <div class="check">
@@ -2577,7 +2659,7 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               type="checkbox"
               id="ha-music-palette"
               .checked=${t.palette!==!1}
-              @change=${i=>this._update({palette:i.target.checked})}
+              @change=${a=>this._update({palette:a.target.checked})}
             />
             <label for="ha-music-palette">
               ${this._zh?"\u4ECE\u5C01\u9762\u81EA\u52A8\u53D6\u8272":"Extract colors from cover art"}
@@ -2595,15 +2677,15 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               type="text"
               .value=${t.volume_entity||""}
               placeholder="number.volume / media_player.amp"
-              @change=${i=>this._update({volume_entity:i.target.value||void 0})}
+              @change=${a=>this._update({volume_entity:a.target.value||void 0})}
             />
           </label>
-          ${this._switch(this._zh?"\u663E\u793A\u97F3\u91CF\u6761":"Show volume",t.show_volume!==!1,i=>this._update({show_volume:i}))}
-          ${this._switch(this._zh?"\u663E\u793A\u97F3\u6E90\u9009\u62E9":"Show source picker",t.show_source!==!1,i=>this._update({show_source:i}))}
-          ${this._switch(this._zh?"\u663E\u793A\u64AD\u653E\u961F\u5217":"Show queue",t.show_queue!==!1,i=>this._update({show_queue:i}))}
-          ${this._switch(this._zh?"\u663E\u793A\u5A92\u4F53\u5E93\u6D4F\u89C8":"Show media browser",t.show_library!==!1,i=>this._update({show_library:i}))}
-          ${this._switch(this._zh?"\u663E\u793A\u5206\u7EC4\u4FE1\u606F":"Show group info",t.show_group!==!1,i=>this._update({show_group:i}))}
-          ${this._switch(this._zh?"\u663E\u793A Music Assistant \u6B4C\u5355\u5165\u53E3":"Show Music Assistant playlists",t.music_assistant!==!1,i=>this._update({music_assistant:i?typeof t.music_assistant=="string"?t.music_assistant:this._maUrlDraft||!0:!1}))}
+          ${this._switch(this._zh?"\u663E\u793A\u97F3\u91CF\u6761":"Show volume",t.show_volume!==!1,a=>this._update({show_volume:a}))}
+          ${this._switch(this._zh?"\u663E\u793A\u97F3\u6E90\u9009\u62E9":"Show source picker",t.show_source!==!1,a=>this._update({show_source:a}))}
+          ${this._switch(this._zh?"\u663E\u793A\u64AD\u653E\u961F\u5217":"Show queue",t.show_queue!==!1,a=>this._update({show_queue:a}))}
+          ${this._switch(this._zh?"\u663E\u793A\u5A92\u4F53\u5E93\u6D4F\u89C8":"Show media browser",t.show_library!==!1,a=>this._update({show_library:a}))}
+          ${this._switch(this._zh?"\u663E\u793A\u5206\u7EC4\u4FE1\u606F":"Show group info",t.show_group!==!1,a=>this._update({show_group:a}))}
+          ${this._switch(this._zh?"\u663E\u793A Music Assistant \u6B4C\u5355\u5165\u53E3":"Show Music Assistant playlists",t.music_assistant!==!1,a=>this._update({music_assistant:a?typeof t.music_assistant=="string"?t.music_assistant:this._maUrlDraft||!0:!1}))}
           <label class="field">
             <span class="label">
               ${this._zh?"MA \u9762\u677F\u5730\u5740\uFF08\u7559\u7A7A\u81EA\u52A8\uFF0C\u4EC5\u4F9B\u62BD\u5C49\u5185\u8DF3\u8F6C\uFF09":"MA panel URL (optional)"}
@@ -2612,21 +2694,35 @@ var yt=globalThis,xt=yt.ShadowRoot&&(yt.ShadyCSS===void 0||yt.ShadyCSS.nativeSha
               type="text"
               .value=${typeof t.music_assistant=="string"?t.music_assistant:""}
               placeholder="/music-assistant"
-              @input=${i=>{this._maUrlDraft=i.target.value.trim()}}
-              @change=${i=>this._update({music_assistant:i.target.value.trim()||!0})}
+              @input=${a=>{this._maUrlDraft=a.target.value.trim()}}
+              @change=${a=>this._update({music_assistant:a.target.value.trim()||!0})}
             />
             <span class="hint">
               ${this._zh?"\u7559\u7A7A\u81EA\u52A8\u8BFB\u53D6 HA \u9762\u677F\u8DEF\u5F84\uFF1B\u6B4C\u5355\u5165\u53E3\u672C\u8EAB\u4E0D\u4F9D\u8D56\u6B64\u9879":"Leave empty to auto-detect the HA panel path"}
             </span>
           </label>
-          ${this._switch(this._zh?"\u5168\u5C40\u60AC\u6D6E\u5165\u53E3\uFF08\u9876\u90E8\u80F6\u56CA + \u53F3\u4E0B\u89D2\uFF09":"Global dock (top pill + bottom-right)",t.dock===!0,i=>this._update({dock:i}))}
+          <label class="field">
+            <span class="label">${this._zh?"\u5168\u5C40\u8FF7\u4F60\u64AD\u653E\u5668":"Global mini player"}</span>
+            <select
+              .value=${t.dock===!0?"top":t.dock||"none"}
+              @change=${a=>this._update({dock:a.target.value})}
+            >
+              <option value="none">${this._zh?"\u5173\u95ED":"Off"}</option>
+              <option value="top">${this._zh?"\u9876\u90E8\u64AD\u653E\u5668":"Top bar"}</option>
+              <option value="sidebar">${this._zh?"\u4FA7\u8FB9\u680F\u64AD\u653E\u5668":"Sidebar"}</option>
+              <option value="fab">${this._zh?"\u53F3\u4E0B\u89D2\u64AD\u653E\u5668":"Bottom-right"}</option>
+            </select>
+            <span class="hint">
+              ${this._zh?"\u76F4\u63A5\u63A7\u5236\u64AD\u653E/\u6682\u505C\u3001\u4E0A\u4E00\u9996\u3001\u4E0B\u4E00\u9996\uFF1B\u4E0D\u8DF3\u8F6C\u9875\u9762":"Direct play/pause, previous and next controls; no page jump"}
+            </span>
+          </label>
         </div>
       </div>
-    `}_switch(t,e,a){return c`<label class="switch-row">
+    `}_switch(t,e,i){return c`<label class="switch-row">
       <span class="label">${t}</span>
       <input
         type="checkbox"
         .checked=${e}
-        @change=${i=>a(i.target.checked)}
+        @change=${a=>i(a.target.checked)}
       />
-    </label>`}};customElements.get("ha-music-editor")||customElements.define("ha-music-editor",ee);var At=new URL(import.meta.url);At.searchParams.get("dock")==="1"&&gt({path:At.searchParams.get("dock_path")||void 0,top:At.searchParams.get("dock_top")!=="0",fab:At.searchParams.get("dock_fab")!=="0"});
+    </label>`}};customElements.get("ha-music-editor")||customElements.define("ha-music-editor",re);var je=new URL(import.meta.url),Ve=je.searchParams.get("dock"),Ke=gt(),ne=Ve==="1"?"top":Ve||Ke?.mode,Be=je.searchParams.get("dock_entity")||Ke?.entity;ne&&ne!=="none"&&Be&&bt({mode:ne,entity:Be,hass:Mt()});

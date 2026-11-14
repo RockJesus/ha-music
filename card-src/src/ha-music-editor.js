@@ -457,6 +457,13 @@ class HaMusicEditor extends LitElement {
                 : "Leave empty to auto-detect the HA panel path"}
             </span>
           </label>
+          ${this._switch(
+            this._zh
+              ? "全局悬浮入口（顶部胶囊 + 右下角）"
+              : "Global dock (top pill + bottom-right)",
+            config.dock === true,
+            (checked) => this._update({ dock: checked })
+          )}
         </div>
       </div>
     `;
@@ -474,4 +481,6 @@ class HaMusicEditor extends LitElement {
   }
 }
 
-customElements.define("ha-music-editor", HaMusicEditor);
+if (!customElements.get("ha-music-editor")) {
+  customElements.define("ha-music-editor", HaMusicEditor);
+}

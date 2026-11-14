@@ -449,7 +449,7 @@ const VIS = ["bars", "wave", "orbit", "none"];
     document.getElementById("stage").appendChild(editor);
     await editor.updateComplete;
     const switches = editor.shadowRoot.querySelectorAll(".switch-row");
-    check("editor/switches", switches.length === 6, switches.length);
+    check("editor/switches", switches.length === 7, switches.length);
     let emitted = null;
     editor.addEventListener("config-changed", (e) => (emitted = e.detail.config));
     switches[2].querySelector('input[type="checkbox"]').click();

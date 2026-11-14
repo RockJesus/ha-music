@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.0.6`
+   - URL：`/local/ha-music.js?v=1.0.9`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -96,8 +96,27 @@ entity: media_player.living_room
 | `show_queue` | bool | `true` | 显示队列按钮（需播放器提供 `queue` 属性） |
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |
+| `dock` | bool | `false` | 卡片渲染后安装全局入口：顶部悬浮胶囊 + 右下角悬浮按钮；同一浏览器只装一次 |
+| `dock_path` | string | `/ha-music-player` | 悬浮入口点击后跳转的仪表盘路径；不存在时请先建仪表盘或改成现有路径 |
 | `max_queue` | number | `60` | 队列最多展示条数 |
 | `music_assistant` | `true` \| `false` \| string | 自动 | 歌单入口：不填时检测到 MA 服务/播放器即显示；`false` 隐藏；字符串同时作为抽屉内「打开 MA」按钮的面板地址（留空自动读 HA 面板路径） |
+
+### 全局入口
+
+- **侧边栏**：HA 仪表盘本身就是侧边栏入口。新建一个播放器仪表盘并勾选「显示在侧边栏」，里面放 `custom:ha-music` 卡片即可；本仓库实例已建 `HA Music Player`（`/ha-music-player`）。
+- **顶部悬浮胶囊 + 右下角悬浮按钮**：两种开启方式。
+  1. 卡片配置 `dock: true`：不需要改 YAML，该卡所在页面渲染后安装；之后在前端 SPA 内切换页面仍保留。
+  2. 真正全局：在 `configuration.yaml` 加 `frontend.extra_module_url`，保存后重启 HA。市场安装后的路径一般是 `/local/community/ha-music/ha-music.js`：
+
+```yaml
+frontend:
+  extra_module_url:
+    - /local/community/ha-music/ha-music.js?dock=1&dock_path=/ha-music-player
+```
+
+- 同一个 `ha-music.js` 既可作为 Lovelace 资源，也可作为全局模块加载；内部已防止重复 `customElements.define`。
+- 进入 `dock_path` 指向的播放器页面后，胶囊和悬浮按钮会自动隐藏，避免遮挡播放器。
+- 不需要悬浮入口时，保持 `dock: false`，并从 `extra_module_url` 移除该行即可。
 
 ### 示例
 
@@ -174,6 +193,14 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.0.9
+
+- 新增全局入口：顶部悬浮胶囊 + 右下角悬浮按钮，点击进入独立播放器仪表盘；进入播放器路径后自动隐藏。
+- 卡片新增 `dock` / `dock_path` 配置，编辑器新增「全局悬浮入口」开关；也支持模块 URL `?dock=1&dock_path=...` 作为 `frontend.extra_module_url` 全局加载。
+- 同一份 bundle 可同时作为 Lovelace 资源和全局模块加载，已加 `customElements` 重复注册保护。
+- 新增侧边栏播放器仪表盘入口（`HA Music Player`，`/ha-music-player`）。
+- 体检：卡片 62/62、编辑器 45/45 全部通过；单测 11/11 通过。
 
 ### 1.0.8
 

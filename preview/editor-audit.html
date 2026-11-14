@@ -106,8 +106,8 @@ const switches = () => er().querySelectorAll(".switch-row");
   check("init/visualizer", selects()[3].value === "bars", selects()[3].value);
   check("init/name", texts()[0]?.value === "HA Music", texts()[0]?.value);
   check("init/color", er().querySelector('input[type="color"]')?.value === "#2ee6c5", er().querySelector('input[type="color"]')?.value);
-  check("init/switches", switches().length === 6, switches().length);
-  check("init/switch-checked", [...switches()].every((s) => s.querySelector('input[type="checkbox"]').checked), [...switches()].map((s) => s.querySelector('input[type="checkbox"]').checked).join(","));
+  check("init/switches", switches().length === 7, switches().length);
+  check("init/switch-checked", [...switches()].filter((s) => s.querySelector('input[type="checkbox"]').checked).length === 6, [...switches()].map((s) => s.querySelector('input[type="checkbox"]').checked).join(","));
   check("init/pickers", er().querySelectorAll("ha-entity-picker").length === 1, er().querySelectorAll("ha-entity-picker").length);
   check("init/option-counts", [...selects()].map((s) => s.options.length).join(",") === "4,5,4,4", [...selects()].map((s) => s.options.length).join(","));
   check("init/card-entity", card._eid() === "media_player.living", card._eid());
@@ -190,6 +190,16 @@ const switches = () => er().querySelectorAll(".switch-row");
     switches()[i].querySelector('input[type="checkbox"]').click();
     await wait(30);
     check(`switch/${key}-on`, lastConfig?.[key] !== false, lastConfig?.[key]);
+  }
+
+  // 第七个开关：全局悬浮入口，默认关闭
+  {
+    const box = switches()[6].querySelector('input[type="checkbox"]');
+    box.click();
+    await wait(30);
+    check("switch/dock-on", lastConfig?.dock === true, lastConfig?.dock);
+    switches()[6].querySelector('input[type="checkbox"]').click();
+    await wait(30);
   }
 
   // MA 地址（字符串 / 留空）

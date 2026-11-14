@@ -28,6 +28,7 @@ import {
   visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
+import { installDock } from "./dock.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -1005,6 +1006,32 @@ class HaMusicCard extends LitElement {
       this._crossFadeArt(card, url);
     }
     this._syncRangeValues();
+    this._installDock();
+  }
+
+  _isPreviewContext() {
+    let root = this.getRootNode?.();
+    while (root) {
+      const host = root.host;
+      if (!host) break;
+      const tag = String(host.tagName || "").toLowerCase();
+      if (
+        tag === "hui-card-preview" ||
+        tag === "hui-card-options" ||
+        tag === "hui-dialog-edit-card" ||
+        tag === "ha-dialog"
+      ) {
+        return true;
+      }
+      root = host.getRootNode?.();
+    }
+    return Boolean(this.closest?.("hui-card-preview, hui-card-options"));
+  }
+
+  _installDock() {
+    if (!this._config?.dock || !this._hass || !this.isConnected) return;
+    if (this._isPreviewContext()) return;
+    installDock({ path: this._config.dock_path || "/ha-music-player" });
   }
 
   _artUrlFor() {
@@ -1765,20 +1792,22 @@ class HaMusicCard extends LitElement {
   }
 }
 
-customElements.define("ha-music", HaMusicCard);
+if (!customElements.get("ha-music")) {
+  customElements.define("ha-music", HaMusicCard);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: CARD_TYPE,
-  name: CARD_NAME,
-  description:
-    "现代炫酷配色的全功能音乐播放器卡片：封面取色、频谱可视化、媒体库浏览、播放队列、多设备切换。",
-  preview: true,
-  documentationURL: "https://github.com/RockJesus/ha-music",
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: CARD_TYPE,
+    name: CARD_NAME,
+    description:
+      "现代炫酷配色的全功能音乐播放器卡片：封面取色、频谱可视化、媒体库浏览、播放队列、多设备切换。",
+    preview: true,
+    documentationURL: "https://github.com/RockJesus/ha-music",
+  });
 
-console.info(
-  `%c HA-MUSIC %c v${CARD_VERSION} `,
-  "background:#2ee6c5;color:#04121a;font-weight:700;border-radius:4px 0 0 4px",
-  "background:#7b5cff;color:#fff;border-radius:0 4px 4px 0"
-);
+  console.info(
+    `%c HA-MUSIC %c v${CARD_VERSION} `,
+    "background:#2ee6c5;color:#04121a;font-weight:700;border-radius:4px 0 0 4px",
+    "background:#7b5cff;color:#fff;border-radius:0 4px 4px 0"
+  );
+}

@@ -1840,41 +1840,63 @@ export const cardStyles = css`
 
   @container (max-width: 620px) {
     .hm-card[data-panel="true"] .hm-body {
-      padding: 16px;
+      padding: 12px 14px;
+      gap: 8px;
     }
 
     .hm-card[data-panel="true"] .hm-main {
-      grid-template-columns: 1fr;
-      justify-items: center;
-      text-align: center;
-      gap: 14px;
+      grid-template-columns: minmax(108px, 42%) minmax(0, 1fr);
+      justify-items: stretch;
+      text-align: left;
+      align-items: center;
+      gap: 12px;
     }
 
     .hm-card[data-panel="true"] .hm-cover {
-      width: min(58%, 250px);
+      width: 100%;
+      border-radius: 16px;
     }
 
     .hm-card[data-panel="true"] .hm-meta {
-      align-items: center;
+      align-items: flex-start;
       width: 100%;
     }
 
     .hm-card[data-panel="true"] .hm-tags {
-      justify-content: center;
+      display: none;
+    }
+
+    .hm-card[data-panel="true"] .hm-vis {
+      height: 22px;
     }
 
     .hm-card[data-panel="true"] .hm-controls {
-      flex-direction: column;
-      align-items: stretch;
+      flex-wrap: nowrap;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
     }
 
     .hm-card[data-panel="true"] .hm-transport {
-      justify-content: center;
+      justify-content: flex-start;
+      gap: 4px;
     }
 
     .hm-card[data-panel="true"] .hm-volume {
-      width: min(100%, 260px);
-      margin: 0 auto;
+      flex: 0 1 124px;
+      width: auto;
+      max-width: 124px;
+      margin-left: auto;
+    }
+
+    .hm-card[data-panel="true"] .hm-btn {
+      width: 32px;
+      height: 32px;
+    }
+
+    .hm-card[data-panel="true"] .hm-play {
+      width: 44px;
+      height: 44px;
     }
   }
 

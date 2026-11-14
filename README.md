@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.5`
+   - URL：`/local/ha-music.js?v=1.1.6`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -192,6 +192,10 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+### 1.1.6
+
+- 窄面板（≤620px）改为封面+信息双列、控制栏单行，避免小屏面板内容过高被裁切。
 
 ### 1.1.5
 

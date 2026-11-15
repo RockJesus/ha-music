@@ -76,7 +76,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.9`
+   - URL：`/local/ha-music.js?v=1.3.10`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -204,7 +204,8 @@ python3 -m http.server 8765
 
 ## 更新日志
 
-- **1.3.9**：新增卡片选择器缩略预览专用 UI，参考圆角方形封面、大标题与完整控制条；按预览尺寸分 lg / md / sm 三档自适应。仅作用于 `hui-card-preview`，不影响仪表盘卡片与迷你播放器。
+- **1.3.10**：修复 HA 2026.6 新卡片选择器缩略预览不生效：兼容 `hui-suggestion-card` 与 `hui-card[preview]`，并读取卡片自身的 `preview` 属性；窄高预览卡片按 md/sm 自适应，保留圆角方形封面、大标题、频谱、进度和控制条。
+- **1.3.9**：新增卡片选择器缩略预览专用 UI，参考圆角方形封面、大标题与完整控制条；按预览尺寸分 lg / md / sm 三档自适应。仅作用于预览容器，不影响仪表盘卡片与迷你播放器。
 
 - **1.3.8**：修复各尺寸元素互相遮盖：封面尺寸按卡片高度动态收缩；控制条禁止换行，音量收窄；紧凑矮卡片隐藏频谱与封面光晕并收紧内边距。
 

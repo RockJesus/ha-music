@@ -84,6 +84,8 @@ class HaMusicCard extends LitElement {
     return {
       _config: { state: true },
       _width: { state: false },
+      preview: { type: Boolean, attribute: false },
+      editMode: { type: Boolean, attribute: false },
     };
   }
 
@@ -113,6 +115,8 @@ class HaMusicCard extends LitElement {
     this._paletteKey = "";
     this._resizeObserver = null;
     this._thumbPreview = false;
+    this.preview = false;
+    this.editMode = false;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -310,7 +314,7 @@ class HaMusicCard extends LitElement {
   }
 
   _layoutKey() {
-    if (this._thumbPreview) return "full";
+    if (this._thumbMode()) return "full";
     if (this._panel) return "full";
     const requested = this._config?.layout || "adaptive";
     if (requested === "adaptive") {
@@ -328,10 +332,15 @@ class HaMusicCard extends LitElement {
 
   _coverPx(layout) {
     const height = this._height || 0;
-    if (this._thumbPreview) {
+    if (this._thumbMode()) {
       const tier = this._thumbTier();
       if (tier === "lg") return Math.round(Math.min(260, Math.max(160, height * 0.34)));
-      if (tier === "md") return Math.round(Math.min(180, Math.max(96, height * 0.32)));
+      if (tier === "md") {
+        const width = this._width || 0;
+        return Math.round(
+          Math.min(180, width ? width * 0.45 : 180, Math.max(96, height * 0.32))
+        );
+      }
       return Math.round(Math.min(120, Math.max(64, height * 0.30)));
     }
     if (layout === "mini") return 44;
@@ -342,7 +351,7 @@ class HaMusicCard extends LitElement {
   }
 
   _tight() {
-    if (this._thumbPreview) return false;
+    if (this._thumbMode()) return false;
     return this._layoutKey() === "compact" && (this._height || 0) < 270;
   }
 
@@ -1155,19 +1164,28 @@ class HaMusicCard extends LitElement {
     while (root) {
       const host = root.host;
       if (!host) break;
-      if (String(host.tagName || "").toLowerCase() === "hui-card-preview") {
+      const tag = String(host.tagName || "").toLowerCase();
+      if (tag === "hui-card-preview" || tag === "hui-suggestion-card") {
+        return true;
+      }
+      // HA 2026.6 新卡片选择器用 <hui-card preview> 渲染缩略预览。
+      if (tag === "hui-card" && host.preview === true) {
         return true;
       }
       root = host.getRootNode?.();
     }
-    return Boolean(this.closest?.("hui-card-preview"));
+    return Boolean(this.closest?.("hui-card-preview, hui-suggestion-card"));
+  }
+
+  _thumbMode() {
+    return this.preview === true || this.editMode === true || this._thumbPreview;
   }
 
   _thumbTier() {
     const width = this._width || 0;
     const height = this._height || 0;
     if (width >= 700 && height >= 500) return "lg";
-    if (width >= 440 && height >= 320) return "md";
+    if (width >= 440 || height >= 520) return "md";
     return "sm";
   }
 
@@ -1376,7 +1394,7 @@ class HaMusicCard extends LitElement {
 
     if (!hass) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbPreview ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbMode() ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">${t("loading")}</div>
           </div>
@@ -1388,7 +1406,7 @@ class HaMusicCard extends LitElement {
     const state = hass.states?.[entityId];
     if (!state) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbPreview ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbMode() ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">
               ${entityId ? `实体未找到：${entityId}` : "ha-music: entity 未配置"}
@@ -1457,7 +1475,7 @@ class HaMusicCard extends LitElement {
         data-theme=${themeKey}
         data-layout=${layout}
         data-panel=${this._panel ? "true" : "false"}
-        data-thumb=${this._thumbPreview ? this._thumbTier() : "false"}
+        data-thumb=${this._thumbMode() ? this._thumbTier() : "false"}
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
         data-tight=${this._tight() ? "true" : "false"}

@@ -2189,6 +2189,37 @@ export const cardStyles = css`
     display: none;
   }
 
+  @container (max-width: 460px) {
+    .hm-card[data-thumb="md"] .hm-controls {
+      gap: 8px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-transport .hm-btn[data-role="shuffle"],
+    .hm-card[data-thumb="md"] .hm-transport .hm-btn[data-role="repeat"] {
+      display: none;
+    }
+
+    .hm-card[data-thumb="md"] .hm-play {
+      width: 56px;
+      height: 56px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-btn {
+      width: 36px;
+      height: 36px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-volume {
+      flex: 0 1 90px;
+      max-width: 90px;
+      margin-left: auto;
+    }
+
+    .hm-card[data-thumb="md"] .hm-vol-pct {
+      display: none;
+    }
+  }
+
   /* 缩略预览不要走正常卡片的“窄卡片单列”规则，否则小预览会被竖向堆叠撑破 */
   @container (max-width: 380px) {
     .hm-card[data-thumb="sm"] .hm-main {
@@ -2217,6 +2248,51 @@ export const cardStyles = css`
       flex: 0 0 34px;
       width: 34px;
       margin-left: auto;
+    }
+
+    .hm-card[data-thumb="md"] .hm-main {
+      grid-template-columns: var(--hm-cover-size) minmax(0, 1fr);
+      justify-items: stretch;
+      text-align: left;
+      gap: 14px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-meta {
+      align-items: flex-start;
+      text-align: left;
+    }
+
+    .hm-card[data-thumb="md"] .hm-vis {
+      display: block;
+    }
+
+    .hm-card[data-thumb="md"] .hm-controls {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-transport {
+      justify-content: flex-start;
+    }
+
+    .hm-card[data-thumb="md"] .hm-volume {
+      flex: 0 1 90px;
+      width: auto;
+      margin-left: auto;
+    }
+
+    .hm-card[data-thumb="md"] .hm-title {
+      font-size: 20px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-artist {
+      font-size: 12px;
+    }
+
+    .hm-card[data-thumb="md"] .hm-kicker {
+      font-size: 10px;
+      letter-spacing: 0.6px;
     }
   }
 

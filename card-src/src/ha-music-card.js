@@ -112,6 +112,7 @@ class HaMusicCard extends LitElement {
     this._palette = null;
     this._paletteKey = "";
     this._resizeObserver = null;
+    this._thumbPreview = false;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -158,6 +159,7 @@ class HaMusicCard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this._thumbPreview = this._isThumbnailPreview();
     this._onKeyDown = (event) => {
       if (event.key !== "Escape") return;
       if (this._drawer.open) this._closeDrawer();
@@ -308,6 +310,7 @@ class HaMusicCard extends LitElement {
   }
 
   _layoutKey() {
+    if (this._thumbPreview) return "full";
     if (this._panel) return "full";
     const requested = this._config?.layout || "adaptive";
     if (requested === "adaptive") {
@@ -325,6 +328,12 @@ class HaMusicCard extends LitElement {
 
   _coverPx(layout) {
     const height = this._height || 0;
+    if (this._thumbPreview) {
+      const tier = this._thumbTier();
+      if (tier === "lg") return Math.round(Math.min(260, Math.max(160, height * 0.34)));
+      if (tier === "md") return Math.round(Math.min(180, Math.max(96, height * 0.32)));
+      return Math.round(Math.min(120, Math.max(64, height * 0.30)));
+    }
     if (layout === "mini") return 44;
     if (layout === "compact") {
       return Math.round(Math.min(88, Math.max(52, height * 0.26)));
@@ -333,6 +342,7 @@ class HaMusicCard extends LitElement {
   }
 
   _tight() {
+    if (this._thumbPreview) return false;
     return this._layoutKey() === "compact" && (this._height || 0) < 270;
   }
 
@@ -1140,6 +1150,27 @@ class HaMusicCard extends LitElement {
     this.renderRoot?.querySelector?.(".hm-card")?.setAttribute("data-panel", String(panel));
   }
 
+  _isThumbnailPreview() {
+    let root = this.getRootNode?.();
+    while (root) {
+      const host = root.host;
+      if (!host) break;
+      if (String(host.tagName || "").toLowerCase() === "hui-card-preview") {
+        return true;
+      }
+      root = host.getRootNode?.();
+    }
+    return Boolean(this.closest?.("hui-card-preview"));
+  }
+
+  _thumbTier() {
+    const width = this._width || 0;
+    const height = this._height || 0;
+    if (width >= 700 && height >= 500) return "lg";
+    if (width >= 440 && height >= 320) return "md";
+    return "sm";
+  }
+
   _isPreviewContext() {
     let root = this.getRootNode?.();
     while (root) {
@@ -1345,7 +1376,7 @@ class HaMusicCard extends LitElement {
 
     if (!hass) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbPreview ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">${t("loading")}</div>
           </div>
@@ -1357,7 +1388,7 @@ class HaMusicCard extends LitElement {
     const state = hass.states?.[entityId];
     if (!state) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbPreview ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">
               ${entityId ? `实体未找到：${entityId}` : "ha-music: entity 未配置"}
@@ -1426,6 +1457,7 @@ class HaMusicCard extends LitElement {
         data-theme=${themeKey}
         data-layout=${layout}
         data-panel=${this._panel ? "true" : "false"}
+        data-thumb=${this._thumbPreview ? this._thumbTier() : "false"}
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
         data-tight=${this._tight() ? "true" : "false"}

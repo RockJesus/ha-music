@@ -1133,7 +1133,12 @@ class HaMusicCard extends LitElement {
   }
 
   _installDock() {
-    const modes = normalizeDockModes(this._config?.dock);
+    const dockConfig = this._config?.dock;
+    const explicitNone =
+      dockConfig === "none" ||
+      (Array.isArray(dockConfig) && dockConfig.length === 0) ||
+      dockConfig === "";
+    const modes = normalizeDockModes(dockConfig);
     const dockEntities = normalizeDockEntities(this._config?.dock_entities);
     const dockThemes = normalizeDockThemes(this._config?.dock_themes);
     const fallback =
@@ -1141,9 +1146,11 @@ class HaMusicCard extends LitElement {
       this._config?.entity ||
       (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
     if (!modes.length) {
-      // 全局播放器由 localStorage 记忆；只有本卡片此前装过才允许清空，
-      // 避免同一仪表盘里其他未配置 dock 的卡片误删全局播放器。
-      if (this._dockOwner) {
+      // 全局播放器由 localStorage 记忆。显式 `dock: none` 表示用户在编辑器里
+      // 主动停用了三个位置，必须同时清掉旧配置留下的 localStorage，否则刷新后
+      // index.js 会按旧 pref 把播放器重新装回来，表现为开关关不掉。
+      // 未配置 dock 的普通卡片不参与清理，避免同仪表盘的其他卡片互相误删。
+      if (!this._isPreviewContext() && (this._dockOwner || explicitNone)) {
         clearDockPref();
         uninstallDock();
         this._dockOwner = false;

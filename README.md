@@ -71,7 +71,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.3`
+   - URL：`/local/ha-music.js?v=1.3.4`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -198,6 +198,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.3.4**：修复三个迷你播放器开关全部关闭后仍会被旧 localStorage 记录重新装回的问题；显式 `dock: none` 现在会同步清除旧的三位置记忆。
 
 - **1.3.3**：调整三个迷你播放器的默认位置：顶部默认在顶栏「+」按钮左侧，侧边栏默认在「设置」入口上方，右下角默认在屏幕右侧垂直居中；已拖动保存过的位置仍优先生效。
 

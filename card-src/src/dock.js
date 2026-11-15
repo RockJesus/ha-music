@@ -37,6 +37,123 @@ const PAUSE_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden=
 const UP_ICON = `<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path d="M6.7 14.7L12 9.4l5.3 5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const DOWN_ICON = `<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path d="M6.7 9.3L12 14.6l5.3-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+
+const TOP_BAR_TAGS = new Set(["HA-TOP-APP-BAR", "HA-HEADER", "HA-APP-HEADER", "APP-HEADER", "HEADER"]);
+const SIDEBAR_TAGS = new Set(["HA-SIDEBAR", "ASIDE"]);
+
+function isUsableRect(rect, minW = 1, minH = 1) {
+  return Boolean(rect && rect.width >= minW && rect.height >= minH && rect.bottom > 0 && rect.right > 0);
+}
+
+function collectDeep(root, predicate, out, depth = 0) {
+  if (!root || depth > 8) return;
+  const nodes = root.querySelectorAll ? root.querySelectorAll("*") : [];
+  for (const node of nodes) {
+    try {
+      if (predicate(node)) out.push(node);
+    } catch {
+      /* 忽略单个节点的异常 */
+    }
+    if (node.shadowRoot) collectDeep(node.shadowRoot, predicate, out, depth + 1);
+  }
+}
+
+function deepMatches(predicate) {
+  const out = [];
+  collectDeep(document, predicate, out);
+  return out;
+}
+
+function visibleTagRect(tags) {
+  const found = deepMatches((node) => tags.has(node.tagName));
+  let best = null;
+  for (const node of found) {
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 24, 24)) continue;
+    if (!best || rect.width * rect.height > best.width * best.height) {
+      best = { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
+    }
+  }
+  return best;
+}
+
+function findTopBarRect() {
+  const tagged = visibleTagRect(TOP_BAR_TAGS);
+  if (tagged && tagged.height <= 120) return tagged;
+  // 兜底：找页面顶部、横跨较长、带 header/top/app-bar 语义的可见元素。
+  const found = deepMatches((node) => {
+    if (node.tagName === "BODY" || node.tagName === "HTML") return false;
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 240, 36) || rect.top > 12 || rect.height > 96) return false;
+    const name = `${node.tagName} ${node.id} ${node.className || ""}`.toLowerCase();
+    return /header|top|app-bar|appbar|navbar/.test(name);
+  });
+  let best = null;
+  for (const node of found) {
+    const rect = node.getBoundingClientRect();
+    if (!best || rect.width * rect.height > best.width * best.height) {
+      best = { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
+    }
+  }
+  return best;
+}
+
+function findSidebarRect() {
+  const tagged = visibleTagRect(SIDEBAR_TAGS);
+  if (tagged) return tagged;
+  const found = deepMatches((node) => {
+    if (node.tagName === "BODY" || node.tagName === "HTML") return false;
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 40, 240) || rect.left > 8) return false;
+    const name = `${node.tagName} ${node.id} ${node.className || ""}`.toLowerCase();
+    return /sidebar|navigation|nav-drawer/.test(name);
+  });
+  let best = null;
+  for (const node of found) {
+    const rect = node.getBoundingClientRect();
+    if (!best || rect.height > best.height) {
+      best = { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
+    }
+  }
+  return best;
+}
+
+function getDockBounds(mode) {
+  const vw = Math.round(window.innerWidth || 0);
+  const vh = Math.round(window.innerHeight || 0);
+  if (mode === "top") {
+    const bar = findTopBarRect();
+    const height = bar?.height || 56;
+    const top = bar?.top || 0;
+    return {
+      left: bar?.left || 0,
+      top,
+      width: bar?.width || vw,
+      height: Math.max(40, Math.min(72, height)),
+      right: (bar?.left || 0) + (bar?.width || vw),
+      bottom: top + Math.max(40, Math.min(72, height)),
+    };
+  }
+  if (mode === "sidebar") {
+    const side = findSidebarRect();
+    if (side) return side;
+    const top = findTopBarRect()?.height || 56;
+    return { left: 0, top, width: 256, height: Math.max(240, vh - top), right: 256, bottom: vh };
+  }
+  return null;
+}
+
+function clampNumber(value, min, max) {
+  if (max < min) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function dockMargin(mode) {
+  if (mode === "top") return 8;
+  if (mode === "sidebar") return 8;
+  return 24;
+}
+
 const STYLE = `
   :host {
     position: fixed;
@@ -79,14 +196,36 @@ const STYLE = `
       0 0 26px -6px rgba(46, 230, 197, 0.5);
   }
   .mini[data-mode="top"] {
-    top: calc(env(safe-area-inset-top, 0px) + 56px);
-    right: max(16px, env(safe-area-inset-right, 0px));
-    width: min(420px, calc(100vw - 32px));
+    top: 4px;
+    left: 8px;
+    right: auto;
+    height: 48px;
+    padding: 5px 8px;
+    gap: 6px;
+    border-radius: 12px;
   }
   .mini[data-mode="sidebar"] {
-    left: max(10px, env(safe-area-inset-left, 0px));
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+    left: 8px;
+    top: 64px;
+    bottom: auto;
     width: 236px;
+    max-height: calc(100vh - 72px);
+    border-radius: 14px;
+  }
+  .mini[data-mode="sidebar"][data-compact="true"] {
+    width: 56px !important;
+    height: 56px;
+    padding: 4px;
+    gap: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .mini[data-mode="sidebar"][data-compact="true"] .meta,
+  .mini[data-mode="sidebar"][data-compact="true"] .controls,
+  .mini[data-mode="sidebar"][data-compact="true"] .progress { display: none; }
+  .mini[data-mode="sidebar"][data-compact="true"] .art {
+    width: 44px;
+    height: 44px;
   }
   .mini[data-mode="fab"] {
     right: max(16px, env(safe-area-inset-right, 0px));
@@ -195,16 +334,15 @@ const STYLE = `
   }
   @media (max-width: 700px) {
     .mini[data-mode="top"] {
-      top: calc(env(safe-area-inset-top, 0px) + 58px);
-      left: max(10px, env(safe-area-inset-left, 0px));
-      right: max(10px, env(safe-area-inset-right, 0px));
-      width: auto;
+      top: 4px;
+      left: 8px;
+      right: auto;
+      width: calc(100vw - 16px);
+      height: 48px;
     }
     .mini[data-mode="sidebar"] {
-      left: max(10px, env(safe-area-inset-left, 0px));
-      right: max(10px, env(safe-area-inset-right, 0px));
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
-      width: auto;
+      width: 236px;
+      right: auto;
     }
     .mini[data-mode="fab"] {
       right: max(12px, env(safe-area-inset-right, 0px));
@@ -216,6 +354,10 @@ const STYLE = `
   .mini[data-mode="fab"] {
     right: max(24px, env(safe-area-inset-right, 0px));
     bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    left: auto;
+    top: auto;
+    cursor: default;
+    touch-action: manipulation;
     width: 64px;
     height: 64px;
     padding: 0;
@@ -786,36 +928,90 @@ class HaMusicMini extends HTMLElement {
     return labels[state] || state;
   }
 
+  _clearDockInlineStyles() {
+    if (!this._mini) return;
+    for (const prop of ["left", "top", "right", "bottom", "width", "height", "max-height"]) {
+      this._mini.style.removeProperty(prop);
+    }
+    delete this._mini.dataset.compact;
+  }
+
   _applySavedPosition() {
     if (!this._mini || !this._mini.isConnected) return;
+    if (this._mode === "fab") {
+      // 右下角悬浮播放器固定，不参与拖动和位置恢复。
+      this._clearDockInlineStyles();
+      return;
+    }
+    const bounds = getDockBounds(this._mode);
+    if (!bounds) return;
     const positions = loadDockPositions();
     const pos = positions[this._mode];
-    if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
-    const rect = this._mini.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const margin = this._mode === "fab" ? 24 : 8;
-    const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
-    const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
-    const x = Math.max(margin, Math.min(maxX, pos.x * window.innerWidth));
-    const y = Math.max(margin, Math.min(maxY, pos.y * window.innerHeight));
-    this._mini.style.left = `${Math.round(x)}px`;
-    this._mini.style.top = `${Math.round(y)}px`;
-    this._mini.style.right = "auto";
-    this._mini.style.bottom = "auto";
+    const margin = dockMargin(this._mode);
+    const mini = this._mini;
+
+    if (this._mode === "top") {
+      const h = Math.round(Math.min(56, Math.max(40, bounds.height - 8)));
+      const maxW = Math.max(160, bounds.width - margin * 2);
+      const w = Math.round(Math.min(420, Math.max(250, bounds.width - 140), maxW));
+      mini.style.width = `${w}px`;
+      mini.style.height = `${h}px`;
+      mini.style.removeProperty("max-height");
+      delete mini.dataset.compact;
+      const defaultX = bounds.right - w - 120;
+      const x = clampNumber(
+        pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
+        bounds.left + margin,
+        bounds.right - w - margin,
+      );
+      mini.style.left = `${Math.round(x)}px`;
+      mini.style.top = `${Math.round(bounds.top + Math.max(2, (bounds.height - h) / 2))}px`;
+      mini.style.right = "auto";
+      mini.style.bottom = "auto";
+      return;
+    }
+
+    // 侧边栏：宽度贴合侧栏，X 固定，只允许上下移动，不能进入主内容区。
+    const w = Math.round(Math.max(56, Math.min(236, bounds.width - 16)));
+    mini.style.width = `${w}px`;
+    mini.style.height = "auto";
+    mini.style.maxHeight = `${Math.max(56, bounds.height - 16)}px`;
+    mini.dataset.compact = w < 170 ? "true" : "false";
+    const left = Math.round(bounds.left + margin);
+    mini.style.left = `${left}px`;
+    mini.style.right = "auto";
+    mini.style.bottom = "auto";
+    const height = mini.getBoundingClientRect().height || 58;
+    const defaultY = bounds.bottom - height - 12;
+    const y = clampNumber(
+      pos && Number.isFinite(pos.y) ? pos.y * window.innerHeight : defaultY,
+      bounds.top + margin,
+      bounds.bottom - height - margin,
+    );
+    mini.style.top = `${Math.round(y)}px`;
   }
 
   _saveCurrentPosition() {
-    if (!this._mini) return;
+    if (!this._mini || this._mode === "fab") return;
     const rect = this._mini.getBoundingClientRect();
+    if (this._mode === "top") {
+      saveDockPosition(
+        this._mode,
+        clampNumber(rect.left / Math.max(1, window.innerWidth), 0, 1),
+        0,
+      );
+      return;
+    }
     saveDockPosition(
       this._mode,
-      Math.max(0, Math.min(1, rect.left / window.innerWidth)),
-      Math.max(0, Math.min(1, rect.top / window.innerHeight)),
+      0,
+      clampNumber(rect.top / Math.max(1, window.innerHeight), 0, 1),
     );
   }
 
   _handlePointerDown(event) {
     if (!this._mini || event.button !== 0 || event.isPrimary === false) return;
+    if (this._mode === "fab") return;
     this._clearPress();
     this._press = {
       pointerId: event.pointerId,
@@ -844,6 +1040,7 @@ class HaMusicMini extends HTMLElement {
       height: rect.height,
       x: this._press.x,
       y: this._press.y,
+      bounds: getDockBounds(this._mode),
     };
     this._mini.dataset.dragging = "true";
     this._mini.style.left = `${rect.left}px`;
@@ -872,13 +1069,30 @@ class HaMusicMini extends HTMLElement {
       return;
     }
     event.preventDefault();
-    const margin = this._mode === "fab" ? 24 : 8;
-    const maxX = Math.max(margin, window.innerWidth - this._drag.width - margin);
-    const maxY = Math.max(margin, window.innerHeight - this._drag.height - margin);
-    const x = Math.max(margin, Math.min(maxX, this._drag.left + dx));
-    const y = Math.max(margin, Math.min(maxY, this._drag.top + dy));
+    const bounds = this._drag.bounds;
+    if (!bounds) return;
+    const margin = dockMargin(this._mode);
+    let x = this._drag.left;
+    let y = this._drag.top;
+    if (this._mode === "top") {
+      // 顶部只允许左右移动，并且始终留在导航栏内。
+      x = clampNumber(
+        this._drag.left + dx,
+        bounds.left + margin,
+        bounds.right - this._drag.width - margin,
+      );
+    } else if (this._mode === "sidebar") {
+      // 侧边栏只允许上下移动，X 固定在侧栏内。
+      y = clampNumber(
+        this._drag.top + dy,
+        bounds.top + margin,
+        bounds.bottom - this._drag.height - margin,
+      );
+    }
     this._mini.style.left = `${Math.round(x)}px`;
     this._mini.style.top = `${Math.round(y)}px`;
+    this._mini.style.right = "auto";
+    this._mini.style.bottom = "auto";
   }
 
   _handlePointerUp() {

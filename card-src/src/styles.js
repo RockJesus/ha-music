@@ -1799,9 +1799,11 @@ export const cardStyles = css`
 
   /* ---------- 面板视图：自动铺满可用区域 ---------- */
   :host([data-panel="true"]) {
-    height: 100%;
+    --hm-panel-height: 100%;
+    --hm-panel-cover: calc(100dvh - 440px);
+    height: var(--hm-panel-height, 100%);
     min-height: 0;
-    max-height: 100%;
+    max-height: var(--hm-panel-height, 100%);
   }
 
   .hm-card[data-panel="true"] {
@@ -1917,6 +1919,39 @@ export const cardStyles = css`
     .hm-card[data-panel="true"] .hm-play {
       width: 44px;
       height: 44px;
+    }
+  }
+
+  /* 窄屏/竖屏面板：封面在上、信息在下，占满剩余高度 */
+  @container (max-width: 820px) {
+    .hm-card[data-panel="true"] .hm-main {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: clamp(10px, 3cqi, 20px);
+    }
+
+    .hm-card[data-panel="true"] .hm-cover-wrap {
+      width: 100%;
+      height: auto;
+      flex: 0 0 auto;
+    }
+
+    .hm-card[data-panel="true"] .hm-cover {
+      width: min(88%, var(--hm-panel-cover, calc(100dvh - 440px)));
+      max-height: none;
+      margin: 0 auto;
+    }
+
+    .hm-card[data-panel="true"] .hm-meta {
+      align-items: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    .hm-card[data-panel="true"] .hm-tags {
+      justify-content: center;
     }
   }
 

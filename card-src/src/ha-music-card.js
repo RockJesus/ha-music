@@ -97,6 +97,7 @@ class HaMusicCard extends LitElement {
     this._height = 0;
     this._panel = false;
     this._fitPanelRaf = null;
+    this._panelHeight = 0;
     this._tickTimer = null;
     this._toast = "";
     this._toastTimer = null;
@@ -166,6 +167,9 @@ class HaMusicCard extends LitElement {
       }
     };
     window.addEventListener("keydown", this._onKeyDown);
+    this._onViewportResize = () => this._queuePanelFit();
+    window.addEventListener("resize", this._onViewportResize);
+    window.visualViewport?.addEventListener("resize", this._onViewportResize);
     if (typeof ResizeObserver !== "undefined") {
       this._resizeObserver = new ResizeObserver((entries) => {
         const width = entries[0]?.contentRect?.width || 0;
@@ -191,6 +195,11 @@ class HaMusicCard extends LitElement {
     if (this._onKeyDown) {
       window.removeEventListener("keydown", this._onKeyDown);
       this._onKeyDown = null;
+    }
+    if (this._onViewportResize) {
+      window.removeEventListener("resize", this._onViewportResize);
+      window.visualViewport?.removeEventListener("resize", this._onViewportResize);
+      this._onViewportResize = null;
     }
     this._stopTimer();
     this._resizeObserver?.disconnect();
@@ -1045,16 +1054,41 @@ class HaMusicCard extends LitElement {
   _fitPanel() {
     if (!this._panel) {
       this.style.removeProperty("--hm-panel-cover");
+      this.style.removeProperty("--hm-panel-height");
+      this._panelHeight = 0;
       return;
+    }
+    const card = this.renderRoot?.querySelector?.(".hm-card");
+    if (!card) return;
+    const viewportH = Math.round(
+      window.visualViewport?.height || window.innerHeight || 0
+    );
+    if (viewportH < 240) return;
+    // 让卡片贴合当前视口底部，解决面板父容器高度未约束导致的下滑。
+    const rect = card.getBoundingClientRect();
+    const available = Math.max(
+      240,
+      Math.min(viewportH, Math.floor(viewportH - Math.max(0, rect.top)))
+    );
+    if (available !== this._panelHeight) {
+      this._panelHeight = available;
+      this.style.setProperty("--hm-panel-height", `${available}px`);
     }
     const main = this.renderRoot?.querySelector?.(".hm-main");
     if (!main) return;
     const mainH = Math.round(main.clientHeight || 0);
     const mainW = Math.round(main.clientWidth || 0);
     if (mainH < 80 || mainW < 80) return;
-    // 封面以主区可用高度为上限；窄屏放宽到 42% 宽度，避免封面过小。
-    const widthRatio = mainW < 620 ? 0.42 : 0.34;
-    const size = Math.max(120, Math.min(mainH, mainW * widthRatio));
+    const stack = card.clientWidth < 820;
+    let size;
+    if (stack) {
+      // 窄屏/竖屏：封面在上、信息在下，封面尽量大但不挤掉底部信息。
+      const reserve = Math.min(180, Math.max(96, mainH * 0.3));
+      size = Math.max(120, Math.min(mainW * 0.88, mainH - reserve));
+    } else {
+      // 宽屏：封面以主区可用高度为上限，同时保留 34% 宽度上限。
+      size = Math.max(120, Math.min(mainH, mainW * 0.34));
+    }
     this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
   }
 

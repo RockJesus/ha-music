@@ -1136,7 +1136,7 @@ class HaMusicMini extends HTMLElement {
     if (this._mode === "top") {
       const h = Math.round(Math.min(44, Math.max(38, bounds.height - 8)));
       const maxW = Math.max(150, bounds.width - margin * 2);
-      const w = Math.round(Math.min(330, Math.max(220, bounds.width - 140), maxW));
+      const w = Math.round(Math.min(300, Math.max(200, bounds.width - 140), maxW));
       mini.style.width = `${w}px`;
       mini.style.height = `${h}px`;
       mini.style.removeProperty("max-height");

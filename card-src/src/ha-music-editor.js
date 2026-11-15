@@ -510,7 +510,7 @@ class HaMusicEditor extends LitElement {
           <div class="section-title">${this._zh ? "全局迷你播放器" : "Global mini players"}</div>
           <div class="hint">
             ${this._zh
-              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；单击播放/暂停，双击折叠或展开。顶部只可左右移动、侧边栏只可上下移动，右下角固定不可拖动。"
+              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；单击播放/暂停，双击折叠或展开。顶部只可左右移动、侧边栏只可上下移动；右下角长按后可任意拖动，但不能进入侧边栏和顶栏。"
               : "Each position can use its own entity; click to play/pause, double-click to fold, long-press to drag."}
           </div>
           ${[

@@ -198,6 +198,28 @@ function getDockBounds(mode) {
   return null;
 }
 
+const FAB_GAP = 12;
+
+function getFabConstraints() {
+  const vw = Math.round(window.innerWidth || 0);
+  const vh = Math.round(window.innerHeight || 0);
+  const bar = findTopBarRect();
+  const side = findSidebarRect();
+  const minX = side && side.height >= vh * 0.4 ? side.right + FAB_GAP : 0;
+  const minY = bar && bar.width >= vw * 0.5 ? bar.bottom + FAB_GAP : 0;
+  return { vw, vh, minX, minY };
+}
+
+function clampFabPosition(x, y, width, height, constraints = getFabConstraints()) {
+  const { vw, vh, minX, minY } = constraints;
+  const maxX = Math.max(minX, vw - width - FAB_GAP);
+  const maxY = Math.max(minY, vh - height - FAB_GAP);
+  return {
+    x: clampNumber(x, minX, maxX),
+    y: clampNumber(y, minY, maxY),
+  };
+}
+
 function clampNumber(value, min, max) {
   if (max < min) return min;
   return Math.max(min, Math.min(max, value));
@@ -437,8 +459,8 @@ const STYLE = `
     bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
     left: auto;
     top: auto;
-    cursor: default;
-    touch-action: manipulation;
+    cursor: grab;
+    touch-action: none;
     width: 64px;
     height: 64px;
     padding: 0;
@@ -928,13 +950,20 @@ class HaMusicMini extends HTMLElement {
 
   _watchDockBounds() {
     if (typeof ResizeObserver === "undefined") return;
-    const node = this._mode === "top" ? findTopBarNode() : this._mode === "sidebar" ? findSidebarNode() : null;
-    if (!node) {
+    let nodes = [];
+    if (this._mode === "top") {
+      nodes = [findTopBarNode()].filter(Boolean);
+    } else if (this._mode === "sidebar") {
+      nodes = [findSidebarNode()].filter(Boolean);
+    } else if (this._mode === "fab") {
+      nodes = [findTopBarNode(), findSidebarNode()].filter(Boolean);
+    }
+    if (!nodes.length) {
       this._boundsNodes = 0;
       return;
     }
     if (this._boundsObserver) this._boundsObserver.disconnect();
-    this._boundsNodes = 1;
+    this._boundsNodes = nodes.length;
     this._boundsObserver = new ResizeObserver(() => {
       if (this._dragging || this._boundsRaf) return;
       this._boundsRaf = window.requestAnimationFrame(() => {
@@ -942,7 +971,7 @@ class HaMusicMini extends HTMLElement {
         this._applySavedPosition();
       });
     });
-    this._boundsObserver.observe(node);
+    for (const node of nodes) this._boundsObserver.observe(node);
   }
 
   _render() {
@@ -1060,8 +1089,26 @@ class HaMusicMini extends HTMLElement {
   _applySavedPosition() {
     if (!this._mini || !this._mini.isConnected) return;
     if (this._mode === "fab") {
-      // 右下角悬浮播放器固定，不参与拖动和位置恢复。
-      this._clearDockInlineStyles();
+      const mini = this._mini;
+      const rect = mini.getBoundingClientRect();
+      const width = rect.width || 64;
+      const height = rect.height || 64;
+      const constraints = getFabConstraints();
+      const positions = loadDockPositions();
+      const pos = positions.fab;
+      const defaultX = constraints.vw - width - 24;
+      const defaultY = constraints.vh - height - 24;
+      const target = clampFabPosition(
+        pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
+        pos && Number.isFinite(pos.y) ? pos.y * window.innerHeight : defaultY,
+        width,
+        height,
+        constraints,
+      );
+      mini.style.left = `${Math.round(target.x)}px`;
+      mini.style.top = `${Math.round(target.y)}px`;
+      mini.style.right = "auto";
+      mini.style.bottom = "auto";
       return;
     }
     const bounds = getDockBounds(this._mode);
@@ -1123,8 +1170,16 @@ class HaMusicMini extends HTMLElement {
   }
 
   _saveCurrentPosition() {
-    if (!this._mini || this._mode === "fab") return;
+    if (!this._mini) return;
     const rect = this._mini.getBoundingClientRect();
+    if (this._mode === "fab") {
+      saveDockPosition(
+        "fab",
+        clampNumber(rect.left / Math.max(1, window.innerWidth), 0, 1),
+        clampNumber(rect.top / Math.max(1, window.innerHeight), 0, 1),
+      );
+      return;
+    }
     if (this._mode === "top") {
       saveDockPosition(
         this._mode,
@@ -1142,7 +1197,6 @@ class HaMusicMini extends HTMLElement {
 
   _handlePointerDown(event) {
     if (!this._mini || event.button !== 0 || event.isPrimary === false) return;
-    if (this._mode === "fab") return;
     this._clearPress();
     this._press = {
       pointerId: event.pointerId,
@@ -1171,7 +1225,7 @@ class HaMusicMini extends HTMLElement {
       height: rect.height,
       x: this._press.x,
       y: this._press.y,
-      bounds: getDockBounds(this._mode),
+      bounds: this._mode === "fab" ? getFabConstraints() : getDockBounds(this._mode),
     };
     this._mini.dataset.dragging = "true";
     this._mini.style.left = `${rect.left}px`;
@@ -1219,6 +1273,17 @@ class HaMusicMini extends HTMLElement {
         bounds.top + margin,
         bounds.bottom - this._drag.height - margin,
       );
+    } else if (this._mode === "fab") {
+      // 右下角可任意拖动，但不能进入顶部导航栏和侧边栏。
+      const safe = clampFabPosition(
+        this._drag.left + dx,
+        this._drag.top + dy,
+        this._drag.width,
+        this._drag.height,
+        bounds,
+      );
+      x = safe.x;
+      y = safe.y;
     }
     this._mini.style.left = `${Math.round(x)}px`;
     this._mini.style.top = `${Math.round(y)}px`;

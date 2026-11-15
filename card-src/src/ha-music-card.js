@@ -94,7 +94,9 @@ class HaMusicCard extends LitElement {
     this._activeEntity = "";
     this._sig = "";
     this._width = 0;
+    this._height = 0;
     this._panel = false;
+    this._fitPanelRaf = null;
     this._tickTimer = null;
     this._toast = "";
     this._toastTimer = null;
@@ -167,10 +169,18 @@ class HaMusicCard extends LitElement {
     if (typeof ResizeObserver !== "undefined") {
       this._resizeObserver = new ResizeObserver((entries) => {
         const width = entries[0]?.contentRect?.width || 0;
-        if (Math.abs(width - this._width) < 1) return;
+        const height = entries[0]?.contentRect?.height || 0;
+        const widthChanged = Math.abs(width - this._width) >= 1;
+        const heightChanged = Math.abs(height - this._height) >= 1;
         this._width = width;
-        const layout = this._config?.layout || "adaptive";
-        if (layout === "adaptive") this.requestUpdate();
+        this._height = height;
+        if (widthChanged) {
+          const layout = this._config?.layout || "adaptive";
+          if (layout === "adaptive") this.requestUpdate();
+          else this._queuePanelFit();
+        } else if (heightChanged) {
+          this._queuePanelFit();
+        }
       });
       this._resizeObserver.observe(this);
     }
@@ -185,6 +195,8 @@ class HaMusicCard extends LitElement {
     this._stopTimer();
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
+    if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
+    this._fitPanelRaf = null;
     if (this._toastTimer) clearTimeout(this._toastTimer);
   }
 
@@ -1010,11 +1022,40 @@ class HaMusicCard extends LitElement {
     }
     this._syncRangeValues();
     this._syncPanelFlag();
+    this._queuePanelFit();
     this._installDock();
     syncCoverSpin(
       this.renderRoot?.querySelector?.(".hm-cover img"),
       this._state()?.state === "playing",
     );
+  }
+
+  _queuePanelFit() {
+    if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
+    if (typeof requestAnimationFrame === "undefined") {
+      this._fitPanel();
+      return;
+    }
+    this._fitPanelRaf = requestAnimationFrame(() => {
+      this._fitPanelRaf = null;
+      this._fitPanel();
+    });
+  }
+
+  _fitPanel() {
+    if (!this._panel) {
+      this.style.removeProperty("--hm-panel-cover");
+      return;
+    }
+    const main = this.renderRoot?.querySelector?.(".hm-main");
+    if (!main) return;
+    const mainH = Math.round(main.clientHeight || 0);
+    const mainW = Math.round(main.clientWidth || 0);
+    if (mainH < 80 || mainW < 80) return;
+    // 封面以主区可用高度为上限；窄屏放宽到 42% 宽度，避免封面过小。
+    const widthRatio = mainW < 620 ? 0.42 : 0.34;
+    const size = Math.max(120, Math.min(mainH, mainW * widthRatio));
+    this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
   }
 
   _isPanelContext() {

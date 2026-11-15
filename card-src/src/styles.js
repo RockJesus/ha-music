@@ -1800,25 +1800,44 @@ export const cardStyles = css`
   /* ---------- 面板视图：自动铺满可用区域 ---------- */
   :host([data-panel="true"]) {
     height: 100%;
+    min-height: 0;
+    max-height: 100%;
   }
 
   .hm-card[data-panel="true"] {
     height: 100%;
+    min-height: 0;
+    max-height: 100%;
     border-radius: 0;
   }
 
   .hm-card[data-panel="true"] .hm-body {
     max-width: none;
+    min-height: 0;
+    overflow: hidden;
     padding: clamp(18px, 2.4vw, 40px);
   }
 
+  /* 主区吃掉剩余高度；封面按主区高度收缩，避免把频谱/进度条压出视口 */
   .hm-card[data-panel="true"] .hm-main {
-    grid-template-columns: minmax(180px, 34%) minmax(0, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, var(--hm-panel-cover, 34%)) minmax(0, 1fr);
     gap: clamp(20px, 3.2vw, 46px);
   }
 
-  .hm-card[data-panel="true"] .hm-cover {
+  .hm-card[data-panel="true"] .hm-cover-wrap {
     width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hm-card[data-panel="true"] .hm-cover {
+    width: min(100%, var(--hm-panel-cover, 100%));
+    max-height: 100%;
     border-radius: 50%;
   }
 
@@ -1846,7 +1865,7 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-main {
-      grid-template-columns: minmax(108px, 42%) minmax(0, 1fr);
+      grid-template-columns: minmax(0, var(--hm-panel-cover, 42%)) minmax(0, 1fr);
       justify-items: stretch;
       text-align: left;
       align-items: center;
@@ -1854,7 +1873,7 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-cover {
-      width: 100%;
+      width: min(100%, var(--hm-panel-cover, 100%));
       border-radius: 50%;
     }
 

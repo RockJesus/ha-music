@@ -2,10 +2,38 @@
 // 通过卡片传入 hass 与当前实体；也支持模块 URL 的 dock=top|sidebar|fab + dock_entity。
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
+import { THEMES, DEFAULT_THEME } from "./const.js";
+import { colorTriplet } from "./util.js";
 
 const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
 const MODES = new Set(["top", "sidebar", "fab"]);
+
+export function normalizeTheme(value) {
+  return typeof value === "string" && THEMES[value] ? value : DEFAULT_THEME;
+}
+
+export function normalizeDockThemes(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const mode of MODES) {
+    if (THEMES[value[mode]]) out[mode] = value[mode];
+  }
+  return out;
+}
+
+function applyMiniTheme(node, themeKey) {
+  if (!node) return;
+  const key = normalizeTheme(themeKey);
+  const theme = THEMES[key];
+  node.dataset.theme = key;
+  node.style.setProperty("--hm-accent", theme.accent[0]);
+  node.style.setProperty("--hm-accent-2", theme.accent[1]);
+  node.style.setProperty("--hm-accent-rgb", colorTriplet(theme.accent[0], "46,230,197"));
+  node.style.setProperty("--hm-accent-2-rgb", colorTriplet(theme.accent[1], "123,92,255"));
+  node.style.setProperty("--hm-base-rgb", colorTriplet(theme.base, "5,10,18"));
+  node.style.setProperty("--hm-glow", String(theme.glow ?? 1));
+}
 
 function loadDockPositions() {
   try {
@@ -239,6 +267,10 @@ const STYLE = `
     pointer-events: none;
     --hm-accent: #2ee6c5;
     --hm-accent-2: #7b5cff;
+    --hm-accent-rgb: 46,230,197;
+    --hm-accent-2-rgb: 123,92,255;
+    --hm-base-rgb: 5,10,18;
+    --hm-glow: 1;
   }
   * { box-sizing: border-box; }
   .mini {
@@ -248,14 +280,14 @@ const STYLE = `
     align-items: center;
     gap: 8px;
     padding: 7px 9px 9px;
-    border: 1px solid rgba(46, 230, 197, 0.3);
+    border: 1px solid rgba(var(--hm-accent-rgb), 0.3);
     border-radius: 16px;
     background:
-      linear-gradient(135deg, rgba(46, 230, 197, 0.14), rgba(123, 92, 255, 0.14)),
-      rgba(7, 11, 19, 0.82);
+      linear-gradient(135deg, rgba(var(--hm-accent-rgb), 0.14), rgba(var(--hm-accent-2-rgb), 0.14)),
+      rgba(var(--hm-base-rgb), 0.82);
     box-shadow:
       0 14px 38px rgba(0, 0, 0, 0.4),
-      0 0 20px -6px rgba(46, 230, 197, 0.4);
+      0 0 20px -6px rgba(var(--hm-accent-rgb), 0.4);
     backdrop-filter: blur(16px) saturate(1.25);
     -webkit-backdrop-filter: blur(16px) saturate(1.25);
     color: #eaf6ff;
@@ -267,10 +299,10 @@ const STYLE = `
     transition: box-shadow 0.18s ease, border-color 0.18s ease;
   }
   .mini:hover {
-    border-color: rgba(46, 230, 197, 0.5);
+    border-color: rgba(var(--hm-accent-rgb), 0.5);
     box-shadow:
       0 16px 40px rgba(0, 0, 0, 0.46),
-      0 0 26px -6px rgba(46, 230, 197, 0.5);
+      0 0 26px -6px rgba(var(--hm-accent-rgb), 0.5);
   }
   .mini[data-mode="top"] {
     top: 4px;
@@ -330,6 +362,23 @@ const STYLE = `
     width: calc(var(--hm-sidebar-compact-size, 56px) - 12px);
     height: calc(var(--hm-sidebar-compact-size, 56px) - 12px);
   }
+  .mini[data-theme="liquid"] {
+    backdrop-filter: blur(22px) saturate(1.45);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  }
+  .mini[data-theme="cyber"] {
+    border-style: double;
+    border-width: 2px;
+  }
+  .mini[data-theme="mono"] {
+    filter: saturate(0.35);
+  }
+  .mini[data-theme="sunset"] .progress span {
+    background: linear-gradient(90deg, #ffa45c, #ff4d8d);
+  }
+  .mini[data-theme="ocean"] .progress span {
+    background: linear-gradient(90deg, #39d0ff, #2f7bff);
+  }
   .mini[data-mode="fab"] {
     right: max(16px, env(safe-area-inset-right, 0px));
     bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
@@ -345,7 +394,7 @@ const STYLE = `
     display: grid;
     place-items: center;
     color: var(--hm-accent);
-    background: linear-gradient(135deg, rgba(46, 230, 197, 0.2), rgba(123, 92, 255, 0.26));
+    background: linear-gradient(135deg, rgba(var(--hm-accent-rgb), 0.2), rgba(var(--hm-accent-2-rgb), 0.26));
   }
   .art img {
     width: 100%;
@@ -408,10 +457,10 @@ const STYLE = `
     -webkit-tap-highlight-color: transparent;
     transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
   }
-  .controls button:hover { background: rgba(46, 230, 197, 0.13); color: var(--hm-accent); }
+  .controls button:hover { background: rgba(var(--hm-accent-rgb), 0.13); color: var(--hm-accent); }
   .controls button:active { transform: scale(0.92); }
   .controls button:focus-visible {
-    outline: 2px solid rgba(46, 230, 197, 0.8);
+    outline: 2px solid rgba(var(--hm-accent-rgb), 0.8);
     outline-offset: 2px;
   }
   .controls button[disabled] { opacity: 0.38; cursor: default; }
@@ -420,9 +469,9 @@ const STYLE = `
     height: 32px;
     border-radius: 10px;
     color: var(--hm-accent);
-    background: rgba(46, 230, 197, 0.15);
+    background: rgba(var(--hm-accent-rgb), 0.15);
   }
-  .controls .toggle:hover { background: rgba(46, 230, 197, 0.24); }
+  .controls .toggle:hover { background: rgba(var(--hm-accent-rgb), 0.24); }
   .progress {
     position: absolute;
     left: 10px;
@@ -487,15 +536,15 @@ const STYLE = `
     padding: 10px 12px;
     gap: 12px;
     align-items: center;
-    border: 1px solid rgba(139, 92, 246, 0.36);
+    border: 1px solid rgba(var(--hm-accent-2-rgb), 0.36);
     border-radius: 18px;
     background:
-      linear-gradient(104deg, rgba(7, 10, 20, 0.6) 0%, rgba(10, 14, 28, 0.5) 48%, rgba(22, 12, 40, 0.46) 100%),
-      rgba(8, 11, 21, 0.66);
+      linear-gradient(104deg, rgba(var(--hm-base-rgb), 0.6) 0%, rgba(var(--hm-base-rgb), 0.5) 48%, rgba(var(--hm-accent-2-rgb), 0.16) 100%),
+      rgba(var(--hm-base-rgb), 0.66);
     box-shadow:
       0 16px 40px rgba(2, 6, 18, 0.62),
       0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-      0 0 28px rgba(139, 92, 246, 0.2);
+      0 0 28px rgba(var(--hm-accent-2-rgb), 0.2);
     backdrop-filter: blur(26px) saturate(165%);
     -webkit-backdrop-filter: blur(26px) saturate(165%);
     overflow: hidden;
@@ -551,7 +600,7 @@ const STYLE = `
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: rgba(20, 26, 44, 0.9);
+    background: rgba(var(--hm-base-rgb), 0.9);
     color: var(--hm-accent);
     cursor: pointer;
     overflow: visible;
@@ -590,7 +639,7 @@ const STYLE = `
     inset: -5px;
     z-index: -1;
     border-radius: 50%;
-    background: conic-gradient(from 30deg, rgba(46, 230, 197, 0.85), rgba(123, 92, 255, 0.9), rgba(236, 72, 153, 0.55), rgba(46, 230, 197, 0.85));
+    background: conic-gradient(from 30deg, rgba(var(--hm-accent-rgb), 0.85), rgba(var(--hm-accent-2-rgb), 0.9), rgba(var(--hm-accent-rgb), 0.55), rgba(var(--hm-accent-rgb), 0.85));
     filter: blur(9px);
     opacity: 0.72;
     animation: fabRingSpin 9s linear infinite;
@@ -603,7 +652,7 @@ const STYLE = `
   .fab-disc:hover .fab-glow { opacity: 0.95; }
   .fab-disc:active { transform: scale(0.96); }
   .fab-disc:focus-visible {
-    outline: 2px solid rgba(46, 230, 197, 0.8);
+    outline: 2px solid rgba(var(--hm-accent-rgb), 0.8);
     outline-offset: 4px;
   }
   .fab-quick {
@@ -615,19 +664,19 @@ const STYLE = `
     height: 24px;
     margin: 0;
     padding: 0;
-    border: 1px solid rgba(180, 160, 255, 0.5);
+    border: 1px solid rgba(var(--hm-accent-2-rgb), 0.5);
     border-radius: 7px;
     display: grid;
     place-items: center;
-    background: rgba(7, 10, 20, 0.78);
-    color: #d8ccff;
+    background: rgba(var(--hm-base-rgb), 0.78);
+    color: var(--hm-accent-2);
     box-shadow: 0 4px 12px rgba(2, 6, 18, 0.46);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  .fab-quick:hover { background: rgba(123, 92, 255, 0.42); color: #fff; }
+  .fab-quick:hover { background: rgba(var(--hm-accent-2-rgb), 0.42); color: #fff; }
   .fab-quick:active { transform: scale(0.92); }
-  .fab-quick:focus-visible { outline: 2px solid rgba(46, 230, 197, 0.8); outline-offset: 2px; }
+  .fab-quick:focus-visible { outline: 2px solid rgba(var(--hm-accent-rgb), 0.8); outline-offset: 2px; }
   .fab-quick[disabled] { opacity: 0.42; cursor: default; }
   .mini[data-mode="fab"][data-open="true"] .fab-quick { display: none; }
   .fab-panel {
@@ -658,7 +707,7 @@ const STYLE = `
     color: #9fb3c8;
     cursor: pointer;
   }
-  .fab-collapse:hover { color: var(--hm-accent); background: rgba(46, 230, 197, 0.12); }
+  .fab-collapse:hover { color: var(--hm-accent); background: rgba(var(--hm-accent-rgb), 0.12); }
   .fab-panel .progress {
     position: relative;
     left: auto;
@@ -669,7 +718,7 @@ const STYLE = `
     overflow: visible;
     background: rgba(255, 255, 255, 0.14);
   }
-  .fab-panel .progress span { box-shadow: 0 0 8px rgba(46, 230, 197, 0.55); }
+  .fab-panel .progress span { box-shadow: 0 0 8px rgba(var(--hm-accent-rgb), 0.55); }
   .fab-panel .controls { gap: 3px; }
   .fab-panel .controls .toggle { width: 32px; height: 32px; border-radius: 9px; }
   .fab-panel .title { font-size: 13px; }
@@ -752,11 +801,12 @@ export function loadDockPref() {
     const pref = JSON.parse(raw);
     const modes = normalizeDockModes(pref?.modes ?? pref?.mode);
     const entities = normalizeDockEntities(pref?.entities);
+    const themes = normalizeDockThemes(pref?.themes);
     const legacyEntity = normalizeEntity(pref?.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
     const cleanModes = modes.filter((mode) => entities[mode]);
     if (!cleanModes.length) return null;
-    return { modes: cleanModes, entities };
+    return { modes: cleanModes, entities, themes };
   } catch {
     return null;
   }
@@ -766,6 +816,7 @@ export function saveDockPref(input = {}) {
   try {
     const modes = normalizeDockModes(input.modes ?? input.mode);
     const entities = normalizeDockEntities(input.entities);
+    const themes = normalizeDockThemes(input.themes);
     const legacyEntity = normalizeEntity(input.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
     const cleanModes = modes.filter((mode) => entities[mode]);
@@ -773,7 +824,7 @@ export function saveDockPref(input = {}) {
       window.localStorage.removeItem(PREF_KEY);
       return;
     }
-    const next = JSON.stringify({ modes: cleanModes, entities });
+    const next = JSON.stringify({ modes: cleanModes, entities, themes });
     const current = window.localStorage.getItem(PREF_KEY);
     if (current === next) return;
     window.localStorage.setItem(PREF_KEY, next);
@@ -816,7 +867,12 @@ export function installDocks(inputs = []) {
     const mode = normalizeMode(input?.mode);
     const entity = normalizeEntity(input?.entity);
     if (mode === "none" || !entity) continue;
-    configs.push({ mode, entity, hass: input?.hass || null });
+    configs.push({
+      mode,
+      entity,
+      hass: input?.hass || null,
+      theme: normalizeTheme(input?.theme),
+    });
   }
   if (!configs.length) {
     uninstallDock();
@@ -859,6 +915,7 @@ class HaMusicMini extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._mode = "top";
+    this._theme = DEFAULT_THEME;
     this._open = false;
     this._folded = false;
     this._entity = "";
@@ -895,8 +952,10 @@ class HaMusicMini extends HTMLElement {
   update(config = {}) {
     const mode = normalizeMode(config.mode);
     const entity = normalizeEntity(config.entity);
+    const theme = normalizeTheme(config.theme);
     const changedMode = mode !== this._mode;
     this._mode = mode;
+    this._theme = theme;
     if (changedMode) {
       this._open = false;
       this._folded = false;
@@ -1360,6 +1419,7 @@ class HaMusicMini extends HTMLElement {
 
   _sync() {
     if (!this._mini) return;
+    applyMiniTheme(this._mini, this._theme);
     this._mini.dataset.mode = this._mode;
     this._mini.dataset.folded = this._mode !== "fab" && this._folded ? "true" : "false";
     if (this._mode === "fab") this._mini.dataset.open = this._open ? "true" : "false";
@@ -1427,6 +1487,7 @@ class HaMusicMini extends HTMLElement {
       title: attrs.media_title,
       artist: attrs.media_artist,
       album: attrs.media_album_name,
+      accent: THEMES[this._theme]?.accent,
     });
   }
 

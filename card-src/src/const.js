@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.3.1";
+export const CARD_VERSION = "1.3.2";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -89,6 +89,20 @@ export const THEMES = {
     accent: ["#e9ecf5", "#8d95a8"],
     base: "#08090c",
     glow: 0.4,
+    grid: false,
+  },
+  sunset: {
+    label: { en: "Sunset", zh: "日落" },
+    accent: ["#ffa45c", "#ff4d8d"],
+    base: "#120806",
+    glow: 1.1,
+    grid: false,
+  },
+  ocean: {
+    label: { en: "Ocean", zh: "海洋" },
+    accent: ["#39d0ff", "#2f7bff"],
+    base: "#04101c",
+    glow: 0.9,
     grid: false,
   },
 };

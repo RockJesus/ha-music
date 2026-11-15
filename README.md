@@ -1,7 +1,7 @@
 # HA Music
 
 > 为 Home Assistant 打造的高颜值、全功能音乐播放器 Lovelace 卡片。<br>
-> 液态玻璃 / 赛博霓虹 / 极光 / 天鹅绒 / 黑白 五套主题，三种自适应布局，从封面取色的动态氛围光。
+> 液态玻璃 / 赛博霓虹 / 极光 / 天鹅绒 / 黑白 / 日落 / 海洋 七套主题，三种自适应布局，从封面取色的动态氛围光。
 
 [![GitHub Release](https://img.shields.io/github/v/release/RockJesus/ha-music?style=flat-square)](https://github.com/RockJesus/ha-music/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz)
@@ -13,7 +13,7 @@
 
 ## 特性
 
-- **五套主题**：`aurora` 极光、`cyber` 赛博朋克、`liquid` 液态玻璃、`velvet` 天鹅绒、`mono` 黑白，均可用 `accent` 覆盖主色。
+- **七套主题**：`aurora` 极光、`cyber` 赛博朋克、`liquid` 液态玻璃、`velvet` 天鹅绒、`mono` 黑白、`sunset` 日落、`ocean` 海洋；顶部、侧边栏、右下角三个迷你播放器可分别选择主题。
 - **三档自适应布局**：`full` 完整、`compact` 紧凑、`mini` 迷你单行；默认 `adaptive` 按卡片宽度自动切换（< 430px 进入 compact）。
 - **封面驱动配色**：从当前封面提取主色，混入次色与背景氛围光；跨域或取色失败时回退到主题色。
 - **面板单屏铺满**：面板视图按可用高度约束圆形封面，自动压缩主区，频谱、进度和控制条保持在单屏内，不产生纵向溢出。
@@ -71,7 +71,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.1`
+   - URL：`/local/ha-music.js?v=1.3.2`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -87,7 +87,7 @@ entity: media_player.living_room
 | `entities` | list | — | 多个播放器，卡片顶部显示切换胶囊 |
 | `name` | string | 实体名称 | 状态栏显示的播放器名称 |
 | `layout` | `adaptive` \| `full` \| `compact` \| `mini` | `adaptive` | 布局；`adaptive` 按宽度自动切换 |
-| `theme` | `aurora` \| `cyber` \| `liquid` \| `velvet` \| `mono` | `aurora` | 主题 |
+| `theme` | `aurora` \| `cyber` \| `liquid` \| `velvet` \| `mono` \| `sunset` \| `ocean` | `aurora` | 主卡片主题 |
 | `accent` | hex color | — | 覆盖主题主色，如 `"#ff5fa2"` |
 | `palette` | bool | `true` | 是否从封面取色（`false` 则固定主题色） |
 | `cover` | `ambient` \| `art` \| `palette` \| `none` | `ambient` | 背景模式 |
@@ -100,6 +100,7 @@ entity: media_player.living_room
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |
 | `dock` | `none` \| 位置数组 | `none` | 全局迷你播放器位置，可同时启用多个：`top` / `sidebar` / `fab`；直接控制播放暂停、上一首、下一首，不跳转页面 |
 | `dock_entities` | object | — | 每个位置各自的播放器实体，如 `{ top: "media_player.a", sidebar: "media_player.b", fab: "media_player.c" }`；未填时回退主卡片实体 |
+| `dock_themes` | object | — | 每个位置各自的播放器主题，如 `{ top: "cyber", sidebar: "liquid", fab: "velvet" }`；未填时跟随主卡片 `theme` |
 | `max_queue` | number | `60` | 队列最多展示条数 |
 | `music_assistant` | `true` \| `false` \| string | 自动 | 歌单入口：不填时检测到 MA 服务/播放器即显示；`false` 隐藏；字符串同时作为抽屉内「打开 MA」按钮的面板地址（留空自动读 HA 面板路径） |
 
@@ -112,7 +113,8 @@ entity: media_player.living_room
 - **右下角**：默认在右下角的圆形唱片；长按约 0.36 秒后可**任意拖动**，但位置会被约束在主内容区，不能进入顶部导航栏或侧边栏。点击展开为玻璃面板，显示封面模糊背景、曲目信息、进度和播放控制。收起态外圈带 **36 根镜像音频律动柱**（12 点低频紫、6 点高频青），随歌曲元数据与 `media_position` 起伏，并叠加唱片脉冲与紫色辉光；暂停或展开时淡出。参考 `rockjesus.cn` 左下角播放器的 `rj-pl-eq`。
 - **交互**：单击任意非按钮区域切换播放/暂停；双击折叠或展开；顶部/侧边栏/右下角都支持长按约 0.36 秒后拖动位置，其中顶部只左右、侧边栏只上下、右下角可任意拖动但避开顶栏与侧栏。顶部/侧边栏双击折叠成小圆盘，右下角双击展开或收起玻璃面板；上一首、下一首、音量等按钮仍保留各自动作。
 - 卡片渲染一次后，位置、当前播放器实体和拖动坐标记入浏览器 `localStorage`；之后打开其他仪表盘会自动恢复，不需要每个页面都放卡。
-- 也可以直接用资源 URL 指定：`&dock=top,fab&dock_entity_top=media_player.a&dock_entity_fab=media_player.b`；`dock` 可选 `top` / `sidebar` / `fab`，多个用逗号分隔。
+- 也可以直接用资源 URL 指定：`&dock=top,fab&dock_entity_top=media_player.a&dock_entity_fab=media_player.b&dock_theme_top=cyber&dock_theme_fab=velvet`；`dock` 可选 `top` / `sidebar` / `fab`，多个用逗号分隔。
+- 编辑器里每个已启用的位置都有独立「播放器主题」下拉，可选 `aurora` / `cyber` / `liquid` / `velvet` / `mono` / `sunset` / `ocean`；未显式选择时跟随主卡片主题。
 - 关闭：在编辑器里取消对应位置的勾选；全部关闭即移除全局播放器。
 - 同一个 `ha-music.js` 既可作为 Lovelace 资源，也可作为全局模块加载；内部已防止重复 `customElements.define`。
 - 需要设置页等非仪表盘页面也加载时，再把模块地址加入 `frontend.extra_module_url`（可选）。
@@ -196,6 +198,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.3.2**：新增 `sunset` 日落与 `ocean` 海洋两套主题；顶部、侧边栏、右下角三个迷你播放器支持在编辑器中分别选择主题（`dock_themes`），每个位置独立持久化，并跟随各自的播放器实例渲染。
 
 - **1.3.1**：顶部播放器宽度从 330px 收到 300px（窄屏最低 200px），减少顶栏占用；内部封面/标题/控制按钮尺寸不变。
 

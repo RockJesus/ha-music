@@ -9,6 +9,29 @@ const BARS = 36;
 const HALF = BARS / 2;
 const DPR = Math.min(2, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
 const states = new WeakMap();
+const FALLBACK_ACCENT = ["#7b5cff", "#2ee6c5"];
+
+function parseHex(value) {
+  const text = String(value || "").replace("#", "");
+  if (text.length === 3) {
+    return [0, 1, 2].map((i) => parseInt(text[i] + text[i], 16));
+  }
+  if (text.length === 6) {
+    return [0, 2, 4].map((i) => parseInt(text.slice(i, i + 2), 16));
+  }
+  return [123, 92, 255];
+}
+
+function blend(a, b, t) {
+  const ca = parseHex(a);
+  const cb = parseHex(b);
+  return ca.map((value, i) => Math.round(value + (cb[i] - value) * t));
+}
+
+function rgba(color, alpha) {
+  const [r, g, b] = color;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 function paint(canvas, bars, glow) {
   const state = states.get(canvas);
@@ -19,6 +42,7 @@ function paint(canvas, bars, glow) {
   const R = SIZE / 2;
   const r0 = 33.5;
   const maxLen = R - r0 - 3;
+  const accent = state.accent || FALLBACK_ACCENT;
   ctx.lineCap = "round";
   ctx.shadowBlur = 5 + glow * 7;
 
@@ -29,13 +53,10 @@ function paint(canvas, bars, glow) {
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = Math.abs(i - HALF) / HALF;
-    const hue = 264 - 76 * (1 - t);
-    const light = 56 + v * 23 - 2 * t;
-    const satur = 96 - 4 * t;
+    const color = blend(accent[0], accent[1], t);
     const alpha = 0.5 + v * 0.48;
-    const col = `hsla(${hue.toFixed(0)}, ${satur.toFixed(0)}%, ${light.toFixed(0)}%, ${alpha.toFixed(2)})`;
-    ctx.strokeStyle = col;
-    ctx.shadowColor = `hsla(${hue.toFixed(0)}, ${satur.toFixed(0)}%, ${light.toFixed(0)}%, ${(0.12 + glow * 0.26).toFixed(2)})`;
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.shadowColor = rgba(color, 0.12 + glow * 0.26);
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(R + c * r0, R + s * r0);
@@ -46,7 +67,7 @@ function paint(canvas, bars, glow) {
     const core = clamp((t - 0.3) / 0.45, 0, 1);
     if (core > 0.01) {
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = `hsla(${hue.toFixed(0)}, 96%, 96%, ${((0.05 + v * 0.24) * core).toFixed(2)})`;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${((0.05 + v * 0.24) * core).toFixed(2)})`;
       ctx.lineWidth = 1.1;
       ctx.stroke();
       ctx.shadowBlur = 5 + glow * 7;
@@ -63,16 +84,19 @@ function clear(canvas) {
   state.ctx.clearRect(0, 0, SIZE, SIZE);
 }
 
-function setBeat(root, scale, glow) {
+function setBeat(root, scale, glow, accent) {
   if (!root?.style) return;
   root.style.setProperty("--fab-beat", scale.toFixed(4));
   root.style.setProperty("--fab-beat-glow", glow.toFixed(3));
   const disc = root.querySelector?.(".fab-disc");
   if (disc) {
+    const colors = accent || FALLBACK_ACCENT;
+    const [r, g, b] = parseHex(colors[0]);
+    const [r2, g2, b2] = parseHex(colors[1]);
     disc.style.boxShadow = [
       "0 10px 26px rgba(2, 6, 18, 0.46)",
-      `0 0 26px rgba(139, 92, 246, ${(glow * 0.92).toFixed(3)})`,
-      `0 0 52px rgba(124, 58, 237, ${(glow * 0.55).toFixed(3)})`,
+      `0 0 26px rgba(${r}, ${g}, ${b}, ${(glow * 0.92).toFixed(3)})`,
+      `0 0 52px rgba(${r2}, ${g2}, ${b2}, ${(glow * 0.55).toFixed(3)})`,
     ].join(", ");
   }
 }
@@ -119,7 +143,7 @@ function frame(canvas, now) {
   const glow = Math.min(1, low * 1.05 + kick * 0.4);
   paint(canvas, state.smooth, glow);
   const scale = 1 + Math.min(0.085, low * 0.05 + kick * 0.05);
-  setBeat(state.root, scale, 0.16 + Math.min(0.46, low * 0.5 + kick * 0.26));
+  setBeat(state.root, scale, 0.16 + Math.min(0.46, low * 0.5 + kick * 0.26), state.accent);
   state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
 }
 
@@ -168,12 +192,18 @@ export function syncFabEq(canvas, root, media = {}) {
       period: 2,
       phase: 0,
       energy: 0.6,
+      accent: FALLBACK_ACCENT,
       smooth: new Array(BARS).fill(0),
       raf: 0,
       clearTimer: 0,
     };
     states.set(canvas, state);
   }
+  const accent = Array.isArray(media.accent) && media.accent.length >= 2
+    ? [media.accent[0], media.accent[1]]
+    : FALLBACK_ACCENT;
+  state.accent = accent;
+  state.root = root;
 
   if (state.clearTimer) {
     window.clearTimeout(state.clearTimer);

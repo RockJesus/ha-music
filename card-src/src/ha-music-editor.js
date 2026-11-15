@@ -6,7 +6,7 @@ import {
   VISUALIZERS,
   isChinese,
 } from "./const.js";
-import { normalizeDockModes, normalizeDockEntities } from "./dock.js";
+import { normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 
 function fireConfigChanged(node, config) {
   node.dispatchEvent(
@@ -114,6 +114,16 @@ class HaMusicEditor extends LitElement {
       .dock-row ha-entity-picker {
         min-width: 0;
       }
+      .dock-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .dock-theme {
+        flex: 0 0 105px;
+        min-width: 0;
+      }
       .entity-row ha-entity-picker {
         flex: 1 1 auto;
         min-width: 0;
@@ -217,6 +227,17 @@ class HaMusicEditor extends LitElement {
 
   _dockEntities() {
     return normalizeDockEntities(this._config?.dock_entities);
+  }
+
+  _dockThemes() {
+    return normalizeDockThemes(this._config?.dock_themes);
+  }
+
+  _setDockTheme(mode, value) {
+    const themes = { ...this._dockThemes() };
+    if (value) themes[mode] = value;
+    else delete themes[mode];
+    this._update({ dock_themes: themes });
   }
 
   _mainEntity() {
@@ -513,13 +534,16 @@ class HaMusicEditor extends LitElement {
               ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；单击播放/暂停，双击折叠或展开。顶部只可左右移动、侧边栏只可上下移动；右下角长按后可任意拖动，但不能进入侧边栏和顶栏。"
               : "Each position can use its own entity; click to play/pause, double-click to fold, long-press to drag."}
           </div>
-          ${[
+          ${(() => {
+            const dockThemes = this._dockThemes();
+            return [
             ["top", this._zh ? "顶部播放器" : "Top bar"],
             ["sidebar", this._zh ? "侧边栏播放器" : "Sidebar"],
             ["fab", this._zh ? "右下角播放器" : "Bottom-right"],
           ].map(([mode, label]) => {
             const enabled = dockModes.includes(mode);
             const entity = dockEntities[mode] || this._mainEntity();
+            const theme = dockThemes[mode] || this._config.theme || "aurora";
             return html`
               <div class="dock-row">
                 <label class="check">
@@ -530,20 +554,38 @@ class HaMusicEditor extends LitElement {
                   />
                   <span>${label}</span>
                 </label>
-                <ha-entity-picker
-                  .hass=${this.hass}
-                  .value=${entity || ""}
-                  .includeDomains=${["media_player"]}
-                  .allowCustomEntity=${false}
-                  .label=${this._zh ? "播放器实体" : "Player entity"}
-                  @value-changed=${(event) => {
-                    event.stopPropagation();
-                    this._setDockEntity(mode, event.detail?.value ?? "");
-                  }}
-                ></ha-entity-picker>
+                <div class="dock-right">
+                  <ha-entity-picker
+                    .hass=${this.hass}
+                    .value=${entity || ""}
+                    .includeDomains=${["media_player"]}
+                    .allowCustomEntity=${false}
+                    .label=${this._zh ? "播放器实体" : "Player entity"}
+                    @value-changed=${(event) => {
+                      event.stopPropagation();
+                      this._setDockEntity(mode, event.detail?.value ?? "");
+                    }}
+                  ></ha-entity-picker>
+                  ${enabled
+                    ? html`<select
+                        class="dock-theme"
+                        .value=${theme}
+                        @change=${(e) => this._setDockTheme(mode, e.target.value)}
+                        title=${this._zh ? "播放器主题" : "Player theme"}
+                      >
+                        ${Object.keys(THEMES).map(
+                          (key) =>
+                            html`<option value=${key} ?selected=${theme === key}>
+                              ${this._optionLabel(THEMES[key].label)}
+                            </option>`
+                        )}
+                      </select>`
+                    : nothing}
+                </div>
               </div>
             `;
-          })}
+            });
+          })()}
         </div>
       </div>
     `;

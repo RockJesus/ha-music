@@ -28,7 +28,7 @@ import {
   visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
-import { installDocks, saveDockPref, clearDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities } from "./dock.js";
+import { installDocks, saveDockPref, clearDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
@@ -1135,6 +1135,7 @@ class HaMusicCard extends LitElement {
   _installDock() {
     const modes = normalizeDockModes(this._config?.dock);
     const dockEntities = normalizeDockEntities(this._config?.dock_entities);
+    const dockThemes = normalizeDockThemes(this._config?.dock_themes);
     const fallback =
       this._eid?.() ||
       this._config?.entity ||
@@ -1160,9 +1161,16 @@ class HaMusicCard extends LitElement {
       mode,
       entity,
       hass: this._hass,
+      theme: dockThemes[mode] || this._themeKey(),
     }));
     installDocks(configs);
-    saveDockPref({ modes: Object.keys(entities), entities });
+    saveDockPref({
+      modes: Object.keys(entities),
+      entities,
+      themes: Object.fromEntries(
+        Object.keys(entities).map((mode) => [mode, dockThemes[mode] || this._themeKey()])
+      ),
+    });
     this._dockOwner = true;
   }
 

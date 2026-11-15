@@ -6,6 +6,7 @@ import {
   loadDockPref,
   resolveHass,
   normalizeDockModes,
+  normalizeDockThemes,
 } from "./dock.js";
 
 // 同一个 bundle 既可作为 Lovelace 资源，也可作为全局模块加载。
@@ -18,13 +19,18 @@ const modes = queryMode
   ? normalizeDockModes(queryMode === "1" ? "top" : queryMode)
   : pref?.modes || [];
 const entities = { ...(pref?.entities || {}) };
+const themes = normalizeDockThemes(pref?.themes);
 const queryEntity = moduleUrl.searchParams.get("dock_entity");
 if (queryEntity && modes[0]) entities[modes[0]] = queryEntity;
+const queryTheme = moduleUrl.searchParams.get("dock_theme");
+if (queryTheme && modes[0]) themes[modes[0]] = queryTheme;
 for (const mode of modes) {
   const scoped = moduleUrl.searchParams.get(`dock_entity_${mode}`);
   if (scoped) entities[mode] = scoped;
+  const scopedTheme = moduleUrl.searchParams.get(`dock_theme_${mode}`);
+  if (scopedTheme) themes[mode] = scopedTheme;
 }
 const configs = modes
-  .map((mode) => ({ mode, entity: entities[mode] }))
+  .map((mode) => ({ mode, entity: entities[mode], theme: themes[mode] }))
   .filter((item) => item.entity);
 if (configs.length) installDocks(configs.map((item) => ({ ...item, hass: resolveHass() })));

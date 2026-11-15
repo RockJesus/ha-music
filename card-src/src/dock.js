@@ -139,6 +139,40 @@ function findSidebarRect() {
   return best;
 }
 
+function findTopBarNode() {
+  const bars = deepMatches((node) => {
+    if (node.tagName === "BODY" || node.tagName === "HTML") return false;
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 200, 36) || rect.top > 8 || rect.height > 150) return false;
+    return (
+      node.classList?.contains("top-app-bar") ||
+      node.classList?.contains("app-header") ||
+      node.tagName === "HA-TOP-APP-BAR" ||
+      node.tagName === "HA-TOP-APP-BAR-FIXED"
+    );
+  });
+  let best = null;
+  for (const node of bars) {
+    const rect = node.getBoundingClientRect();
+    if (rect.height > 150) continue;
+    if (!best || rect.width * rect.height > best.area) {
+      best = { node, area: rect.width * rect.height };
+    }
+  }
+  return best?.node || null;
+}
+
+function findSidebarNode() {
+  const found = deepMatches((node) => SIDEBAR_TAGS.has(node.tagName));
+  let best = null;
+  for (const node of found) {
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 24, 120)) continue;
+    if (!best || rect.height > best.height) best = { node, height: rect.height };
+  }
+  return best?.node || null;
+}
+
 function getDockBounds(mode) {
   const vw = Math.round(window.innerWidth || 0);
   const vh = Math.round(window.innerHeight || 0);
@@ -260,8 +294,8 @@ const STYLE = `
     border-radius: 14px;
   }
   .mini[data-mode="sidebar"][data-compact="true"] {
-    width: 56px !important;
-    height: 56px;
+    width: var(--hm-sidebar-compact-size, 56px) !important;
+    height: var(--hm-sidebar-compact-size, 56px);
     padding: 4px;
     gap: 0;
     justify-content: center;
@@ -271,8 +305,8 @@ const STYLE = `
   .mini[data-mode="sidebar"][data-compact="true"] .controls,
   .mini[data-mode="sidebar"][data-compact="true"] .progress { display: none; }
   .mini[data-mode="sidebar"][data-compact="true"] .art {
-    width: 44px;
-    height: 44px;
+    width: calc(var(--hm-sidebar-compact-size, 56px) - 12px);
+    height: calc(var(--hm-sidebar-compact-size, 56px) - 12px);
   }
   .mini[data-mode="fab"] {
     right: max(16px, env(safe-area-inset-right, 0px));
@@ -813,7 +847,13 @@ class HaMusicMini extends HTMLElement {
     this._onPointerUp = (event) => this._handlePointerUp(event);
     this._onPointerCancel = (event) => this._handlePointerCancel(event);
     this._onContextMenu = (event) => this._handleContextMenu(event);
-    this._onResize = () => this._applySavedPosition();
+    this._onResize = () => {
+      this._applySavedPosition();
+      this._watchDockBounds();
+    };
+    this._boundsObserver = null;
+    this._boundsRaf = null;
+    this._boundsNodes = 0;
     this._sync = this._sync.bind(this);
   }
 
@@ -831,6 +871,7 @@ class HaMusicMini extends HTMLElement {
     if (!this.shadowRoot.childElementCount || changedMode) this._render();
     this._sync();
     this._applySavedPosition();
+    this._watchDockBounds();
   }
 
   connectedCallback() {
@@ -845,7 +886,10 @@ class HaMusicMini extends HTMLElement {
     window.addEventListener("location-changed", this._onRoute);
     this._startPolling();
     this._sync();
-    window.requestAnimationFrame(() => this._applySavedPosition());
+    window.requestAnimationFrame(() => {
+      this._applySavedPosition();
+      this._watchDockBounds();
+    });
   }
 
   disconnectedCallback() {
@@ -857,6 +901,15 @@ class HaMusicMini extends HTMLElement {
     this.shadowRoot.removeEventListener("contextmenu", this._onContextMenu);
     window.removeEventListener("resize", this._onResize);
     window.removeEventListener("location-changed", this._onRoute);
+    if (this._boundsObserver) {
+      this._boundsObserver.disconnect();
+      this._boundsObserver = null;
+    }
+    if (this._boundsRaf) {
+      cancelAnimationFrame(this._boundsRaf);
+      this._boundsRaf = null;
+    }
+    this._boundsNodes = 0;
     if (this._poll) clearInterval(this._poll);
     this._poll = null;
   }
@@ -869,7 +922,27 @@ class HaMusicMini extends HTMLElement {
         this._hass = hass;
         this._sync();
       }
+      if (!this._boundsNodes) this._watchDockBounds();
     }, 1000);
+  }
+
+  _watchDockBounds() {
+    if (typeof ResizeObserver === "undefined") return;
+    const node = this._mode === "top" ? findTopBarNode() : this._mode === "sidebar" ? findSidebarNode() : null;
+    if (!node) {
+      this._boundsNodes = 0;
+      return;
+    }
+    if (this._boundsObserver) this._boundsObserver.disconnect();
+    this._boundsNodes = 1;
+    this._boundsObserver = new ResizeObserver(() => {
+      if (this._dragging || this._boundsRaf) return;
+      this._boundsRaf = window.requestAnimationFrame(() => {
+        this._boundsRaf = null;
+        this._applySavedPosition();
+      });
+    });
+    this._boundsObserver.observe(node);
   }
 
   _render() {
@@ -980,6 +1053,7 @@ class HaMusicMini extends HTMLElement {
     for (const prop of ["left", "top", "right", "bottom", "width", "height", "max-height"]) {
       this._mini.style.removeProperty(prop);
     }
+    this._mini.style.removeProperty("--hm-sidebar-compact-size");
     delete this._mini.dataset.compact;
   }
 
@@ -1020,11 +1094,21 @@ class HaMusicMini extends HTMLElement {
 
     // 侧边栏：宽度贴合侧栏，X 固定，只允许上下移动，不能进入主内容区。
     const w = Math.round(Math.max(56, Math.min(236, bounds.width - 16)));
-    mini.style.width = `${w}px`;
-    mini.style.height = "auto";
+    const compact = w < 170;
+    const compactSize = Math.round(Math.max(40, Math.min(56, bounds.width - 4)));
+    if (compact) {
+      mini.style.setProperty("--hm-sidebar-compact-size", `${compactSize}px`);
+      mini.style.width = `${compactSize}px`;
+      mini.style.height = `${compactSize}px`;
+      mini.dataset.compact = "true";
+    } else {
+      mini.style.removeProperty("--hm-sidebar-compact-size");
+      mini.style.width = `${w}px`;
+      mini.style.height = "auto";
+      mini.dataset.compact = "false";
+    }
     mini.style.maxHeight = `${Math.max(56, bounds.height - 16)}px`;
-    mini.dataset.compact = w < 170 ? "true" : "false";
-    const left = Math.round(bounds.left + margin);
+    const left = Math.round(bounds.left + (compact ? 4 : margin));
     mini.style.left = `${left}px`;
     mini.style.right = "auto";
     mini.style.bottom = "auto";

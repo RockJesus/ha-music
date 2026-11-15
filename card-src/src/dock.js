@@ -391,6 +391,13 @@ const STYLE = `
     border-radius: 50%;
     overflow: hidden;
     clip-path: circle(50% at 50% 50%);
+    -webkit-clip-path: circle(50% at 50% 50%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
     display: grid;
     place-items: center;
     color: var(--hm-accent);
@@ -404,6 +411,9 @@ const STYLE = `
     display: none;
     border-radius: 50%;
     clip-path: circle(50% at 50% 50%);
+    -webkit-clip-path: circle(50% at 50% 50%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
     pointer-events: none;
     -webkit-user-drag: none;
     user-select: none;
@@ -621,6 +631,13 @@ const STYLE = `
     border-radius: 50%;
     overflow: hidden;
     clip-path: circle(50% at 50% 50%);
+    -webkit-clip-path: circle(50% at 50% 50%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
     box-shadow: 0 10px 26px rgba(2, 6, 18, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
     background: linear-gradient(135deg, rgba(46, 230, 197, 0.2), rgba(123, 92, 255, 0.26));
   }
@@ -630,6 +647,9 @@ const STYLE = `
     object-fit: cover;
     border-radius: 50%;
     clip-path: circle(50% at 50% 50%);
+    -webkit-clip-path: circle(50% at 50% 50%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
     display: none;
   }
   .fab-disc .art img[src] { display: block; }

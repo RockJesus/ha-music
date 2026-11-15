@@ -323,6 +323,26 @@ class HaMusicCard extends LitElement {
     return ["full", "compact", "mini"].includes(requested) ? requested : "full";
   }
 
+  _coverPx(layout) {
+    const height = this._height || 0;
+    if (layout === "mini") return 44;
+    if (layout === "compact") {
+      return Math.round(Math.min(88, Math.max(52, height * 0.26)));
+    }
+    return Math.round(Math.min(178, Math.max(76, height * 0.22)));
+  }
+
+  _tight() {
+    return this._layoutKey() === "compact" && (this._height || 0) < 270;
+  }
+
+  _styleVars() {
+    return {
+      ...this._themeVars(),
+      "--hm-cover-size": `${this._coverPx(this._layoutKey())}px`,
+    };
+  }
+
   _themeKey() {
     const theme = this._config?.theme;
     return theme && THEMES[theme] ? theme : DEFAULT_THEME;
@@ -1325,7 +1345,7 @@ class HaMusicCard extends LitElement {
 
     if (!hass) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._themeVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">${t("loading")}</div>
           </div>
@@ -1337,7 +1357,7 @@ class HaMusicCard extends LitElement {
     const state = hass.states?.[entityId];
     if (!state) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._themeVars())}>
+        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">
               ${entityId ? `实体未找到：${entityId}` : "ha-music: entity 未配置"}
@@ -1408,7 +1428,8 @@ class HaMusicCard extends LitElement {
         data-panel=${this._panel ? "true" : "false"}
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
-        style=${styleMap(this._themeVars())}
+        data-tight=${this._tight() ? "true" : "false"}
+        style=${styleMap(this._styleVars())}
         @click=${this._onCardClick}
       >
         <div class="hm-bg">

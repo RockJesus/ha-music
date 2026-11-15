@@ -173,6 +173,7 @@ export const cardStyles = css`
   /* ---------- 顶栏 ---------- */
   .hm-top {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
@@ -274,16 +275,19 @@ export const cardStyles = css`
   /* ---------- 主区 ---------- */
   .hm-main {
     display: grid;
-    grid-template-columns: clamp(104px, 31cqi, 178px) minmax(0, 1fr);
+    grid-template-columns: var(--hm-cover-size, 168px) minmax(0, 1fr);
     align-items: center;
     gap: clamp(12px, 3.4cqi, 22px);
     min-height: 0;
+    flex: 0 0 auto;
   }
 
   .hm-cover {
     position: relative;
     display: block;
-    width: 100%;
+    width: var(--hm-cover-size, 168px);
+    height: var(--hm-cover-size, 168px);
+    max-width: 100%;
     aspect-ratio: 1 / 1;
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.16);
@@ -493,6 +497,7 @@ export const cardStyles = css`
   /* ---------- 频谱 ---------- */
   .hm-vis {
     position: relative;
+    flex: 0 0 auto;
     height: clamp(22px, 5.6cqi, 38px);
     overflow: hidden;
     mask-image: linear-gradient(
@@ -630,6 +635,7 @@ export const cardStyles = css`
   /* ---------- 进度 ---------- */
   .hm-progress {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 9px;
   }
@@ -736,6 +742,7 @@ export const cardStyles = css`
   /* ---------- 控制区 ---------- */
   .hm-controls {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
     gap: clamp(8px, 2.6cqi, 18px);
@@ -1177,7 +1184,7 @@ export const cardStyles = css`
 
   /* ---------- 布局：紧凑 ---------- */
   .hm-card[data-layout="compact"] .hm-main {
-    grid-template-columns: clamp(62px, 17cqi, 88px) minmax(0, 1fr) auto;
+    grid-template-columns: var(--hm-cover-size, 64px) minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
   }
@@ -1375,6 +1382,11 @@ export const cardStyles = css`
   .hm-cover-wrap {
     position: relative;
     min-width: 0;
+    height: var(--hm-cover-size, 168px);
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
   }
 
   .hm-cover-halo {
@@ -1775,29 +1787,37 @@ export const cardStyles = css`
     }
   }
 
-  /* 窄卡片：控制区换行，音量独占一行，避免触屏大按钮把卡片撑破 */
+  /* 窄卡片：控制区保持单行，避免音量换行把矮格子撑破；紧凑布局下音量收窄 */
   @container (max-width: 470px) {
     .hm-card[data-layout="full"] .hm-controls,
     .hm-card[data-layout="compact"] .hm-controls {
-      flex-wrap: wrap;
-      row-gap: 10px;
+      flex-wrap: nowrap;
+      row-gap: 0;
     }
 
-    .hm-card[data-layout="full"] .hm-volume,
     .hm-card[data-layout="compact"] .hm-volume {
-      flex: 1 1 100%;
-      margin-left: 0;
-      max-width: none;
-      width: 100%;
+      flex: 0 1 112px;
+      max-width: 112px;
+      margin-left: auto;
       box-sizing: border-box;
-      justify-content: space-between;
     }
 
-    .hm-card[data-layout="full"] .hm-volume .hm-range,
-    .hm-card[data-layout="compact"] .hm-volume .hm-range {
-      flex: 1 1 auto;
-      min-width: 72px;
+    .hm-card[data-layout="compact"] .hm-vol-pct {
+      display: none;
     }
+  }
+
+  .hm-card[data-tight="true"] .hm-vis {
+    display: none;
+  }
+
+  .hm-card[data-tight="true"] .hm-body {
+    padding: clamp(8px, 1.6cqi, 12px);
+    gap: clamp(6px, 1.2cqi, 8px);
+  }
+
+  .hm-card[data-tight="true"] .hm-cover-halo {
+    display: none;
   }
 
 
@@ -1843,6 +1863,7 @@ export const cardStyles = css`
 
   .hm-card[data-panel="true"] .hm-cover {
     width: min(100%, var(--hm-panel-cover, 100%));
+    height: auto;
     max-height: 100%;
     border-radius: 50%;
   }

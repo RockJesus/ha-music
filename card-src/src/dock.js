@@ -1,7 +1,30 @@
 // 全局迷你播放器：顶部 / 侧边栏 / 右下角三种位置，直接控制当前播放器。
 // 通过卡片传入 hass 与当前实体；也支持模块 URL 的 dock=top|sidebar|fab + dock_entity。
 const PREF_KEY = "haMusicMiniPlayer";
+const POS_KEY = "haMusicMiniPositions";
 const MODES = new Set(["top", "sidebar", "fab"]);
+
+function loadDockPositions() {
+  try {
+    const raw = window.localStorage.getItem(POS_KEY);
+    if (!raw) return {};
+    const value = JSON.parse(raw);
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDockPosition(mode, x, y) {
+  if (!MODES.has(mode)) return;
+  try {
+    const positions = loadDockPositions();
+    positions[mode] = { x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) };
+    window.localStorage.setItem(POS_KEY, JSON.stringify(positions));
+  } catch {
+    /* localStorage 不可用时只影响跨页面位置记忆 */
+  }
+}
 
 const NOTE_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M14.5 5.2l4.6-1v9.1a3 3 0 1 1-1.8-2.7V7.1l-2.8.6v7.7a3 3 0 1 1-1.8-2.7V5.2z" fill="currentColor"/></svg>`;
 const PREV_ICON = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/></svg>`;
@@ -40,6 +63,10 @@ const STYLE = `
     -webkit-backdrop-filter: blur(16px) saturate(1.25);
     color: #eaf6ff;
     font-family: var(--ha-font-family, "Noto Sans SC", "PingFang SC", system-ui, sans-serif);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    cursor: grab;
     transition: box-shadow 0.18s ease, border-color 0.18s ease;
   }
   .mini:hover {
@@ -367,6 +394,28 @@ const STYLE = `
   .fab-panel .controls .toggle { width: 32px; height: 32px; border-radius: 9px; }
   .fab-panel .title { font-size: 13px; }
   .fab-panel .sub { font-size: 10.5px; }
+  .mini[data-dragging="true"] {
+    transition: none;
+    cursor: grabbing;
+  }
+  .mini[data-dragging="true"] * { cursor: grabbing; }
+  /* 顶部 / 侧边栏双击折叠成小圆盘，再次双击展开 */
+  .mini[data-mode][data-folded="true"] {
+    width: 56px !important;
+    height: 56px;
+    padding: 4px;
+    gap: 0;
+    border-radius: 50%;
+    justify-content: center;
+  }
+  .mini[data-mode][data-folded="true"] .meta,
+  .mini[data-mode][data-folded="true"] .controls,
+  .mini[data-mode][data-folded="true"] .progress { display: none; }
+  .mini[data-mode][data-folded="true"] .art {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+  }
   @keyframes fabRingSpin {
     to { transform: rotate(1turn); }
   }
@@ -531,11 +580,24 @@ class HaMusicMini extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._mode = "top";
     this._open = false;
+    this._folded = false;
     this._entity = "";
     this._hass = null;
     this._poll = null;
+    this._press = null;
+    this._pressTimer = null;
+    this._drag = null;
+    this._dragging = false;
+    this._suppressClick = false;
+    this._clickTimer = null;
     this._onClick = (event) => this._handleClick(event);
     this._onRoute = () => this._sync();
+    this._onPointerDown = (event) => this._handlePointerDown(event);
+    this._onPointerMove = (event) => this._handlePointerMove(event);
+    this._onPointerUp = (event) => this._handlePointerUp(event);
+    this._onPointerCancel = (event) => this._handlePointerCancel(event);
+    this._onContextMenu = (event) => this._handleContextMenu(event);
+    this._onResize = () => this._applySavedPosition();
     this._sync = this._sync.bind(this);
   }
 
@@ -544,23 +606,40 @@ class HaMusicMini extends HTMLElement {
     const entity = normalizeEntity(config.entity);
     const changedMode = mode !== this._mode;
     this._mode = mode;
-    if (changedMode) this._open = false;
+    if (changedMode) {
+      this._open = false;
+      this._folded = false;
+    }
     this._entity = entity;
     if (config.hass?.states) this._hass = config.hass;
     if (!this.shadowRoot.childElementCount || changedMode) this._render();
     this._sync();
+    this._applySavedPosition();
   }
 
   connectedCallback() {
     if (!this.shadowRoot.childElementCount) this._render();
     this.shadowRoot.addEventListener("click", this._onClick);
+    this.shadowRoot.addEventListener("pointerdown", this._onPointerDown);
+    this.shadowRoot.addEventListener("pointermove", this._onPointerMove);
+    this.shadowRoot.addEventListener("pointerup", this._onPointerUp);
+    this.shadowRoot.addEventListener("pointercancel", this._onPointerCancel);
+    this.shadowRoot.addEventListener("contextmenu", this._onContextMenu);
+    window.addEventListener("resize", this._onResize);
     window.addEventListener("location-changed", this._onRoute);
     this._startPolling();
     this._sync();
+    window.requestAnimationFrame(() => this._applySavedPosition());
   }
 
   disconnectedCallback() {
     this.shadowRoot.removeEventListener("click", this._onClick);
+    this.shadowRoot.removeEventListener("pointerdown", this._onPointerDown);
+    this.shadowRoot.removeEventListener("pointermove", this._onPointerMove);
+    this.shadowRoot.removeEventListener("pointerup", this._onPointerUp);
+    this.shadowRoot.removeEventListener("pointercancel", this._onPointerCancel);
+    this.shadowRoot.removeEventListener("contextmenu", this._onContextMenu);
+    window.removeEventListener("resize", this._onResize);
     window.removeEventListener("location-changed", this._onRoute);
     if (this._poll) clearInterval(this._poll);
     this._poll = null;
@@ -620,7 +699,7 @@ class HaMusicMini extends HTMLElement {
       <style>${STYLE}</style>
       <div class="mini mini-fab" data-mode="fab" data-open="${this._open ? "true" : "false"}" role="region" aria-label="HA Music 悬浮播放器">
         <div class="fab-orb">
-          <button class="fab-disc" data-act="expand" type="button" aria-label="展开播放器" aria-expanded="${this._open ? "true" : "false"}">
+          <button class="fab-disc" type="button" aria-label="展开播放器" aria-expanded="${this._open ? "true" : "false"}">
             <div class="art">
               <img alt="" />
               <span class="fallback">${NOTE_ICON}</span>
@@ -635,7 +714,7 @@ class HaMusicMini extends HTMLElement {
               <div class="title">选择播放器</div>
               <div class="sub">在卡片编辑器中选择位置</div>
             </div>
-            <button class="fab-collapse" data-act="expand" type="button" aria-label="收起播放器">${DOWN_ICON}</button>
+            <button class="fab-collapse" data-act="collapse" type="button" aria-label="收起播放器">${DOWN_ICON}</button>
           </div>
           <div class="progress"><span></span></div>
           <div class="controls">
@@ -677,9 +756,160 @@ class HaMusicMini extends HTMLElement {
     return labels[state] || state;
   }
 
+  _applySavedPosition() {
+    if (!this._mini || !this._mini.isConnected) return;
+    const positions = loadDockPositions();
+    const pos = positions[this._mode];
+    if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
+    const rect = this._mini.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const margin = 8;
+    const rangeX = Math.max(0, window.innerWidth - rect.width - margin * 2);
+    const rangeY = Math.max(0, window.innerHeight - rect.height - margin * 2);
+    const x = margin + Math.max(0, Math.min(1, pos.x)) * rangeX;
+    const y = margin + Math.max(0, Math.min(1, pos.y)) * rangeY;
+    this._mini.style.left = `${Math.round(x)}px`;
+    this._mini.style.top = `${Math.round(y)}px`;
+    this._mini.style.right = "auto";
+    this._mini.style.bottom = "auto";
+  }
+
+  _saveCurrentPosition() {
+    if (!this._mini) return;
+    const rect = this._mini.getBoundingClientRect();
+    const margin = 8;
+    const rangeX = Math.max(1, window.innerWidth - rect.width - margin * 2);
+    const rangeY = Math.max(1, window.innerHeight - rect.height - margin * 2);
+    saveDockPosition(
+      this._mode,
+      Math.max(0, Math.min(1, (rect.left - margin) / rangeX)),
+      Math.max(0, Math.min(1, (rect.top - margin) / rangeY)),
+    );
+  }
+
+  _handlePointerDown(event) {
+    if (!this._mini || event.button !== 0 || event.isPrimary === false) return;
+    this._clearPress();
+    this._press = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      long: false,
+      moved: false,
+    };
+    this._dragging = false;
+    this._suppressClick = false;
+    this._pressTimer = window.setTimeout(() => {
+      this._pressTimer = null;
+      if (this._press) this._beginDrag();
+    }, 360);
+  }
+
+  _beginDrag() {
+    if (!this._press || !this._mini) return;
+    this._press.long = true;
+    this._dragging = true;
+    const rect = this._mini.getBoundingClientRect();
+    this._drag = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      x: this._press.x,
+      y: this._press.y,
+    };
+    this._mini.dataset.dragging = "true";
+    this._mini.style.left = `${rect.left}px`;
+    this._mini.style.top = `${rect.top}px`;
+    this._mini.style.right = "auto";
+    this._mini.style.bottom = "auto";
+    try {
+      this._mini.setPointerCapture(this._press.pointerId);
+    } catch {
+      /* 某些浏览器不支持指针捕获 */
+    }
+  }
+
+  _handlePointerMove(event) {
+    if (!this._press) return;
+    const dx = event.clientX - this._press.x;
+    const dy = event.clientY - this._press.y;
+    if (!this._dragging) {
+      if (Math.hypot(dx, dy) > 8) {
+        this._press.moved = true;
+        if (this._pressTimer) {
+          window.clearTimeout(this._pressTimer);
+          this._pressTimer = null;
+        }
+      }
+      return;
+    }
+    event.preventDefault();
+    const margin = 8;
+    const maxX = Math.max(margin, window.innerWidth - this._drag.width - margin);
+    const maxY = Math.max(margin, window.innerHeight - this._drag.height - margin);
+    const x = Math.max(margin, Math.min(maxX, this._drag.left + dx));
+    const y = Math.max(margin, Math.min(maxY, this._drag.top + dy));
+    this._mini.style.left = `${Math.round(x)}px`;
+    this._mini.style.top = `${Math.round(y)}px`;
+  }
+
+  _handlePointerUp() {
+    if (!this._press) return;
+    const long = this._press.long;
+    const moved = this._press.moved;
+    if (this._pressTimer) {
+      window.clearTimeout(this._pressTimer);
+      this._pressTimer = null;
+    }
+    if (this._dragging) {
+      this._saveCurrentPosition();
+      this._releasePointer();
+    }
+    if (this._dragging || long || moved) {
+      this._suppressClick = true;
+      window.setTimeout(() => {
+        this._suppressClick = false;
+      }, 560);
+    }
+    this._dragging = false;
+    this._press = null;
+    if (this._mini) delete this._mini.dataset.dragging;
+  }
+
+  _handlePointerCancel() {
+    this._releasePointer();
+    this._clearPress();
+    this._dragging = false;
+    if (this._mini) delete this._mini.dataset.dragging;
+  }
+
+  _clearPress() {
+    if (this._pressTimer) {
+      window.clearTimeout(this._pressTimer);
+      this._pressTimer = null;
+    }
+    this._press = null;
+  }
+
+  _releasePointer() {
+    const pointerId = this._press?.pointerId;
+    if (pointerId === undefined || !this._mini) return;
+    try {
+      this._mini.releasePointerCapture(pointerId);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  _handleContextMenu(event) {
+    if (this._press || this._dragging) event.preventDefault();
+  }
+
   _sync() {
     if (!this._mini) return;
     this._mini.dataset.mode = this._mode;
+    this._mini.dataset.folded = this._mode !== "fab" && this._folded ? "true" : "false";
     if (this._mode === "fab") this._mini.dataset.open = this._open ? "true" : "false";
     if (!this._entity) {
       this._title.textContent = "选择播放器";
@@ -762,18 +992,47 @@ class HaMusicMini extends HTMLElement {
       this._disc.setAttribute("aria-label", this._open ? "收起播放器" : "展开播放器");
       this._disc.setAttribute("aria-expanded", this._open ? "true" : "false");
     }
+    window.setTimeout(() => this._applySavedPosition(), 340);
+  }
+
+  _toggleFold() {
+    if (this._mode === "fab") {
+      this._toggleOpen();
+      return;
+    }
+    this._folded = !this._folded;
+    this._sync();
+    window.setTimeout(() => this._applySavedPosition(), 340);
   }
 
   _handleClick(event) {
     const button = event.target.closest?.("button[data-act]");
-    if (!button || button.disabled) return;
+    if (button) {
+      if (button.disabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const act = button.dataset.act;
+      if (act === "collapse") this._toggleOpen();
+      else if (act === "toggle") this._call("media_play_pause");
+      else if (act === "prev") this._call("media_previous_track");
+      else if (act === "next") this._call("media_next_track");
+      return;
+    }
+    if (this._suppressClick) {
+      this._suppressClick = false;
+      return;
+    }
     event.preventDefault();
-    event.stopPropagation();
-    const act = button.dataset.act;
-    if (act === "expand") this._toggleOpen();
-    else if (act === "toggle") this._call("media_play_pause");
-    else if (act === "prev") this._call("media_previous_track");
-    else if (act === "next") this._call("media_next_track");
+    if (this._clickTimer) {
+      window.clearTimeout(this._clickTimer);
+      this._clickTimer = null;
+      this._toggleFold();
+      return;
+    }
+    this._clickTimer = window.setTimeout(() => {
+      this._clickTimer = null;
+      this._call("media_play_pause");
+    }, 280);
   }
 
   _call(service) {

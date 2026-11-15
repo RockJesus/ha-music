@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.8`
+   - URL：`/local/ha-music.js?v=1.1.9`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -108,9 +108,10 @@ entity: media_player.living_room
 - **顶部**：悬浮在 HA 顶栏下方右侧，宽 420px；移动端自动全宽。
 - **侧边栏**：左侧底部，236px，像侧边栏小组件。
 - **右下角**：右下角圆形唱片，默认收起；点击展开为玻璃面板，显示封面模糊背景、曲目信息、进度和播放控制。
-- 卡片渲染一次后，位置和当前播放器实体记入浏览器 `localStorage`；之后打开其他仪表盘会自动恢复，不需要每个页面都放卡。
+- **交互**：单击任意非按钮区域切换播放/暂停；双击折叠或展开；长按约 0.36 秒后拖动位置。顶部/侧边栏双击折叠成小圆盘，右下角双击展开或收起玻璃面板；上一首、下一首、音量等按钮仍保留各自动作。
+- 卡片渲染一次后，位置、当前播放器实体和拖动坐标记入浏览器 `localStorage`；之后打开其他仪表盘会自动恢复，不需要每个页面都放卡。
 - 也可以直接用资源 URL 指定：`&dock=top,fab&dock_entity_top=media_player.a&dock_entity_fab=media_player.b`；`dock` 可选 `top` / `sidebar` / `fab`，多个用逗号分隔。
-- 关闭：编辑器选“关闭”，或移除资源 URL 里的 `dock` 参数。
+- 关闭：在编辑器里取消对应位置的勾选；全部关闭即移除全局播放器。
 - 同一个 `ha-music.js` 既可作为 Lovelace 资源，也可作为全局模块加载；内部已防止重复 `customElements.define`。
 - 需要设置页等非仪表盘页面也加载时，再把模块地址加入 `frontend.extra_module_url`（可选）。
 

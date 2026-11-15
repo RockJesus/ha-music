@@ -352,6 +352,9 @@ const STYLE = `
     object-fit: cover;
     transform-origin: 50% 50%;
     display: none;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    user-select: none;
   }
   .art img[src] { display: block; }
   .art .fallback { display: grid; place-items: center; }
@@ -869,6 +872,11 @@ class HaMusicMini extends HTMLElement {
     this._onPointerUp = (event) => this._handlePointerUp(event);
     this._onPointerCancel = (event) => this._handlePointerCancel(event);
     this._onContextMenu = (event) => this._handleContextMenu(event);
+    this._onDragStart = (event) => {
+      // 防止长按拖动时浏览器把封面 img 当成原生拖拽对象。
+      event.preventDefault();
+      event.stopPropagation();
+    };
     this._onResize = () => {
       this._applySavedPosition();
       this._watchDockBounds();
@@ -904,6 +912,7 @@ class HaMusicMini extends HTMLElement {
     this.shadowRoot.addEventListener("pointerup", this._onPointerUp);
     this.shadowRoot.addEventListener("pointercancel", this._onPointerCancel);
     this.shadowRoot.addEventListener("contextmenu", this._onContextMenu);
+    this.shadowRoot.addEventListener("dragstart", this._onDragStart, true);
     window.addEventListener("resize", this._onResize);
     window.addEventListener("location-changed", this._onRoute);
     this._startPolling();
@@ -921,6 +930,7 @@ class HaMusicMini extends HTMLElement {
     this.shadowRoot.removeEventListener("pointerup", this._onPointerUp);
     this.shadowRoot.removeEventListener("pointercancel", this._onPointerCancel);
     this.shadowRoot.removeEventListener("contextmenu", this._onContextMenu);
+    this.shadowRoot.removeEventListener("dragstart", this._onDragStart, true);
     window.removeEventListener("resize", this._onResize);
     window.removeEventListener("location-changed", this._onRoute);
     if (this._boundsObserver) {
@@ -981,7 +991,7 @@ class HaMusicMini extends HTMLElement {
       <style>${STYLE}</style>
       <div class="mini" data-mode="${this._mode}" role="region" aria-label="HA Music 迷你播放器">
         <div class="art">
-          <img alt="" />
+          <img alt="" draggable="false" />
           <span class="fallback">${NOTE_ICON}</span>
         </div>
         <div class="meta">
@@ -1020,7 +1030,7 @@ class HaMusicMini extends HTMLElement {
         <div class="fab-orb">
           <button class="fab-disc" type="button" aria-label="展开播放器" aria-expanded="${this._open ? "true" : "false"}">
             <div class="art">
-              <img alt="" />
+              <img alt="" draggable="false" />
               <span class="fallback">${NOTE_ICON}</span>
             </div>
             <span class="fab-glow"></span>

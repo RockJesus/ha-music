@@ -71,7 +71,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.2.8`
+   - URL：`/local/ha-music.js?v=1.2.9`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -196,6 +196,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.2.9**：修复长按拖动右下角播放器时封面图片被浏览器原生拖拽、播放器不跟随鼠标的问题；封面 img 禁用原生拖拽并加 `dragstart` 拦截，拖动恢复为整卡跟随鼠标。
 
 - **1.2.8**：右下角播放器支持长按拖动，可移动到主内容区的任意位置并记住坐标；拖动时自动避开 HA 顶栏与侧边栏，侧栏展开/折叠后也会重新夹紧，不进入这两个区域。
 

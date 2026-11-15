@@ -13,6 +13,7 @@
 
 ## 特性
 
+- **全局统一**：顶部、侧边栏、右下角三个迷你播放器的开关、实体和主题写入浏览器 localStorage，在 `test`、`music` 等不同视图/仪表盘之间保持同一组配置。
 - **七套主题**：`aurora` 极光、`cyber` 赛博朋克、`liquid` 液态玻璃、`velvet` 天鹅绒、`mono` 黑白、`sunset` 日落、`ocean` 海洋；顶部、侧边栏、右下角三个迷你播放器可分别选择主题。
 - **三档自适应布局**：`full` 完整、`compact` 紧凑、`mini` 迷你单行；默认 `adaptive` 按卡片宽度自动切换（< 430px 进入 compact）。
 - **封面驱动配色**：从当前封面提取主色，混入次色与背景氛围光；跨域或取色失败时回退到主题色。
@@ -71,7 +72,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.4`
+   - URL：`/local/ha-music.js?v=1.3.5`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -198,6 +199,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.3.5**：三个迷你播放器改为全局配置：开关、实体、主题跨仪表盘/视图统一；旧页面里的 `dock: none` 不再清除其他页面已启用的全局播放器。
 
 - **1.3.4**：修复三个迷你播放器开关全部关闭后仍会被旧 localStorage 记录重新装回的问题；显式 `dock: none` 现在会同步清除旧的三位置记忆。
 

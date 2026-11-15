@@ -28,7 +28,7 @@ import {
   visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
-import { installDocks, saveDockPref, clearDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
+import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
@@ -1133,25 +1133,43 @@ class HaMusicCard extends LitElement {
   }
 
   _installDock() {
-    const dockConfig = this._config?.dock;
-    const explicitNone =
-      dockConfig === "none" ||
-      (Array.isArray(dockConfig) && dockConfig.length === 0) ||
-      dockConfig === "";
-    const modes = normalizeDockModes(dockConfig);
-    const dockEntities = normalizeDockEntities(this._config?.dock_entities);
-    const dockThemes = normalizeDockThemes(this._config?.dock_themes);
+    const configDock = this._config?.dock;
+    const configEntities = normalizeDockEntities(this._config?.dock_entities);
+    const configThemes = normalizeDockThemes(this._config?.dock_themes);
+    const editedAt = Number(this._config?.dock_edited) || 0;
+    const pref = loadDockPref();
+    // 只有编辑器里真正改过开关/实体/主题的那张卡片，才允许用本地 dock 配置
+    // 覆盖全局记忆；其他仪表盘上的旧 `dock: none` 不能把全局播放器清掉。
+    const useConfig = editedAt > 0 && editedAt >= (pref?.updated || 0);
+    const modes = useConfig
+      ? normalizeDockModes(configDock)
+      : pref
+        ? pref.modes
+        : normalizeDockModes(configDock);
+    const dockEntities = useConfig
+      ? configEntities
+      : pref
+        ? pref.entities
+        : configEntities;
+    const dockThemes = useConfig
+      ? configThemes
+      : pref
+        ? pref.themes
+        : configThemes;
     const fallback =
       this._eid?.() ||
       this._config?.entity ||
       (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
     if (!modes.length) {
-      // 全局播放器由 localStorage 记忆。显式 `dock: none` 表示用户在编辑器里
-      // 主动停用了三个位置，必须同时清掉旧配置留下的 localStorage，否则刷新后
-      // index.js 会按旧 pref 把播放器重新装回来，表现为开关关不掉。
-      // 未配置 dock 的普通卡片不参与清理，避免同仪表盘的其他卡片互相误删。
-      if (!this._isPreviewContext() && (this._dockOwner || explicitNone)) {
-        clearDockPref();
+      // 用户显式把三个位置都关掉时写入 disabled 全局状态；这样其他视图里
+      // 旧卡片的 dock 配置就不会在切换页面时把播放器重新装回来。
+      if (!this._isPreviewContext() && (useConfig || this._dockOwner)) {
+        saveDockPref({
+          modes: [],
+          entities: dockEntities,
+          themes: dockThemes,
+          updated: editedAt || Date.now(),
+        });
         uninstallDock();
         this._dockOwner = false;
       }
@@ -1177,6 +1195,7 @@ class HaMusicCard extends LitElement {
       themes: Object.fromEntries(
         Object.keys(entities).map((mode) => [mode, dockThemes[mode] || this._themeKey()])
       ),
+      updated: editedAt || pref?.updated,
     });
     this._dockOwner = true;
   }

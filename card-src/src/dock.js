@@ -866,11 +866,18 @@ export function loadDockPref() {
     const modes = normalizeDockModes(pref?.modes ?? pref?.mode);
     const entities = normalizeDockEntities(pref?.entities);
     const themes = normalizeDockThemes(pref?.themes);
+    const updated = Number(pref?.updated) || 0;
+    const disabled = pref?.disabled === true;
     const legacyEntity = normalizeEntity(pref?.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
     const cleanModes = modes.filter((mode) => entities[mode]);
-    if (!cleanModes.length) return null;
-    return { modes: cleanModes, entities, themes };
+    if (!cleanModes.length) {
+      // 显式停用是一个全局状态：没有它，其他仪表盘里旧卡片的本地 dock 配置
+      // 会在切页时把播放器重新装回来。
+      if (!disabled) return null;
+      return { modes: [], entities, themes, disabled: true, updated };
+    }
+    return { modes: cleanModes, entities, themes, disabled: false, updated };
   } catch {
     return null;
   }
@@ -881,14 +888,28 @@ export function saveDockPref(input = {}) {
     const modes = normalizeDockModes(input.modes ?? input.mode);
     const entities = normalizeDockEntities(input.entities);
     const themes = normalizeDockThemes(input.themes);
+    const updated = Number(input.updated) || Date.now();
     const legacyEntity = normalizeEntity(input.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
     const cleanModes = modes.filter((mode) => entities[mode]);
     if (!cleanModes.length) {
-      window.localStorage.removeItem(PREF_KEY);
+      const next = JSON.stringify({
+        modes: [],
+        entities,
+        themes,
+        disabled: true,
+        updated,
+      });
+      window.localStorage.setItem(PREF_KEY, next);
       return;
     }
-    const next = JSON.stringify({ modes: cleanModes, entities, themes });
+    const next = JSON.stringify({
+      modes: cleanModes,
+      entities,
+      themes,
+      disabled: false,
+      updated,
+    });
     const current = window.localStorage.getItem(PREF_KEY);
     if (current === next) return;
     window.localStorage.setItem(PREF_KEY, next);

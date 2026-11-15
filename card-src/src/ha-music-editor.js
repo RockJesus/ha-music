@@ -237,7 +237,7 @@ class HaMusicEditor extends LitElement {
     const themes = { ...this._dockThemes() };
     if (value) themes[mode] = value;
     else delete themes[mode];
-    this._update({ dock_themes: themes });
+    this._update({ dock_themes: themes, dock_edited: Date.now() });
   }
 
   _mainEntity() {
@@ -258,13 +258,14 @@ class HaMusicEditor extends LitElement {
     this._update({
       dock: next.length ? next : "none",
       dock_entities: entities,
+      dock_edited: Date.now(),
     });
   }
 
   _setDockEntity(mode, value) {
     const entities = { ...this._dockEntities(), [mode]: value || "" };
     if (!entities[mode]) delete entities[mode];
-    this._update({ dock_entities: entities });
+    this._update({ dock_entities: entities, dock_edited: Date.now() });
   }
 
   _entities() {

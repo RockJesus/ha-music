@@ -71,7 +71,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.2.5`
+   - URL：`/local/ha-music.js?v=1.2.6`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -196,6 +196,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.2.6**：顶部播放器改为识别 HA 的 `ha-top-app-bar-fixed / .top-app-bar`，真正贴入顶部导航栏，不再误用仪表盘视图 `.header`；顶部胶囊缩到 330×44（窄屏自适应），封面 30、控制按钮 24–28，内部标题/副标题/控件不再互相遮挡。
 
 - **1.2.5**：顶部播放器嵌入 HA 顶栏并只允许左右移动；侧边栏播放器贴合侧栏宽度、只允许上下移动且不越出侧栏；右下角播放器固定，不再响应拖动；折叠侧栏自动紧凑。
 

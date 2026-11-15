@@ -38,7 +38,7 @@ const UP_ICON = `<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="tr
 const DOWN_ICON = `<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false"><path d="M6.7 9.3L12 14.6l5.3-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 
-const TOP_BAR_TAGS = new Set(["HA-TOP-APP-BAR", "HA-HEADER", "HA-APP-HEADER", "APP-HEADER", "HEADER"]);
+const TOP_BAR_TAGS = new Set(["HA-TOP-APP-BAR-FIXED", "HA-TOP-APP-BAR"]);
 const SIDEBAR_TAGS = new Set(["HA-SIDEBAR", "ASIDE"]);
 
 function isUsableRect(rect, minW = 1, minH = 1) {
@@ -78,24 +78,45 @@ function visibleTagRect(tags) {
 }
 
 function findTopBarRect() {
-  const tagged = visibleTagRect(TOP_BAR_TAGS);
-  if (tagged && tagged.height <= 120) return tagged;
-  // 兜底：找页面顶部、横跨较长、带 header/top/app-bar 语义的可见元素。
-  const found = deepMatches((node) => {
+  // HA 新版顶栏是 ha-top-app-bar-fixed 内的 .top-app-bar；
+  // 不能用 hui-root 的 .header，那是仪表盘视图标题栏，位置会偏到页面中部。
+  const bars = deepMatches((node) => {
     if (node.tagName === "BODY" || node.tagName === "HTML") return false;
     const rect = node.getBoundingClientRect();
-    if (!isUsableRect(rect, 240, 36) || rect.top > 12 || rect.height > 96) return false;
-    const name = `${node.tagName} ${node.id} ${node.className || ""}`.toLowerCase();
-    return /header|top|app-bar|appbar|navbar/.test(name);
+    if (!isUsableRect(rect, 200, 36) || rect.top > 8 || rect.height > 150) return false;
+    return (
+      node.classList?.contains("top-app-bar") ||
+      node.classList?.contains("app-header") ||
+      node.tagName === "HA-TOP-APP-BAR" ||
+      node.tagName === "HA-TOP-APP-BAR-FIXED"
+    );
   });
   let best = null;
-  for (const node of found) {
+  for (const node of bars) {
     const rect = node.getBoundingClientRect();
+    // ha-top-app-bar-fixed 宿主本身是 100vh，优先取它内部的 .top-app-bar。
+    if (rect.height > 150) continue;
     if (!best || rect.width * rect.height > best.width * best.height) {
       best = { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
     }
   }
-  return best;
+  if (best) return best;
+
+  // 兼容旧版/自定义布局：找页面最顶部、高度接近导航栏的 header。
+  const headers = deepMatches((node) => {
+    if (node.tagName === "BODY" || node.tagName === "HTML") return false;
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 240, 36) || rect.top > 8 || rect.height > 92) return false;
+    const name = `${node.tagName} ${node.id} ${node.className || ""}`.toLowerCase();
+    return /top-app-bar|app-header|navbar|\bheader\b/.test(name);
+  });
+  for (const node of headers) {
+    const rect = node.getBoundingClientRect();
+    if (rect.height <= 92) {
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
+    }
+  }
+  return null;
 }
 
 function findSidebarRect() {
@@ -199,10 +220,36 @@ const STYLE = `
     top: 4px;
     left: 8px;
     right: auto;
-    height: 48px;
-    padding: 5px 8px;
+    height: 44px;
+    padding: 4px 7px;
     gap: 6px;
-    border-radius: 12px;
+    border-radius: 11px;
+    overflow: hidden;
+  }
+  .mini[data-mode="top"] .art {
+    width: 30px;
+    height: 30px;
+  }
+  .mini[data-mode="top"] .title {
+    font-size: 11px;
+  }
+  .mini[data-mode="top"] .sub {
+    font-size: 9.5px;
+  }
+  .mini[data-mode="top"] .controls button {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+  .mini[data-mode="top"] .controls .toggle {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+  .mini[data-mode="top"] .progress {
+    left: 8px;
+    right: 8px;
+    bottom: 2px;
   }
   .mini[data-mode="sidebar"] {
     left: 8px;
@@ -338,7 +385,7 @@ const STYLE = `
       left: 8px;
       right: auto;
       width: calc(100vw - 16px);
-      height: 48px;
+      height: 44px;
     }
     .mini[data-mode="sidebar"] {
       width: 236px;
@@ -951,14 +998,14 @@ class HaMusicMini extends HTMLElement {
     const mini = this._mini;
 
     if (this._mode === "top") {
-      const h = Math.round(Math.min(56, Math.max(40, bounds.height - 8)));
-      const maxW = Math.max(160, bounds.width - margin * 2);
-      const w = Math.round(Math.min(420, Math.max(250, bounds.width - 140), maxW));
+      const h = Math.round(Math.min(44, Math.max(38, bounds.height - 8)));
+      const maxW = Math.max(150, bounds.width - margin * 2);
+      const w = Math.round(Math.min(330, Math.max(220, bounds.width - 140), maxW));
       mini.style.width = `${w}px`;
       mini.style.height = `${h}px`;
       mini.style.removeProperty("max-height");
       delete mini.dataset.compact;
-      const defaultX = bounds.right - w - 120;
+      const defaultX = bounds.right - w - 96;
       const x = clampNumber(
         pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
         bounds.left + margin,

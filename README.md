@@ -71,7 +71,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.3`
+   - URL：`/local/ha-music.js?v=1.3.2`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -198,8 +198,6 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
-
-- **1.3.3**：封面圆形裁剪增加 `-webkit-clip-path` 与圆形 mask 兜底，覆盖主卡片、顶部、侧边栏、右下角四个位置；解决部分浏览器/WebView 中封面仍显示方形四角的问题。
 
 - **1.3.2**：新增 `sunset` 日落与 `ocean` 海洋两套主题；顶部、侧边栏、右下角三个迷你播放器支持在编辑器中分别选择主题（`dock_themes`），每个位置独立持久化，并跟随各自的播放器实例渲染。
 

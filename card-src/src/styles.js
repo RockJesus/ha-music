@@ -285,14 +285,6 @@ export const cardStyles = css`
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 50%;
     overflow: hidden;
-    clip-path: circle(50% at 50% 50%);
-    -webkit-clip-path: circle(50% at 50% 50%);
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
-    mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
-    -webkit-mask-size: 100% 100%;
-    mask-size: 100% 100%;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
     background:
       linear-gradient(
         150deg,
@@ -317,11 +309,6 @@ export const cardStyles = css`
     height: 100%;
     object-fit: cover;
     transform-origin: 50% 50%;
-    border-radius: 50%;
-    clip-path: circle(50% at 50% 50%);
-    -webkit-clip-path: circle(50% at 50% 50%);
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
-    mask-image: radial-gradient(circle at 50% 50%, #000 0 49.4%, transparent 50%);
   }
 
   .hm-cover .hm-cover-ph {

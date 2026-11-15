@@ -1283,6 +1283,30 @@ class HaMusicCard extends LitElement {
     return 6;
   }
 
+  getGridOptions() {
+    const rows = this.getCardSize();
+    return {
+      columns: this._panel ? "full" : 12,
+      rows: this._panel ? Math.max(6, rows) : rows,
+      min_columns: this._panel ? 12 : 6,
+      min_rows: this._panel ? 4 : 2,
+      max_columns: 24,
+      max_rows: 24,
+    };
+  }
+
+  getLayoutOptions() {
+    const grid = this.getGridOptions();
+    return {
+      grid_columns: grid.columns === "full" ? 12 : grid.columns,
+      grid_rows: grid.rows,
+      grid_min_columns: grid.min_columns,
+      grid_max_columns: grid.max_columns,
+      grid_min_rows: grid.min_rows,
+      grid_max_rows: grid.max_rows,
+    };
+  }
+
   /* ---------------- 渲染 ---------------- */
 
   render() {

@@ -3,6 +3,8 @@ import { css } from "lit";
 export const cardStyles = css`
   :host {
     display: block;
+    height: 100%;
+    min-height: 0;
     --hm-radius: 26px;
     --hm-a1: #2ee6c5;
     --hm-a2: #7b5cff;
@@ -15,6 +17,8 @@ export const cardStyles = css`
   .hm-card {
     position: relative;
     box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
     isolation: isolate;
     overflow: hidden;
     border-radius: var(--hm-radius);

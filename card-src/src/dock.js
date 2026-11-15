@@ -375,13 +375,34 @@ const STYLE = `
   }
 `;
 
+export function normalizeDockModes(value) {
+  if (value === true || value === "1") return ["top"];
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((item) => String(item)).filter((item) => MODES.has(item)))];
+  }
+  if (typeof value !== "string" || !value || value === "none") return [];
+  if (value.includes(",")) {
+    return [...new Set(value.split(",").map((item) => item.trim()).filter((item) => MODES.has(item)))];
+  }
+  return MODES.has(value) ? [value] : [];
+}
+
 function normalizeMode(value) {
-  if (value === true || value === "1") return "top";
-  return MODES.has(value) ? value : "none";
+  return normalizeDockModes(value)[0] || "none";
 }
 
 function normalizeEntity(value) {
   return typeof value === "string" && value.startsWith("media_player.") ? value : "";
+}
+
+export function normalizeDockEntities(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const mode of MODES) {
+    const entity = normalizeEntity(value[mode]);
+    if (entity) out[mode] = entity;
+  }
+  return out;
 }
 
 export function resolveHass() {
@@ -400,26 +421,33 @@ export function loadDockPref() {
     const raw = window.localStorage.getItem(PREF_KEY);
     if (!raw) return null;
     const pref = JSON.parse(raw);
-    const mode = normalizeMode(pref?.mode);
-    const entity = normalizeEntity(pref?.entity);
-    if (mode === "none" || !entity) return null;
-    return { mode, entity };
+    const modes = normalizeDockModes(pref?.modes ?? pref?.mode);
+    const entities = normalizeDockEntities(pref?.entities);
+    const legacyEntity = normalizeEntity(pref?.entity);
+    if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
+    const cleanModes = modes.filter((mode) => entities[mode]);
+    if (!cleanModes.length) return null;
+    return { modes: cleanModes, entities };
   } catch {
     return null;
   }
 }
 
-export function saveDockPref({ mode, entity }) {
+export function saveDockPref(input = {}) {
   try {
-    const m = normalizeMode(mode);
-    const e = normalizeEntity(entity);
-    if (m === "none" || !e) {
+    const modes = normalizeDockModes(input.modes ?? input.mode);
+    const entities = normalizeDockEntities(input.entities);
+    const legacyEntity = normalizeEntity(input.entity);
+    if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
+    const cleanModes = modes.filter((mode) => entities[mode]);
+    if (!cleanModes.length) {
       window.localStorage.removeItem(PREF_KEY);
       return;
     }
-    const current = loadDockPref();
-    if (current?.mode === m && current?.entity === e) return;
-    window.localStorage.setItem(PREF_KEY, JSON.stringify({ mode: m, entity: e }));
+    const next = JSON.stringify({ modes: cleanModes, entities });
+    const current = window.localStorage.getItem(PREF_KEY);
+    if (current === next) return;
+    window.localStorage.setItem(PREF_KEY, next);
   } catch {
     /* localStorage 不可用时只影响跨页面记忆，不影响当前实例 */
   }
@@ -433,37 +461,68 @@ export function clearDockPref() {
   }
 }
 
-export function uninstallDock() {
+export function uninstallDock(mode) {
   if (typeof document === "undefined") return;
+  const docks = window.__haMusicDocks;
+  if (docks && typeof docks.get === "function") {
+    if (mode) {
+      const node = docks.get(mode);
+      node?.remove();
+      docks.delete(mode);
+    } else {
+      for (const node of docks.values()) node.remove();
+      docks.clear();
+    }
+    window.__haMusicDock = docks.values().next().value || null;
+    return;
+  }
   window.__haMusicDock?.remove();
   window.__haMusicDock = null;
 }
 
-export function installDock(options = {}) {
-  if (typeof window === "undefined" || typeof document === "undefined") return null;
-  const mode = normalizeMode(options.mode);
-  if (mode === "none") {
+export function installDocks(inputs = []) {
+  if (typeof window === "undefined" || typeof document === "undefined") return [];
+  const configs = [];
+  for (const input of Array.isArray(inputs) ? inputs : [inputs]) {
+    const mode = normalizeMode(input?.mode);
+    const entity = normalizeEntity(input?.entity);
+    if (mode === "none" || !entity) continue;
+    configs.push({ mode, entity, hass: input?.hass || null });
+  }
+  if (!configs.length) {
     uninstallDock();
-    return null;
+    return [];
   }
-  const config = {
-    mode,
-    entity: normalizeEntity(options.entity),
-    hass: options.hass || null,
-  };
   if (!document.body) {
-    document.addEventListener("DOMContentLoaded", () => installDock(config), { once: true });
-    return null;
+    document.addEventListener("DOMContentLoaded", () => installDocks(configs), { once: true });
+    return [];
   }
-  if (window.__haMusicDock) {
-    window.__haMusicDock.update(config);
-    return window.__haMusicDock;
+  const docks = window.__haMusicDocks instanceof Map ? window.__haMusicDocks : new Map();
+  const desired = new Map(configs.map((config) => [config.mode, config]));
+  for (const [mode, node] of docks) {
+    if (!desired.has(mode)) {
+      node.remove();
+      docks.delete(mode);
+    }
   }
-  const node = document.createElement("ha-music-mini");
-  node.update(config);
-  document.body.appendChild(node);
-  window.__haMusicDock = node;
-  return node;
+  for (const [mode, config] of desired) {
+    let node = docks.get(mode);
+    if (!node) {
+      node = document.createElement("ha-music-mini");
+      node.update(config);
+      document.body.appendChild(node);
+      docks.set(mode, node);
+    } else {
+      node.update(config);
+    }
+  }
+  window.__haMusicDocks = docks;
+  window.__haMusicDock = docks.values().next().value || null;
+  return [...docks.values()];
+}
+
+export function installDock(options = {}) {
+  return installDocks([options])[0] || null;
 }
 
 class HaMusicMini extends HTMLElement {

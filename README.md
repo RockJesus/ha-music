@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.7`
+   - URL：`/local/ha-music.js?v=1.1.8`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -96,19 +96,20 @@ entity: media_player.living_room
 | `show_queue` | bool | `true` | 显示队列按钮（需播放器提供 `queue` 属性） |
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |
-| `dock` | `none` \| `top` \| `sidebar` \| `fab` | `none` | 全局迷你播放器位置；直接控制播放/暂停、上一首、下一首，不跳转页面 |
+| `dock` | `none` \| 位置数组 | `none` | 全局迷你播放器位置，可同时启用多个：`top` / `sidebar` / `fab`；直接控制播放暂停、上一首、下一首，不跳转页面 |
+| `dock_entities` | object | — | 每个位置各自的播放器实体，如 `{ top: "media_player.a", sidebar: "media_player.b", fab: "media_player.c" }`；未填时回退主卡片实体 |
 | `max_queue` | number | `60` | 队列最多展示条数 |
 | `music_assistant` | `true` \| `false` \| string | 自动 | 歌单入口：不填时检测到 MA 服务/播放器即显示；`false` 隐藏；字符串同时作为抽屉内「打开 MA」按钮的面板地址（留空自动读 HA 面板路径） |
 
 ### 全局迷你播放器
 
-在任意 `ha-music` 卡片的可视化编辑器里选择位置：**关闭 / 顶部播放器 / 侧边栏播放器 / 右下角播放器**。不是跳转按钮，播放/暂停、上一首、下一首会直接调用当前 `media_player` 的服务。
+在任意 `ha-music` 卡片的可视化编辑器里，**顶部播放器 / 侧边栏播放器 / 右下角播放器** 可以同时启用，也可以分别选择各自的播放器实体。不是跳转按钮，播放/暂停、上一首、下一首会直接调用对应 `media_player` 的服务。
 
 - **顶部**：悬浮在 HA 顶栏下方右侧，宽 420px；移动端自动全宽。
 - **侧边栏**：左侧底部，236px，像侧边栏小组件。
 - **右下角**：右下角圆形唱片，默认收起；点击展开为玻璃面板，显示封面模糊背景、曲目信息、进度和播放控制。
 - 卡片渲染一次后，位置和当前播放器实体记入浏览器 `localStorage`；之后打开其他仪表盘会自动恢复，不需要每个页面都放卡。
-- 也可以直接用资源 URL 指定：`&dock=top&dock_entity=media_player.xxx`，`dock` 可选 `top` / `sidebar` / `fab`。
+- 也可以直接用资源 URL 指定：`&dock=top,fab&dock_entity_top=media_player.a&dock_entity_fab=media_player.b`；`dock` 可选 `top` / `sidebar` / `fab`，多个用逗号分隔。
 - 关闭：编辑器选“关闭”，或移除资源 URL 里的 `dock` 参数。
 - 同一个 `ha-music.js` 既可作为 Lovelace 资源，也可作为全局模块加载；内部已防止重复 `customElements.define`。
 - 需要设置页等非仪表盘页面也加载时，再把模块地址加入 `frontend.extra_module_url`（可选）。

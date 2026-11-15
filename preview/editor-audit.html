@@ -97,6 +97,8 @@ const cr = () => card.shadowRoot;
 const selects = () => er().querySelectorAll("select");
 const texts = () => er().querySelectorAll('input[type="text"]');
 const switches = () => er().querySelectorAll(".switch-row");
+const dockChecks = () => er().querySelectorAll(".dock-row input[type=\"checkbox\"]");
+const dockPickers = () => er().querySelectorAll(".dock-row ha-entity-picker");
 
 (async () => {
   // 初始状态回显
@@ -108,9 +110,9 @@ const switches = () => er().querySelectorAll(".switch-row");
   check("init/color", er().querySelector('input[type="color"]')?.value === "#2ee6c5", er().querySelector('input[type="color"]')?.value);
   check("init/switches", switches().length === 6, switches().length);
   check("init/switch-checked", [...switches()].every((s) => s.querySelector('input[type="checkbox"]').checked), [...switches()].map((s) => s.querySelector('input[type="checkbox"]').checked).join(","));
-  check("init/pickers", er().querySelectorAll("ha-entity-picker").length === 1, er().querySelectorAll("ha-entity-picker").length);
-  check("init/option-counts", [...selects()].map((s) => s.options.length).join(",") === "4,5,4,4,4", [...selects()].map((s) => s.options.length).join(","));
-  check("init/dock", selects()[4]?.value === "none", selects()[4]?.value);
+  check("init/pickers", er().querySelectorAll("ha-entity-picker").length === 4, er().querySelectorAll("ha-entity-picker").length);
+  check("init/option-counts", [...selects()].map((s) => s.options.length).join(",") === "4,5,4,4", [...selects()].map((s) => s.options.length).join(","));
+  check("init/dock", dockChecks().length === 3 && [...dockChecks()].every((b) => !b.checked), `${dockChecks().length}/${[...dockChecks()].map((b) => b.checked).join(",")}`);
   check("init/card-entity", card._eid() === "media_player.living", card._eid());
 
   // 布局
@@ -193,14 +195,21 @@ const switches = () => er().querySelectorAll(".switch-row");
     check(`switch/${key}-on`, lastConfig?.[key] !== false, lastConfig?.[key]);
   }
 
-  // 全局迷你播放器位置
-  selects()[4].value = "top";
-  selects()[4].dispatchEvent(new Event("change", { bubbles: true }));
+  // 全局迷你播放器：三个位置各自开关与实体
+  dockChecks()[0].click();
   await wait(30);
-  check("set/dock-top", lastConfig?.dock === "top", lastConfig?.dock);
-  selects()[4].value = "none";
-  selects()[4].dispatchEvent(new Event("change", { bubbles: true }));
+  check("set/dock-top", JSON.stringify(lastConfig?.dock) === '["top"]', JSON.stringify(lastConfig?.dock));
+  check("set/dock-top-entity", lastConfig?.dock_entities?.top === "media_player.living", lastConfig?.dock_entities?.top);
+  dockPickers()[0].dispatchEvent(new CustomEvent("value-changed", { detail: { value: "media_player.bedroom" }, bubbles: true, composed: true }));
   await wait(30);
+  check("set/dock-entity", lastConfig?.dock_entities?.top === "media_player.bedroom", lastConfig?.dock_entities?.top);
+  dockChecks()[1].click();
+  await wait(30);
+  check("set/dock-multi", JSON.stringify(lastConfig?.dock) === '["top","sidebar"]', JSON.stringify(lastConfig?.dock));
+  dockChecks()[0].click();
+  dockChecks()[1].click();
+  await wait(30);
+  check("set/dock-off", lastConfig?.dock === "none", JSON.stringify(lastConfig?.dock));
 
   // MA 地址（字符串 / 留空）
   const maInput = texts()[2];
@@ -218,7 +227,7 @@ const switches = () => er().querySelectorAll(".switch-row");
   addBtn.click();
   await wait(40);
   const pickers = [...er().querySelectorAll("ha-entity-picker")];
-  check("entities/add-row", pickers.length === 2, pickers.length);
+  check("entities/add-row", pickers.length === 5, pickers.length);
   pickers[1].pick("media_player.study");
   await wait(40);
   check("entities/added", Array.isArray(lastConfig?.entities) && lastConfig.entities.length === 2 && lastConfig.entities[1] === "media_player.study", JSON.stringify(lastConfig?.entities));

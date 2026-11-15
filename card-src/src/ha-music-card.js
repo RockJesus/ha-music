@@ -28,7 +28,7 @@ import {
   visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
-import { installDock, saveDockPref, clearDockPref, loadDockPref, uninstallDock } from "./dock.js";
+import { installDocks, saveDockPref, clearDockPref, loadDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities } from "./dock.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -1052,23 +1052,34 @@ class HaMusicCard extends LitElement {
   }
 
   _installDock() {
-    const mode = this._config?.dock;
-    const entity =
+    const modes = normalizeDockModes(this._config?.dock);
+    const dockEntities = normalizeDockEntities(this._config?.dock_entities);
+    const fallback =
       this._eid?.() ||
       this._config?.entity ||
       (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
-    if (mode === "none") {
+    if (!modes.length) {
       const pref = loadDockPref();
-      if (pref && (!entity || pref.entity === entity)) {
+      if (pref && (!fallback || Object.values(pref.entities).includes(fallback))) {
         clearDockPref();
         uninstallDock();
       }
       return;
     }
-    if (!mode || !this._hass || !this.isConnected || !entity) return;
+    if (!this._hass || !this.isConnected || !fallback) return;
     if (this._isPreviewContext()) return;
-    installDock({ mode, entity, hass: this._hass });
-    saveDockPref({ mode, entity });
+    const entities = {};
+    for (const mode of modes) {
+      const entity = dockEntities[mode] || fallback;
+      if (entity) entities[mode] = entity;
+    }
+    const configs = Object.entries(entities).map(([mode, entity]) => ({
+      mode,
+      entity,
+      hass: this._hass,
+    }));
+    installDocks(configs);
+    saveDockPref({ modes: Object.keys(entities), entities });
   }
 
   _artUrlFor() {

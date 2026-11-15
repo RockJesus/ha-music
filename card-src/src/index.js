@@ -1,17 +1,30 @@
 // 打包入口：注册卡片与可视化编辑器
 import "./ha-music-card.js";
 import "./ha-music-editor.js";
-import { installDock, loadDockPref, resolveHass } from "./dock.js";
+import {
+  installDocks,
+  loadDockPref,
+  resolveHass,
+  normalizeDockModes,
+} from "./dock.js";
 
 // 同一个 bundle 既可作为 Lovelace 资源，也可作为全局模块加载。
 // 迷你播放器的位置由卡片 `dock` 配置记忆到 localStorage；也可用模块 URL 强制指定：
-//   ?dock=top|sidebar|fab&dock_entity=media_player.xxx
+//   ?dock=top|sidebar|fab（可逗号组合）&dock_entity=media_player.xxx
 const moduleUrl = new URL(import.meta.url);
 const queryMode = moduleUrl.searchParams.get("dock");
 const pref = loadDockPref();
-const mode = queryMode === "1" ? "top" : queryMode || pref?.mode;
-const entity = moduleUrl.searchParams.get("dock_entity") || pref?.entity;
-
-if (mode && mode !== "none" && entity) {
-  installDock({ mode, entity, hass: resolveHass() });
+const modes = queryMode
+  ? normalizeDockModes(queryMode === "1" ? "top" : queryMode)
+  : pref?.modes || [];
+const entities = { ...(pref?.entities || {}) };
+const queryEntity = moduleUrl.searchParams.get("dock_entity");
+if (queryEntity && modes[0]) entities[modes[0]] = queryEntity;
+for (const mode of modes) {
+  const scoped = moduleUrl.searchParams.get(`dock_entity_${mode}`);
+  if (scoped) entities[mode] = scoped;
 }
+const configs = modes
+  .map((mode) => ({ mode, entity: entities[mode] }))
+  .filter((item) => item.entity);
+if (configs.length) installDocks(configs.map((item) => ({ ...item, hass: resolveHass() })));

@@ -6,6 +6,7 @@ import {
   VISUALIZERS,
   isChinese,
 } from "./const.js";
+import { normalizeDockModes, normalizeDockEntities } from "./dock.js";
 
 function fireConfigChanged(node, config) {
   node.dispatchEvent(
@@ -100,6 +101,18 @@ class HaMusicEditor extends LitElement {
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+      .dock-row {
+        display: grid;
+        grid-template-columns: 112px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+      }
+      .dock-row .check {
+        min-height: 36px;
+      }
+      .dock-row ha-entity-picker {
+        min-width: 0;
       }
       .entity-row ha-entity-picker {
         flex: 1 1 auto;
@@ -198,6 +211,41 @@ class HaMusicEditor extends LitElement {
     return this._zh ? item.zh : item.en;
   }
 
+  _dockModes() {
+    return normalizeDockModes(this._config?.dock);
+  }
+
+  _dockEntities() {
+    return normalizeDockEntities(this._config?.dock_entities);
+  }
+
+  _mainEntity() {
+    const list = this._entities();
+    return list[0] || this._config?.entity || "";
+  }
+
+  _toggleDock(mode, checked) {
+    const modes = this._dockModes();
+    const entities = this._dockEntities();
+    let next;
+    if (checked) {
+      next = modes.includes(mode) ? modes : [...modes, mode];
+      if (!entities[mode] && this._mainEntity()) entities[mode] = this._mainEntity();
+    } else {
+      next = modes.filter((item) => item !== mode);
+    }
+    this._update({
+      dock: next.length ? next : "none",
+      dock_entities: entities,
+    });
+  }
+
+  _setDockEntity(mode, value) {
+    const entities = { ...this._dockEntities(), [mode]: value || "" };
+    if (!entities[mode]) delete entities[mode];
+    this._update({ dock_entities: entities });
+  }
+
   _entities() {
     if (Array.isArray(this._config.entities) && this._config.entities.length) {
       return this._config.entities;
@@ -244,6 +292,8 @@ class HaMusicEditor extends LitElement {
   render() {
     const config = this._config || {};
     const list = this._entities();
+    const dockModes = this._dockModes();
+    const dockEntities = this._dockEntities();
 
     const picker = (value, index, placeholder) => html`
       <ha-entity-picker
@@ -457,23 +507,43 @@ class HaMusicEditor extends LitElement {
                 : "Leave empty to auto-detect the HA panel path"}
             </span>
           </label>
-          <label class="field">
-            <span class="label">${this._zh ? "全局迷你播放器" : "Global mini player"}</span>
-            <select
-              .value=${config.dock === true ? "top" : config.dock || "none"}
-              @change=${(e) => this._update({ dock: e.target.value })}
-            >
-              <option value="none">${this._zh ? "关闭" : "Off"}</option>
-              <option value="top">${this._zh ? "顶部播放器" : "Top bar"}</option>
-              <option value="sidebar">${this._zh ? "侧边栏播放器" : "Sidebar"}</option>
-              <option value="fab">${this._zh ? "右下角播放器" : "Bottom-right"}</option>
-            </select>
-            <span class="hint">
-              ${this._zh
-                ? "直接控制播放/暂停、上一首、下一首；不跳转页面"
-                : "Direct play/pause, previous and next controls; no page jump"}
-            </span>
-          </label>
+          <div class="section-title">${this._zh ? "全局迷你播放器" : "Global mini players"}</div>
+          <div class="hint">
+            ${this._zh
+              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；不跳转页面，直接控制播放。"
+              : "Each position can be enabled independently with its own player entity; controls stay on the page."}
+          </div>
+          ${[
+            ["top", this._zh ? "顶部播放器" : "Top bar"],
+            ["sidebar", this._zh ? "侧边栏播放器" : "Sidebar"],
+            ["fab", this._zh ? "右下角播放器" : "Bottom-right"],
+          ].map(([mode, label]) => {
+            const enabled = dockModes.includes(mode);
+            const entity = dockEntities[mode] || this._mainEntity();
+            return html`
+              <div class="dock-row">
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    .checked=${enabled}
+                    @change=${(e) => this._toggleDock(mode, e.target.checked)}
+                  />
+                  <span>${label}</span>
+                </label>
+                <ha-entity-picker
+                  .hass=${this.hass}
+                  .value=${entity || ""}
+                  .includeDomains=${["media_player"]}
+                  .allowCustomEntity=${false}
+                  .label=${this._zh ? "播放器实体" : "Player entity"}
+                  @value-changed=${(event) => {
+                    event.stopPropagation();
+                    this._setDockEntity(mode, event.detail?.value ?? "");
+                  }}
+                ></ha-entity-picker>
+              </div>
+            `;
+          })}
         </div>
       </div>
     `;

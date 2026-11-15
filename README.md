@@ -69,7 +69,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.1.6`
+   - URL：`/local/ha-music.js?v=1.1.7`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -106,7 +106,7 @@ entity: media_player.living_room
 
 - **顶部**：悬浮在 HA 顶栏下方右侧，宽 420px；移动端自动全宽。
 - **侧边栏**：左侧底部，236px，像侧边栏小组件。
-- **右下角**：右下角 300px 迷你播放卡。
+- **右下角**：右下角圆形唱片，默认收起；点击展开为玻璃面板，显示封面模糊背景、曲目信息、进度和播放控制。
 - 卡片渲染一次后，位置和当前播放器实体记入浏览器 `localStorage`；之后打开其他仪表盘会自动恢复，不需要每个页面都放卡。
 - 也可以直接用资源 URL 指定：`&dock=top&dock_entity=media_player.xxx`，`dock` 可选 `top` / `sidebar` / `fab`。
 - 关闭：编辑器选“关闭”，或移除资源 URL 里的 `dock` 参数。

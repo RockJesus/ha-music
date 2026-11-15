@@ -147,6 +147,70 @@ function findTopBarRect() {
   return null;
 }
 
+function findTopBarAddRect(bounds) {
+  if (!bounds) return null;
+  const found = deepMatches((node) => {
+    if (node.tagName === "BODY" || node.tagName === "HTML") return false;
+    if (typeof node.getBoundingClientRect !== "function") return false;
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 16, 16) || rect.width > 88 || rect.height > 64) return false;
+    if (rect.left < bounds.left - 2 || rect.right > bounds.right + 2) return false;
+    if (rect.top < bounds.top - 4 || rect.bottom > bounds.bottom + 4) return false;
+    const name = [
+      node.getAttribute?.("aria-label"),
+      node.getAttribute?.("title"),
+      node.getAttribute?.("icon"),
+      node.id,
+      node.className,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    if (/remove|delete|close|unpin|关闭|删除/.test(name)) return false;
+    return /(mdi:(plus|add)|plus|add|create|添加|新增|新建)/.test(name);
+  });
+  let best = null;
+  for (const node of found) {
+    const rect = node.getBoundingClientRect();
+    const area = rect.width * rect.height;
+    if (!best || area > best.area || (area === best.area && rect.right > best.rect.right)) {
+      best = { rect, area };
+    }
+  }
+  return best?.rect || null;
+}
+
+function findSidebarSettingsRect(bounds) {
+  if (!bounds) return null;
+  const found = deepMatches((node) => {
+    if (node.tagName === "BODY" || node.tagName === "HTML") return false;
+    if (typeof node.getBoundingClientRect !== "function") return false;
+    const rect = node.getBoundingClientRect();
+    if (!isUsableRect(rect, 16, 16) || rect.height > 72 || rect.width > bounds.width + 2) return false;
+    if (rect.left < bounds.left - 2 || rect.right > bounds.right + 2) return false;
+    if (rect.top < bounds.top || rect.bottom > bounds.bottom + 2) return false;
+    if (rect.top < bounds.top + bounds.height * 0.45) return false;
+    const name = [
+      node.getAttribute?.("aria-label"),
+      node.getAttribute?.("title"),
+      node.getAttribute?.("icon"),
+      node.id,
+      node.className,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    if (/remove|delete|close|关闭|删除/.test(name)) return false;
+    return /(settings|设置|cog|gear)/.test(name);
+  });
+  let best = null;
+  for (const node of found) {
+    const rect = node.getBoundingClientRect();
+    if (!best || rect.top > best.top) best = { top: rect.top, rect };
+  }
+  return best?.rect || null;
+}
+
 function findSidebarRect() {
   const tagged = visibleTagRect(SIDEBAR_TAGS);
   if (tagged) return tagged;
@@ -1171,7 +1235,7 @@ class HaMusicMini extends HTMLElement {
       const positions = loadDockPositions();
       const pos = positions.fab;
       const defaultX = constraints.vw - width - 24;
-      const defaultY = constraints.vh - height - 24;
+      const defaultY = constraints.vh / 2 - height / 2;
       const target = clampFabPosition(
         pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
         pos && Number.isFinite(pos.y) ? pos.y * window.innerHeight : defaultY,
@@ -1200,7 +1264,10 @@ class HaMusicMini extends HTMLElement {
       mini.style.height = `${h}px`;
       mini.style.removeProperty("max-height");
       delete mini.dataset.compact;
-      const defaultX = bounds.right - w - 96;
+      const addRect = findTopBarAddRect(bounds);
+      const defaultX = addRect
+        ? addRect.left - 8 - w
+        : bounds.right - w - 80;
       const x = clampNumber(
         pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
         bounds.left + margin,
@@ -1234,7 +1301,10 @@ class HaMusicMini extends HTMLElement {
     mini.style.right = "auto";
     mini.style.bottom = "auto";
     const height = mini.getBoundingClientRect().height || 58;
-    const defaultY = bounds.bottom - height - 12;
+    const settingsRect = findSidebarSettingsRect(bounds);
+    const defaultY = settingsRect
+      ? settingsRect.top - 8 - height
+      : bounds.bottom - height - 148;
     const y = clampNumber(
       pos && Number.isFinite(pos.y) ? pos.y * window.innerHeight : defaultY,
       bounds.top + margin,

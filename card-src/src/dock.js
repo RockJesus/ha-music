@@ -1,5 +1,7 @@
 // 全局迷你播放器：顶部 / 侧边栏 / 右下角三种位置，直接控制当前播放器。
 // 通过卡片传入 hass 与当前实体；也支持模块 URL 的 dock=top|sidebar|fab + dock_entity。
+import { syncCoverSpin } from "./cover-spin.js";
+
 const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
 const MODES = new Set(["top", "sidebar", "fab"]);
@@ -94,7 +96,7 @@ const STYLE = `
     width: 36px;
     height: 36px;
     flex: 0 0 auto;
-    border-radius: 9px;
+    border-radius: 50%;
     overflow: hidden;
     display: grid;
     place-items: center;
@@ -105,6 +107,7 @@ const STYLE = `
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform-origin: 50% 50%;
     display: none;
   }
   .art img[src] { display: block; }
@@ -914,6 +917,7 @@ class HaMusicMini extends HTMLElement {
       this._setDisabled(true);
       this._progress.style.width = "0%";
       this._setArt(null);
+      syncCoverSpin(this._art, false);
       return;
     }
     const hass = resolveHass() || this._hass;
@@ -925,6 +929,7 @@ class HaMusicMini extends HTMLElement {
       this._setDisabled(true);
       this._progress.style.width = "0%";
       this._setArt(null);
+      syncCoverSpin(this._art, false);
       return;
     }
     const a = state.attributes || {};
@@ -949,6 +954,7 @@ class HaMusicMini extends HTMLElement {
     }
     if (this._collapse) this._collapse.innerHTML = DOWN_ICON;
     this._setArt(a.entity_picture);
+    syncCoverSpin(this._art, playing);
     const duration = Number(a.media_duration || 0);
     const position = Number(a.media_position || 0);
     const percent = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;

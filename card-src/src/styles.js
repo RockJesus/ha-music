@@ -283,7 +283,7 @@ export const cardStyles = css`
     aspect-ratio: 1 / 1;
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 20px;
+    border-radius: 50%;
     overflow: hidden;
     background:
       linear-gradient(
@@ -308,6 +308,7 @@ export const cardStyles = css`
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform-origin: 50% 50%;
   }
 
   .hm-cover .hm-cover-ph {
@@ -359,7 +360,7 @@ export const cardStyles = css`
     content: "";
     position: absolute;
     inset: -1px;
-    border-radius: 20px;
+    border-radius: 50%;
     padding: 1px;
     background: conic-gradient(
       from 0deg,
@@ -1178,7 +1179,7 @@ export const cardStyles = css`
   }
 
   .hm-card[data-layout="compact"] .hm-cover {
-    border-radius: 14px;
+    border-radius: 50%;
   }
 
   .hm-card[data-layout="compact"] .hm-title {
@@ -1263,7 +1264,7 @@ export const cardStyles = css`
 
   .hm-card[data-layout="mini"] .hm-cover {
     width: 44px;
-    border-radius: 11px;
+    border-radius: 50%;
   }
 
   .hm-card[data-layout="mini"] .hm-title {
@@ -1818,7 +1819,7 @@ export const cardStyles = css`
 
   .hm-card[data-panel="true"] .hm-cover {
     width: 100%;
-    border-radius: 24px;
+    border-radius: 50%;
   }
 
   .hm-card[data-panel="true"] .hm-title {
@@ -1854,7 +1855,7 @@ export const cardStyles = css`
 
     .hm-card[data-panel="true"] .hm-cover {
       width: 100%;
-      border-radius: 16px;
+      border-radius: 50%;
     }
 
     .hm-card[data-panel="true"] .hm-meta {

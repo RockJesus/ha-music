@@ -16,6 +16,7 @@
 - **五套主题**：`aurora` 极光、`cyber` 赛博朋克、`liquid` 液态玻璃、`velvet` 天鹅绒、`mono` 黑白，均可用 `accent` 覆盖主色。
 - **三档自适应布局**：`full` 完整、`compact` 紧凑、`mini` 迷你单行；默认 `adaptive` 按卡片宽度自动切换（< 430px 进入 compact）。
 - **封面驱动配色**：从当前封面提取主色，混入次色与背景氛围光；跨域或取色失败时回退到主题色。
+- **圆形旋转封面**：主卡片和全局迷你播放器的歌曲封面统一为圆形；播放时顺时针旋转，暂停时平滑回正。
 - **三种背景模式**：`ambient` 环境模糊、`art` 封面铺满、`palette` 纯色彩、`none` 无背景。
 - **频谱动效**：`bars` 柱状、`wave` 波形、`orbit` 光环；以「歌名+歌手+专辑」作为曲目种子，用 `media_position` 驱动低频脉冲，播放时随进度起伏、暂停时冻结。属于程序化伪频谱，不读取真实音频采样。
 - **完整播放控制**：播放/暂停、上一首/下一首、进度拖动、音量拖动与静音、随机、循环（关/列表/单曲）、电源开关。
@@ -69,7 +70,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.2.0`
+   - URL：`/local/ha-music.js?v=1.2.1`
    - 类型：JavaScript 模块
 
 ## 配置

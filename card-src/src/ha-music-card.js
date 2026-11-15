@@ -29,6 +29,7 @@ import {
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { installDocks, saveDockPref, clearDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities } from "./dock.js";
+import { syncCoverSpin } from "./cover-spin.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -1010,6 +1011,10 @@ class HaMusicCard extends LitElement {
     this._syncRangeValues();
     this._syncPanelFlag();
     this._installDock();
+    syncCoverSpin(
+      this.renderRoot?.querySelector?.(".hm-cover img"),
+      this._state()?.state === "playing",
+    );
   }
 
   _isPanelContext() {

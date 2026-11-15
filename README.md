@@ -70,7 +70,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.2.1`
+   - URL：`/local/ha-music.js?v=1.2.2`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -108,7 +108,7 @@ entity: media_player.living_room
 
 - **顶部**：悬浮在 HA 顶栏下方右侧，宽 420px；移动端自动全宽。
 - **侧边栏**：左侧底部，236px，像侧边栏小组件。
-- **右下角**：右下角圆形唱片，默认收起；点击展开为玻璃面板，显示封面模糊背景、曲目信息、进度和播放控制。
+- **右下角**：右下角圆形唱片，默认收起；点击展开为玻璃面板，显示封面模糊背景、曲目信息、进度和播放控制。收起态外圈带 **36 根镜像音频律动柱**（12 点低频紫、6 点高频青），随歌曲元数据与 `media_position` 起伏，并叠加唱片脉冲与紫色辉光；暂停或展开时淡出。参考 `rockjesus.cn` 左下角播放器的 `rj-pl-eq`。
 - **交互**：单击任意非按钮区域切换播放/暂停；双击折叠或展开；长按约 0.36 秒后拖动位置。顶部/侧边栏双击折叠成小圆盘，右下角双击展开或收起玻璃面板；上一首、下一首、音量等按钮仍保留各自动作。
 - 卡片渲染一次后，位置、当前播放器实体和拖动坐标记入浏览器 `localStorage`；之后打开其他仪表盘会自动恢复，不需要每个页面都放卡。
 - 也可以直接用资源 URL 指定：`&dock=top,fab&dock_entity_top=media_player.a&dock_entity_fab=media_player.b`；`dock` 可选 `top` / `sidebar` / `fab`，多个用逗号分隔。

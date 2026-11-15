@@ -1,6 +1,7 @@
 // 全局迷你播放器：顶部 / 侧边栏 / 右下角三种位置，直接控制当前播放器。
 // 通过卡片传入 hass 与当前实体；也支持模块 URL 的 dock=top|sidebar|fab + dock_entity。
 import { syncCoverSpin } from "./cover-spin.js";
+import { syncFabEq } from "./fab-eq.js";
 
 const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
@@ -213,8 +214,8 @@ const STYLE = `
   }
   /* 右下角悬浮播放器：参考站内左下角 APlayer 的圆盘 + 玻璃面板 */
   .mini[data-mode="fab"] {
-    right: max(18px, env(safe-area-inset-right, 0px));
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+    right: max(24px, env(safe-area-inset-right, 0px));
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
     width: 64px;
     height: 64px;
     padding: 0;
@@ -274,6 +275,22 @@ const STYLE = `
     width: 52px;
     height: 52px;
   }
+  /* rockjesus.cn 左下角播放器的环形音频律动：36 根柱围绕唱片，12 点低频、6 点高频。 */
+  .fab-eq {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 4;
+    width: 104px;
+    height: 104px;
+    margin: -52px 0 0 -52px;
+    display: none;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+  .mini[data-mode="fab"][data-open="false"] .fab-eq { display: block; }
+  .mini[data-mode="fab"][data-open="false"][data-playing="true"] .fab-eq { opacity: 1; }
   .fab-disc {
     position: relative;
     display: block;
@@ -287,7 +304,14 @@ const STYLE = `
     color: var(--hm-accent);
     cursor: pointer;
     overflow: visible;
+    transform: scale(var(--fab-beat, 1));
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 10px 26px rgba(2, 6, 18, 0.46);
     -webkit-tap-highlight-color: transparent;
+  }
+  .mini[data-mode="fab"][data-playing="true"] .fab-disc {
+    transition: none;
+    will-change: transform;
   }
   .fab-disc .art {
     position: absolute;
@@ -660,6 +684,7 @@ class HaMusicMini extends HTMLElement {
   }
 
   _render() {
+    this._eq = null;
     if (this._mode === "fab") return this._renderFab();
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
@@ -709,6 +734,7 @@ class HaMusicMini extends HTMLElement {
             </div>
             <span class="fab-glow"></span>
           </button>
+          <canvas class="fab-eq" aria-hidden="true"></canvas>
           <button class="fab-quick" data-act="toggle" type="button" aria-label="播放">${PLAY_ICON}</button>
         </div>
         <div class="fab-panel">
@@ -740,6 +766,7 @@ class HaMusicMini extends HTMLElement {
     this._disc = this.shadowRoot.querySelector(".fab-disc");
     this._quick = this.shadowRoot.querySelector(".fab-quick");
     this._collapse = this.shadowRoot.querySelector(".fab-collapse");
+    this._eq = this.shadowRoot.querySelector(".fab-eq");
     this._art.addEventListener("error", () => {
       this._art.removeAttribute("src");
       this._fallback.style.display = "grid";
@@ -766,7 +793,7 @@ class HaMusicMini extends HTMLElement {
     if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
     const rect = this._mini.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const margin = 8;
+    const margin = this._mode === "fab" ? 24 : 8;
     const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
     const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
     const x = Math.max(margin, Math.min(maxX, pos.x * window.innerWidth));
@@ -845,7 +872,7 @@ class HaMusicMini extends HTMLElement {
       return;
     }
     event.preventDefault();
-    const margin = 8;
+    const margin = this._mode === "fab" ? 24 : 8;
     const maxX = Math.max(margin, window.innerWidth - this._drag.width - margin);
     const maxY = Math.max(margin, window.innerHeight - this._drag.height - margin);
     const x = Math.max(margin, Math.min(maxX, this._drag.left + dx));
@@ -911,6 +938,7 @@ class HaMusicMini extends HTMLElement {
     this._mini.dataset.mode = this._mode;
     this._mini.dataset.folded = this._mode !== "fab" && this._folded ? "true" : "false";
     if (this._mode === "fab") this._mini.dataset.open = this._open ? "true" : "false";
+    this._mini.dataset.playing = "false";
     if (!this._entity) {
       this._title.textContent = "选择播放器";
       this._sub.textContent = "在卡片编辑器中选择位置";
@@ -918,6 +946,7 @@ class HaMusicMini extends HTMLElement {
       this._progress.style.width = "0%";
       this._setArt(null);
       syncCoverSpin(this._art, false);
+      this._syncFabEq(false, {}, 0);
       return;
     }
     const hass = resolveHass() || this._hass;
@@ -930,6 +959,7 @@ class HaMusicMini extends HTMLElement {
       this._progress.style.width = "0%";
       this._setArt(null);
       syncCoverSpin(this._art, false);
+      this._syncFabEq(false, {}, 0);
       return;
     }
     const a = state.attributes || {};
@@ -941,6 +971,7 @@ class HaMusicMini extends HTMLElement {
     this._sub.textContent = artist ? `${artist} · ${label}` : label;
     this._setDisabled(false);
     const playing = state.state === "playing";
+    this._mini.dataset.playing = playing ? "true" : "false";
     const icon = playing ? PAUSE_ICON : PLAY_ICON;
     this._toggle.innerHTML = icon;
     this._toggle.setAttribute("aria-label", playing ? "暂停" : "播放");
@@ -957,8 +988,21 @@ class HaMusicMini extends HTMLElement {
     syncCoverSpin(this._art, playing);
     const duration = Number(a.media_duration || 0);
     const position = Number(a.media_position || 0);
+    this._syncFabEq(playing, a, position);
     const percent = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
     this._progress.style.width = `${percent}%`;
+  }
+
+  _syncFabEq(playing, attrs = {}, position = 0) {
+    if (!this._eq) return;
+    syncFabEq(this._eq, this._mini, {
+      playing,
+      visible: !this._open,
+      position,
+      title: attrs.media_title,
+      artist: attrs.media_artist,
+      album: attrs.media_album_name,
+    });
   }
 
   _setArt(url) {
@@ -991,6 +1035,7 @@ class HaMusicMini extends HTMLElement {
     if (this._mode !== "fab" || !this._mini) return;
     this._open = !this._open;
     this._mini.dataset.open = this._open ? "true" : "false";
+    this._sync();
     if (this._disc) {
       this._disc.setAttribute("aria-label", this._open ? "收起播放器" : "展开播放器");
       this._disc.setAttribute("aria-expanded", this._open ? "true" : "false");

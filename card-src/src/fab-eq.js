@@ -1,0 +1,214 @@
+// 右下角悬浮唱片的环形音频律动。
+// 参考 rockjesus.cn 的 rj-pl-eq：36 根镜像柱围绕唱片的 12 点低频 / 6 点高频分布，
+// 颜色从紫色过渡到青色，并叠加唱片轻微脉冲与外圈辉光。
+// HA 的音频由服务端播放，页面拿不到原始采样，因此以歌曲元数据和 media_position 驱动。
+import { clamp, hashString } from "./util.js";
+
+const SIZE = 104;
+const BARS = 36;
+const HALF = BARS / 2;
+const DPR = Math.min(2, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
+const states = new WeakMap();
+
+function paint(canvas, bars, glow) {
+  const state = states.get(canvas);
+  if (!state?.ctx) return;
+  const { ctx } = state;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  const R = SIZE / 2;
+  const r0 = 33.5;
+  const maxLen = R - r0 - 3;
+  ctx.lineCap = "round";
+  ctx.shadowBlur = 5 + glow * 7;
+
+  for (let i = 0; i < BARS; i += 1) {
+    const v = clamp(bars[i] || 0, 0, 1);
+    const angle = (i / BARS) * Math.PI * 2 - Math.PI / 2;
+    const len = 2.2 + Math.pow(v, 1.05) * maxLen;
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const t = Math.abs(i - HALF) / HALF;
+    const hue = 264 - 76 * (1 - t);
+    const light = 56 + v * 23 - 2 * t;
+    const satur = 96 - 4 * t;
+    const alpha = 0.5 + v * 0.48;
+    const col = `hsla(${hue.toFixed(0)}, ${satur.toFixed(0)}%, ${light.toFixed(0)}%, ${alpha.toFixed(2)})`;
+    ctx.strokeStyle = col;
+    ctx.shadowColor = `hsla(${hue.toFixed(0)}, ${satur.toFixed(0)}%, ${light.toFixed(0)}%, ${(0.12 + glow * 0.26).toFixed(2)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(R + c * r0, R + s * r0);
+    ctx.lineTo(R + c * (r0 + len), R + s * (r0 + len));
+    ctx.stroke();
+
+    // 上半环加一道近白亮芯，让紫色一端在深色背景上仍能读出柱长。
+    const core = clamp((t - 0.3) / 0.45, 0, 1);
+    if (core > 0.01) {
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `hsla(${hue.toFixed(0)}, 96%, 96%, ${((0.05 + v * 0.24) * core).toFixed(2)})`;
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      ctx.shadowBlur = 5 + glow * 7;
+    }
+  }
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+}
+
+function clear(canvas) {
+  const state = states.get(canvas);
+  if (!state?.ctx) return;
+  state.ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  state.ctx.clearRect(0, 0, SIZE, SIZE);
+}
+
+function setBeat(root, scale, glow) {
+  if (!root?.style) return;
+  root.style.setProperty("--fab-beat", scale.toFixed(4));
+  root.style.setProperty("--fab-beat-glow", glow.toFixed(3));
+  const disc = root.querySelector?.(".fab-disc");
+  if (disc) {
+    disc.style.boxShadow = [
+      "0 10px 26px rgba(2, 6, 18, 0.46)",
+      `0 0 26px rgba(139, 92, 246, ${(glow * 0.92).toFixed(3)})`,
+      `0 0 52px rgba(124, 58, 237, ${(glow * 0.55).toFixed(3)})`,
+    ].join(", ");
+  }
+}
+
+function frame(canvas, now) {
+  const state = states.get(canvas);
+  if (!state) return;
+  state.raf = 0;
+  if (!state.playing || !state.visible) return;
+  if (!canvas.isConnected) {
+    state.playing = false;
+    return;
+  }
+
+  const t = state.position + Math.max(0, now - state.since) / 1000;
+  const angle = (t / state.period) * Math.PI * 2 + state.phase;
+  const pulse = 0.5 + 0.5 * Math.sin(angle);
+  const low = 0.5 + 0.5 * Math.sin(angle + 0.55);
+  const kick = Math.pow(0.5 + 0.5 * Math.sin(angle * 2.15 + state.phase * 1.7), 3);
+  const bars = [];
+
+  for (let h = 0; h < HALF; h += 1) {
+    const d = h / (HALF - 1); // 0 = 12 点低频，1 = 6 点高频
+    const band = Math.pow(1 - d, 1.05);
+    const wobble = Math.sin(t * (4.6 + (state.hash % 9) * 0.25) + h * 1.1 + state.phase);
+    const shimmer = Math.sin(t * (11.4 + (state.hash % 5) * 0.4) + h * 2.3);
+    const base = (0.16 + 0.68 * band) * (0.62 + 0.38 * (0.5 + 0.5 * wobble));
+    const transient = 0.18 * kick * Math.pow(1 - d, 2.2);
+    const value = clamp(
+      base * (0.55 + 0.45 * (0.5 + 0.5 * shimmer)) + transient + 0.04 * state.energy,
+      0,
+      1,
+    );
+    bars[h] = value;
+    bars[BARS - 1 - h] = value;
+  }
+
+  for (let i = 0; i < BARS; i += 1) {
+    const prev = state.smooth[i] || 0;
+    const target = bars[i] || 0;
+    state.smooth[i] = target > prev ? prev + (target - prev) * 0.72 : prev + (target - prev) * 0.24;
+  }
+
+  const glow = Math.min(1, low * 1.05 + kick * 0.4);
+  paint(canvas, state.smooth, glow);
+  const scale = 1 + Math.min(0.085, low * 0.05 + kick * 0.05);
+  setBeat(state.root, scale, 0.16 + Math.min(0.46, low * 0.5 + kick * 0.26));
+  state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
+}
+
+function stop(canvas, { clearNow = false } = {}) {
+  const state = states.get(canvas);
+  if (!state) return;
+  if (state.raf) {
+    cancelAnimationFrame(state.raf);
+    state.raf = 0;
+  }
+  setBeat(state.root, 1, 0);
+  state.smooth.fill(0);
+  if (clearNow) {
+    clear(canvas);
+    return;
+  }
+  state.clearTimer = window.setTimeout(() => {
+    const current = states.get(canvas);
+    if (current && !current.playing) clear(canvas);
+  }, 460);
+}
+
+/**
+ * 更新右下角悬浮唱片的音频律动。
+ * @param {HTMLCanvasElement|null} canvas
+ * @param {HTMLElement|null} root
+ * @param {{playing?: boolean, visible?: boolean, position?: number, title?: string, artist?: string, album?: string}} media
+ */
+export function syncFabEq(canvas, root, media = {}) {
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  let state = states.get(canvas);
+  if (!state) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = Math.round(SIZE * DPR);
+    canvas.height = Math.round(SIZE * DPR);
+    state = {
+      ctx,
+      root,
+      playing: false,
+      visible: true,
+      position: 0,
+      lastPosition: null,
+      since: 0,
+      hash: 0,
+      period: 2,
+      phase: 0,
+      energy: 0.6,
+      smooth: new Array(BARS).fill(0),
+      raf: 0,
+      clearTimer: 0,
+    };
+    states.set(canvas, state);
+  }
+
+  if (state.clearTimer) {
+    window.clearTimeout(state.clearTimer);
+    state.clearTimer = 0;
+  }
+  state.root = root || state.root;
+
+  const playing = !!media.playing;
+  const visible = media.visible !== false;
+  const wasPlaying = state.playing;
+  const position = Number(media.position);
+  if (Number.isFinite(position) && position >= 0) {
+    const moved = state.lastPosition == null || Math.abs(position - state.lastPosition) > 0.25;
+    if (moved || (!wasPlaying && playing)) {
+      state.position = position;
+      state.since = performance.now();
+    }
+    state.lastPosition = position;
+  }
+
+  const seed = [media.title, media.artist, media.album].filter(Boolean).join("|") || "ha-music";
+  state.hash = hashString(seed);
+  state.period = 1.7 + ((state.hash >>> 8) % 90) / 100;
+  state.phase = ((state.hash % 360) / 360) * Math.PI * 2;
+  state.energy = 0.55 + ((state.hash >>> 16) % 100) / 220;
+  state.playing = playing;
+  state.visible = visible;
+
+  if (!playing || !visible) {
+    stop(canvas, { clearNow: !visible });
+    return;
+  }
+  if (!state.raf) {
+    setBeat(state.root, 1, 0);
+    state.since = performance.now();
+    state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
+  }
+}

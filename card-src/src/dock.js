@@ -764,10 +764,10 @@ class HaMusicMini extends HTMLElement {
     const rect = this._mini.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const margin = 8;
-    const rangeX = Math.max(0, window.innerWidth - rect.width - margin * 2);
-    const rangeY = Math.max(0, window.innerHeight - rect.height - margin * 2);
-    const x = margin + Math.max(0, Math.min(1, pos.x)) * rangeX;
-    const y = margin + Math.max(0, Math.min(1, pos.y)) * rangeY;
+    const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+    const x = Math.max(margin, Math.min(maxX, pos.x * window.innerWidth));
+    const y = Math.max(margin, Math.min(maxY, pos.y * window.innerHeight));
     this._mini.style.left = `${Math.round(x)}px`;
     this._mini.style.top = `${Math.round(y)}px`;
     this._mini.style.right = "auto";
@@ -777,13 +777,10 @@ class HaMusicMini extends HTMLElement {
   _saveCurrentPosition() {
     if (!this._mini) return;
     const rect = this._mini.getBoundingClientRect();
-    const margin = 8;
-    const rangeX = Math.max(1, window.innerWidth - rect.width - margin * 2);
-    const rangeY = Math.max(1, window.innerHeight - rect.height - margin * 2);
     saveDockPosition(
       this._mode,
-      Math.max(0, Math.min(1, (rect.left - margin) / rangeX)),
-      Math.max(0, Math.min(1, (rect.top - margin) / rangeY)),
+      Math.max(0, Math.min(1, rect.left / window.innerWidth)),
+      Math.max(0, Math.min(1, rect.top / window.innerHeight)),
     );
   }
 

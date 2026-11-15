@@ -28,7 +28,7 @@ import {
   visualizerFrame,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
-import { installDocks, saveDockPref, clearDockPref, loadDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities } from "./dock.js";
+import { installDocks, saveDockPref, clearDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities } from "./dock.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -104,6 +104,7 @@ class HaMusicCard extends LitElement {
     this._drawer = this._emptyDrawer();
     this._artUrl = "";
     this._artSlot = 0;
+    this._dockOwner = false;
     this._palette = null;
     this._paletteKey = "";
     this._resizeObserver = null;
@@ -1059,10 +1060,12 @@ class HaMusicCard extends LitElement {
       this._config?.entity ||
       (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
     if (!modes.length) {
-      const pref = loadDockPref();
-      if (pref && (!fallback || Object.values(pref.entities).includes(fallback))) {
+      // 全局播放器由 localStorage 记忆；只有本卡片此前装过才允许清空，
+      // 避免同一仪表盘里其他未配置 dock 的卡片误删全局播放器。
+      if (this._dockOwner) {
         clearDockPref();
         uninstallDock();
+        this._dockOwner = false;
       }
       return;
     }
@@ -1080,6 +1083,7 @@ class HaMusicCard extends LitElement {
     }));
     installDocks(configs);
     saveDockPref({ modes: Object.keys(entities), entities });
+    this._dockOwner = true;
   }
 
   _artUrlFor() {

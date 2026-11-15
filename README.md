@@ -71,7 +71,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.2.9`
+   - URL：`/local/ha-music.js?v=1.3.0`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -196,6 +196,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.3.0**：封面统一强制圆形裁剪（`border-radius:50%` + `clip-path:circle`），即使封面图本身是正方形、带白底/透明角，也不会露出方形边角；顶部、侧栏、右下角三种播放器同步生效。
 
 - **1.2.9**：修复长按拖动右下角播放器时封面图片被浏览器原生拖拽、播放器不跟随鼠标的问题；封面 img 禁用原生拖拽并加 `dragstart` 拦截，拖动恢复为整卡跟随鼠标。
 

@@ -341,6 +341,7 @@ const STYLE = `
     flex: 0 0 auto;
     border-radius: 50%;
     overflow: hidden;
+    clip-path: circle(50% at 50% 50%);
     display: grid;
     place-items: center;
     color: var(--hm-accent);
@@ -352,6 +353,8 @@ const STYLE = `
     object-fit: cover;
     transform-origin: 50% 50%;
     display: none;
+    border-radius: 50%;
+    clip-path: circle(50% at 50% 50%);
     pointer-events: none;
     -webkit-user-drag: none;
     user-select: none;
@@ -568,6 +571,7 @@ const STYLE = `
     height: 100%;
     border-radius: 50%;
     overflow: hidden;
+    clip-path: circle(50% at 50% 50%);
     box-shadow: 0 10px 26px rgba(2, 6, 18, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
     background: linear-gradient(135deg, rgba(46, 230, 197, 0.2), rgba(123, 92, 255, 0.26));
   }
@@ -576,6 +580,7 @@ const STYLE = `
     height: 100%;
     object-fit: cover;
     border-radius: 50%;
+    clip-path: circle(50% at 50% 50%);
     display: none;
   }
   .fab-disc .art img[src] { display: block; }

@@ -178,8 +178,8 @@ class HaMusicCard extends LitElement {
         const heightChanged = Math.abs(height - this._height) >= 1;
         this._width = width;
         this._height = height;
-        if (widthChanged) {
-          const layout = this._config?.layout || "adaptive";
+        const layout = this._config?.layout || "adaptive";
+        if (widthChanged || (heightChanged && layout === "adaptive")) {
           if (layout === "adaptive") this.requestUpdate();
           else this._queuePanelFit();
         } else if (heightChanged) {
@@ -308,10 +308,17 @@ class HaMusicCard extends LitElement {
   }
 
   _layoutKey() {
+    if (this._panel) return "full";
     const requested = this._config?.layout || "adaptive";
     if (requested === "adaptive") {
-      if (!this._width) return "full";
-      return this._width < 430 ? "compact" : "full";
+      const width = this._width;
+      const height = this._height;
+      if (!width) return "full";
+      // 网格卡片可能很矮（例如 6 列 × 2 行）：只按宽度判断会把大卡片
+      // 塞进矮格子里，导致封面/控制条被裁掉。这里同时看可用高度。
+      if (width < 340 || (height && height < 190)) return "mini";
+      if (width < 460 || (height && height < 280)) return "compact";
+      return "full";
     }
     return ["full", "compact", "mini"].includes(requested) ? requested : "full";
   }
@@ -1288,7 +1295,7 @@ class HaMusicCard extends LitElement {
     return {
       columns: this._panel ? "full" : 12,
       rows: this._panel ? Math.max(6, rows) : rows,
-      min_columns: this._panel ? 12 : 6,
+      min_columns: this._panel ? 12 : 4,
       min_rows: this._panel ? 4 : 2,
       max_columns: 24,
       max_rows: 24,

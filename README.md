@@ -15,7 +15,8 @@
 
 - **全局统一**：顶部、侧边栏、右下角三个迷你播放器的开关、实体和主题写入浏览器 localStorage，在 `test`、`music` 等不同视图/仪表盘之间保持同一组配置。
 - **七套主题**：`aurora` 极光、`cyber` 赛博朋克、`liquid` 液态玻璃、`velvet` 天鹅绒、`mono` 黑白、`sunset` 日落、`ocean` 海洋；顶部、侧边栏、右下角三个迷你播放器可分别选择主题。
-- **栅格自适应**：实现 `getGridOptions()` / `getLayoutOptions()`，支持 sections 视图调整列数与行数；卡片高度跟随网格行高填满，不再出现下方空白。
+- **栅格自适应**：实现 `getGridOptions()` / `getLayoutOptions()`，支持 sections 视图调整列数与行数（最低 4 列×2 行）；卡片高度跟随网格行高填满，不再出现下方空白。
+- **宽高双维自适应**：除宽度外同时检测卡片可用高度，矮格子自动降到 mini 单行、低矮中等格子用 compact，避免封面/标题/控制条被裁切。
 - **三档自适应布局**：`full` 完整、`compact` 紧凑、`mini` 迷你单行；默认 `adaptive` 按卡片宽度自动切换（< 430px 进入 compact）。
 - **封面驱动配色**：从当前封面提取主色，混入次色与背景氛围光；跨域或取色失败时回退到主题色。
 - **面板单屏铺满**：面板视图按可用高度约束圆形封面，自动压缩主区，频谱、进度和控制条保持在单屏内，不产生纵向溢出。
@@ -73,7 +74,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.6`
+   - URL：`/local/ha-music.js?v=1.3.7`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -200,6 +201,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.3.7**：自适应布局改为同时按宽度和高度判断：6 列×2 行等矮格子自动切 mini 单行，6 列×4 行等低矮格子切 compact，12 列×6 行恢复 full；最小栅格宽度放宽到 4 列。
 
 - **1.3.6**：实现 sections 栅格尺寸接口 `getGridOptions` / `getLayoutOptions`，消除「调整大小支持不完整」警告；卡片主机与 `.hm-card` 高度改为 100%，在网格单元格内自动填满，配合全宽/按内容高度使用。
 

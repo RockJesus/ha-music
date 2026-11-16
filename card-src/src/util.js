@@ -180,6 +180,39 @@ export function stateOf(hass, entityId) {
   return hass.states ? hass.states[entityId] : undefined;
 }
 
+// 多播放器卡片：优先跟随正在播放的实体。
+// - 当前实体正在播放时保持不变，避免多台同时播放时来回跳。
+// - 当前实体暂停/待机时，切到 playing；没有 playing 再考虑 buffering。
+// - 多台同时播放时，优先 media_position_updated_at 最新的一台。
+export function pickPlayingEntity(hass, entities = [], current = "") {
+  const list = Array.isArray(entities) ? entities.filter(Boolean) : [];
+  if (!list.length) return "";
+  const hasCurrent = list.includes(current);
+  const active = hasCurrent ? current : "";
+  const stateRank = (entityId) => {
+    const value = hass?.states?.[entityId]?.state;
+    if (value === "playing") return 2;
+    if (value === "buffering") return 1;
+    return 0;
+  };
+  if (hasCurrent && stateRank(active) === 2) return active;
+  let best = active || list[0];
+  let bestRank = active ? stateRank(active) : 0;
+  let bestStamp = -Infinity;
+  for (const entityId of list) {
+    const rank = stateRank(entityId);
+    if (rank <= 0) continue;
+    const stamp = Date.parse(hass?.states?.[entityId]?.attributes?.media_position_updated_at || "");
+    const score = Number.isFinite(stamp) ? stamp : 0;
+    if (rank > bestRank || (rank === bestRank && score > bestStamp)) {
+      best = entityId;
+      bestRank = rank;
+      bestStamp = score;
+    }
+  }
+  return bestRank > 0 ? best : active;
+}
+
 export function friendlyName(hass, entityId, fallback = "") {
   const state = stateOf(hass, entityId);
   return state?.attributes?.friendly_name || entityId || fallback;

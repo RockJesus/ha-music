@@ -29,6 +29,7 @@ import {
   canTapSpectrumAudio,
   normalizeSpectrumPlaylist,
   findSpectrumTrack,
+  pickPlayingEntity,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
@@ -183,6 +184,7 @@ class HaMusicCard extends LitElement {
     const previous = this._hass;
     this._hass = hass;
     if (!hass) return;
+    this._autoSwitchToPlaying(hass);
     const entityId = this._eid();
     const state = hass.states?.[entityId];
     const attrs = state?.attributes || {};
@@ -1278,6 +1280,13 @@ class HaMusicCard extends LitElement {
         media_content_type: item.contentType || "music",
       })
     );
+  }
+
+  _autoSwitchToPlaying(hass) {
+    const list = this._entities();
+    if (list.length < 2) return;
+    const target = pickPlayingEntity(hass, list, this._eid());
+    if (target && target !== this._eid()) this._switchEntity(target);
   }
 
   _switchEntity(entityId) {

@@ -14,6 +14,7 @@ import {
   normalizeSpectrumPlaylist,
   findSpectrumTrack,
   trackMatchScore,
+  pickPlayingEntity,
 } from "../src/util.js";
 import { mediaClassLabel } from "../src/const.js";
 
@@ -218,4 +219,44 @@ test("findSpectrumTrack 优先 content_id mid，再按标题/歌手模糊匹配"
   );
   assert.equal(findSpectrumTrack(tracks, { title: "完全无关", artist: "x" }), null);
   assert.ok(trackMatchScore(tracks[1], { title: "You", artist: "Appleby" }) > 0.9);
+});
+
+test("pickPlayingEntity 当前实体播放时保持不变", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "playing", attributes: { media_position_updated_at: "2026-01-01T00:00:00Z" } },
+      "media_player.b": { state: "playing", attributes: { media_position_updated_at: "2026-01-01T00:01:00Z" } },
+    },
+  };
+  assert.equal(pickPlayingEntity(hass, ["media_player.a", "media_player.b"], "media_player.a"), "media_player.a");
+});
+
+test("pickPlayingEntity 当前待机时切到播放中的实体", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "idle", attributes: {} },
+      "media_player.b": { state: "playing", attributes: {} },
+    },
+  };
+  assert.equal(pickPlayingEntity(hass, ["media_player.a", "media_player.b"], "media_player.a"), "media_player.b");
+});
+
+test("pickPlayingEntity 多台播放时选最近更新的一台", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "playing", attributes: { media_position_updated_at: "2026-01-01T00:05:00Z" } },
+      "media_player.b": { state: "playing", attributes: { media_position_updated_at: "2026-01-01T00:10:00Z" } },
+    },
+  };
+  assert.equal(pickPlayingEntity(hass, ["media_player.a", "media_player.b"], "media_player.c"), "media_player.b");
+});
+
+test("pickPlayingEntity 没有播放实体时保持当前选择", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "paused", attributes: {} },
+      "media_player.b": { state: "idle", attributes: {} },
+    },
+  };
+  assert.equal(pickPlayingEntity(hass, ["media_player.a", "media_player.b"], "media_player.a"), "media_player.a");
 });

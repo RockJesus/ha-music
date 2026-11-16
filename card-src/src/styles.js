@@ -2450,47 +2450,72 @@ export const cardStyles = css`
     .hm-card[data-panel="true"] .hm-controls {
       flex-direction: column;
       align-items: stretch;
-      gap: 6px;
+      gap: 4px;
       width: 100%;
       max-width: 360px;
       box-sizing: border-box;
       margin: 0 auto;
-      padding: 8px 10px;
+      padding: 4px;
       border: 1px solid rgba(255, 255, 255, 0.07);
       border-radius: 22px;
       background: rgba(255, 255, 255, 0.035);
       box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
     }
 
     .hm-card[data-panel="true"] .hm-transport {
       width: 100%;
       justify-content: center;
-      gap: 8px;
+      gap: 12px;
     }
 
     .hm-card[data-panel="true"] .hm-volume {
       flex: 1 1 auto;
       width: 100%;
       max-width: 100%;
-      min-height: 38px;
+      min-height: 36px;
       margin: 0;
       padding: 0 2px 0 0;
       border: none;
       background: transparent;
     }
 
-    .hm-card[data-panel="true"] .hm-btn {
-      width: 44px;
-      height: 44px;
+    /* 手机面板：去掉单个按钮的圆框/底色，只保留大热区与图标 */
+    .hm-card[data-panel="true"] .hm-transport .hm-btn,
+    .hm-card[data-panel="true"] .hm-transport .hm-btn[data-on="true"] {
+      width: 60px;
+      height: 60px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
-    .hm-card[data-panel="true"] .hm-play {
-      width: 56px;
-      height: 56px;
-      min-width: 56px;
-      min-height: 56px;
+    .hm-card[data-panel="true"] .hm-transport .hm-btn svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-play {
+      width: 74px;
+      height: 74px;
+      min-width: 74px;
+      min-height: 74px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      color: #fff;
+      filter: drop-shadow(0 0 10px rgba(var(--hm-a1-rgb), 0.9))
+        drop-shadow(0 0 22px rgba(var(--hm-a2-rgb), 0.55));
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-play svg {
+      width: 42px;
+      height: 42px;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-play.is-playing::after {
+      display: none;
     }
   }
 

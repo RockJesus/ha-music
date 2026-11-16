@@ -428,6 +428,25 @@ class HaMusicEditor extends LitElement {
             </label>
           </div>
           <label class="field">
+            <span class="label">
+              ${this._zh ? "频谱音频源（可选）" : "Spectrum audio URL (optional)"}
+            </span>
+            <input
+              type="url"
+              .value=${config.spectrum_audio_url || ""}
+              placeholder="https://…/track.mp3"
+              @change=${(e) =>
+                this._update({
+                  spectrum_audio_url: e.target.value.trim() || undefined,
+                })}
+            />
+          </label>
+          <div class="hint">
+            ${this._zh
+              ? "填写可直接访问且允许跨域的音频直链后，卡片用 Web Audio 读取真实频谱；留空或加载失败时自动回退到逐帧律动。"
+              : "Add a CORS-enabled audio URL for true Web Audio FFT. Leave empty or on failure, the card falls back to the procedural live motion."}
+          </div>
+          <label class="field">
             <span class="label">${this._zh ? "标题（留空用实体名称）" : "Title (optional)"}</span>
             <input
               type="text"

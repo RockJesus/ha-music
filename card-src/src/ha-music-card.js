@@ -981,8 +981,11 @@ class HaMusicCard extends LitElement {
       if (!width) return "full";
       // 网格卡片可能很矮（例如 6 列 × 2 行）：只按宽度判断会把大卡片
       // 塞进矮格子里，导致封面/控制条被裁掉。这里同时看可用高度。
-      if (width < 340 || (height && height < 190)) return "mini";
-      if (width < 460 || (height && height < 280)) return "compact";
+      // 卡片选择器可能是 280×600 这种窄高比例：此时不能用 mini，
+      // 否则只剩中间一行控制、上下大片空白；宽度够且高度富余时走纵向 full。
+      if (width >= 240 && height >= 520 && width < 520) return "full";
+      if (width < 340 && (!height || height < 190)) return "mini";
+      if (width < 460 || (height && height < 300)) return "compact";
       return "full";
     }
     return ["full", "compact", "mini"].includes(requested) ? requested : "full";

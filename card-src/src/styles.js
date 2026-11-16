@@ -938,6 +938,8 @@ export const cardStyles = css`
     gap: 8px;
     flex: 0 1 220px;
     min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     padding: 4px 12px 4px 4px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.07);
@@ -1424,7 +1426,9 @@ export const cardStyles = css`
     }
 
     .hm-card[data-layout="full"] .hm-cover {
-      width: min(62%, 150px);
+      width: var(--hm-cover-size);
+      height: var(--hm-cover-size);
+      border-radius: 50%;
     }
 
     .hm-card[data-layout="full"] .hm-meta {
@@ -1432,8 +1436,9 @@ export const cardStyles = css`
       width: 100%;
     }
 
+    /* 窄高预览里标签会被挤成竖排，直接隐藏；完整卡片仍保留 */
     .hm-card[data-layout="full"] .hm-tags {
-      justify-content: center;
+      display: none;
     }
 
     .hm-card[data-layout="full"] .hm-vis {

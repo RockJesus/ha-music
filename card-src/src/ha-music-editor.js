@@ -197,13 +197,23 @@ class HaMusicEditor extends LitElement {
     super();
     this._config = {};
     this._lang = "en";
+    this._pendingEntity = false;
   }
 
   setConfig(config) {
-    this._config = { ...config };
-    if (typeof config?.music_assistant === "string") {
-      this._maUrlDraft = config.music_assistant;
-    }
+    // 旧配置里可能残留编辑器早先加出来的空实体行；展示前先过滤，避免
+    // 重新打开编辑器时一直看到一条空的“设备”。
+    const entities = Array.isArray(config?.entities)
+      ? config.entities.filter((item) => typeof item === "string" && item.trim())
+      : undefined;
+    this._config = { ...config, ...(entities ? { entities } : {}) };
+  }
+
+  willUpdate() {
+    // 首次渲染前同步语言；放在 updated() 里赋值不会触发重渲染，会导致
+    // 中文 HA 第一次打开编辑器时整页仍是英文标签。
+    const lang = this.hass?.language || this._lang;
+    if (lang !== this._lang) this._lang = lang;
   }
 
   get _zh() {
@@ -289,15 +299,35 @@ class HaMusicEditor extends LitElement {
   }
 
   _addEntity() {
-    const list = this._entities();
-    if (list.length) {
-      this._update({ entities: [...list, ""] });
+    if (this._pendingEntity) return;
+    // 先只显示一条待选行，选到实体后再写 config；避免用户直接关掉编辑器
+    // 时把空字符串写进 entities，重新打开一直挂着一条空行。
+    this._pendingEntity = true;
+    this.requestUpdate();
+  }
+
+  _commitPendingEntity(value) {
+    const entity = String(value || "").trim();
+    this._pendingEntity = false;
+    if (!entity) {
+      this.requestUpdate();
       return;
     }
-    const seed = this._config.entity
-      ? [this._config.entity, ""]
-      : ["", ""];
-    this._update({ entities: seed, entity: undefined });
+    const list = this._entities();
+    if (list.length) {
+      this._update({ entities: [...list, entity] });
+      return;
+    }
+    const first = String(this._config?.entity || "").trim();
+    this._update({
+      entity: undefined,
+      entities: first ? [first, entity] : [entity],
+    });
+  }
+
+  _cancelPendingEntity() {
+    this._pendingEntity = false;
+    this.requestUpdate();
   }
 
   _removeEntity(index) {
@@ -309,17 +339,13 @@ class HaMusicEditor extends LitElement {
     this._update({ entities: list });
   }
 
-  updated() {
-    this._lang = this.hass?.language || this._lang;
-  }
-
   render() {
     const config = this._config || {};
     const list = this._entities();
     const dockModes = this._dockModes();
     const dockEntities = this._dockEntities();
 
-    const picker = (value, index, placeholder) => html`
+    const picker = (value, onValue, placeholder) => html`
       <ha-entity-picker
         .hass=${this.hass}
         .value=${value || ""}
@@ -328,7 +354,7 @@ class HaMusicEditor extends LitElement {
         .label=${placeholder}
         @value-changed=${(event) => {
           event.stopPropagation();
-          this._setEntity(index, event.detail?.value ?? "");
+          onValue(event.detail?.value ?? "");
         }}
       ></ha-entity-picker>
     `;
@@ -341,7 +367,11 @@ class HaMusicEditor extends LitElement {
             ? list.map(
                 (value, index) => html`
                   <div class="entity-row">
-                    ${picker(value, index, index === 0 ? (this._zh ? "播放器" : "Player") : this._zh ? "设备" : "Player")}
+                    ${picker(
+                      value,
+                      (next) => this._setEntity(index, next),
+                      index === 0 ? (this._zh ? "播放器" : "Player") : this._zh ? "设备" : "Player"
+                    )}
                     <button
                       class="mini-btn"
                       @click=${() => this._removeEntity(index)}
@@ -353,8 +383,24 @@ class HaMusicEditor extends LitElement {
                 `
               )
             : html`<div class="entity-row">
-                ${picker(config.entity || "", 0, this._zh ? "播放器" : "Player")}
+                ${picker(
+                  config.entity || "",
+                  (next) => this._setEntity(0, next),
+                  this._zh ? "播放器" : "Player"
+                )}
               </div>`}
+          ${this._pendingEntity
+            ? html`<div class="entity-row">
+                ${picker(
+                  "",
+                  (next) => this._commitPendingEntity(next),
+                  this._zh ? "选择要添加的播放器" : "Pick a player to add"
+                )}
+                <button class="mini-btn" @click=${() => this._cancelPendingEntity()}>
+                  ${this._zh ? "取消" : "Cancel"}
+                </button>
+              </div>`
+            : nothing}
           <button class="mini-btn add" @click=${() => this._addEntity()}>
             ${this._zh ? "＋ 添加播放器" : "＋ Add player"}
           </button>
@@ -571,7 +617,7 @@ class HaMusicEditor extends LitElement {
                   checked
                     ? typeof config.music_assistant === "string"
                       ? config.music_assistant
-                      : this._maUrlDraft || true
+                      : true
                     : false,
               })
           )}
@@ -582,11 +628,9 @@ class HaMusicEditor extends LitElement {
             <input
               type="text"
               .value=${typeof config.music_assistant === "string" ? config.music_assistant : ""}
+              .disabled=${config.music_assistant === false}
               placeholder="/music-assistant"
-              @input=${(e) => {
-                this._maUrlDraft = e.target.value.trim();
-              }}
-              @change=${(e) =>
+              @input=${(e) =>
                 this._update({
                   music_assistant: e.target.value.trim() || true,
                 })}

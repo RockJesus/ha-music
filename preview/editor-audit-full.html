@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HA Music · 编辑器全量回归</title>
+<style>
+  body { margin: 0; padding: 16px; background: #05060a; font-family: "PingFang SC", -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #stage { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  #editor { width: 430px; background: #0d1018; border-radius: 14px; padding: 14px; }
+  #preview { width: 440px; }
+  #out { color: #9fb0c8; font-size: 12px; white-space: pre-wrap; padding: 10px 0 40px; }
+</style>
+<script type="module" src="../ha-music.js"></script>
+</head>
+<body>
+<div id="stage">
+  <div id="editor"></div>
+  <div id="preview"></div>
+</div>
+<pre id="out">running…</pre>
+<script type="module">
+const FEATURES = 1 + 2 + 4 + 8 + 16 + 32 + 128 + 256 + 512 + 2048 + 16384 + 32768 + 65536 + 131072 + 262144 + 524288;
+const ART = "art/cover-aurora-720.jpg";
+function player(id, name, art = ART, extra = {}) {
+  return [id, { entity_id: id, state: "playing", attributes: {
+    friendly_name: name, media_title: "Neon River", media_artist: "AURORA LAB", media_album_name: "Midnight Signals",
+    entity_picture: art, media_duration: 257, media_position: 85, media_position_updated_at: new Date().toISOString(),
+    volume_level: 0.42, is_volume_muted: false, shuffle: true, repeat: "all", mass_player_type: "player",
+    source: "Spotify", source_list: ["Spotify", "本地媒体"], sound_mode: "Music", sound_mode_list: ["Music", "Night"],
+    supported_features: FEATURES, group_members: ["media_player.study"], app_name: "Spotify", media_track: 3,
+    queue: [{ title: "Neon River", artist: "AURORA LAB", duration: 257, entity_picture: ART, active: true, media_content_id: "media-source://preview/neon", media_content_type: "music" }],
+    ...extra,
+  } }];
+}
+const states = Object.fromEntries([
+  player("media_player.living", "客厅 · Living Room"),
+  player("media_player.study", "书房 · Studio", ""),
+  player("media_player.bedroom", "卧室 · Bedroom", ""),
+  ["number.amp_volume", { entity_id: "number.amp_volume", state: "40", attributes: { min: 0, max: 100 } }],
+]);
+const calls = [];
+const hass = {
+  language: "zh-Hans", states,
+  services: {
+    music_assistant: { play_media: {} },
+    media_player: { play_media: {}, media_pause: {}, media_play: {}, media_seek: {}, volume_set: {}, volume_mute: {}, shuffle_set: {}, repeat_set: {}, select_source: {}, select_sound_mode: {}, unjoin: {}, turn_off: {}, turn_on: {}, media_next_track: {}, media_previous_track: {} },
+    number: { set_value: {} },
+  },
+  panels: { b93b5321_music_assistant: { url_path: "b93b5321_music_assistant", component_name: "app", title: "Music Assistant" } },
+  callService(d, s, data) { calls.push({ domain: d, service: s, data }); return Promise.resolve({}); },
+  connection: { sendMessagePromise() { return Promise.resolve({ children: [] }); } },
+};
+
+class FakePicker extends HTMLElement {
+  set hass(v) { this._hass = v; }
+  set value(v) { this._value = v; this.setAttribute("data-value", v || ""); }
+  get value() { return this._value || ""; }
+  set label(v) { this.setAttribute("data-label", v || ""); }
+  set includeDomains(v) {}
+  set allowCustomEntity(v) {}
+  pick(v) { this.dispatchEvent(new CustomEvent("value-changed", { detail: { value: v }, bubbles: true, composed: true })); }
+}
+if (!customElements.get("ha-entity-picker")) customElements.define("ha-entity-picker", FakePicker);
+
+const results = [];
+function check(name, ok, detail = "") { results.push({ name, ok: Boolean(ok), detail: String(detail ?? "") }); }
+const wait = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+const baseConfig = {
+  entity: "media_player.living",
+  entities: ["media_player.living", "media_player.study"],
+  layout: "compact", theme: "ocean", cover: "palette", visualizer: "orbit",
+  name: "测试卡片", accent: "#ff8800", palette: false,
+  volume_entity: "number.amp_volume",
+  show_volume: false, show_source: false, show_queue: false, show_library: false,
+  show_lyrics: false, lyrics_source: "wy", floating_lyrics: false, show_group: false,
+  music_assistant: "/b93b5321_music_assistant",
+  spectrum_playlist_url: "/local/community/ha-music/playlist.json",
+  spectrum_audio_url: "https://example.com/track.mp3",
+  dock: ["top", "sidebar", "fab"],
+  dock_entities: { top: "media_player.living", sidebar: "media_player.study", fab: "media_player.bedroom" },
+  dock_themes: { top: "cyber", sidebar: "liquid", fab: "velvet" },
+  dock_edited: 123456789,
+};
+
+const previewWrap = document.createElement("hui-card-preview");
+document.getElementById("preview").appendChild(previewWrap);
+const card = document.createElement("ha-music");
+card.hass = hass;
+card.setConfig(baseConfig);
+previewWrap.appendChild(card);
+
+let lastConfig = null;
+let changeCount = 0;
+const editor = document.createElement("ha-music-editor");
+editor.hass = hass;
+editor.setConfig(baseConfig);
+document.getElementById("editor").appendChild(editor);
+editor.addEventListener("config-changed", async (e) => {
+  lastConfig = e.detail.config;
+  changeCount += 1;
+  card.setConfig({ entity: "media_player.living", ...lastConfig });
+  await card.updateComplete;
+  layoutCard.setConfig({ entity: "media_player.living", ...lastConfig, dock: "none", floating_lyrics: false });
+  layoutCard._width = 600;
+  layoutCard._height = 500;
+  await layoutCard.updateComplete;
+});
+await editor.updateComplete;
+await card.updateComplete;
+const layoutHost = document.createElement("div");
+layoutHost.style.width = "600px";
+document.body.appendChild(layoutHost);
+const layoutCard = document.createElement("ha-music");
+layoutCard.hass = hass;
+layoutCard.setConfig({ entity: "media_player.living", layout: "compact", dock: "none", floating_lyrics: false });
+layoutCard._width = 600;
+layoutCard._height = 500;
+layoutHost.appendChild(layoutCard);
+await layoutCard.updateComplete;
+await wait(80);
+
+const er = () => editor.shadowRoot;
+const cr = () => card.shadowRoot;
+const selects = () => [...er().querySelectorAll("select")];
+const sw = () => [...er().querySelectorAll(".switch-row")];
+const switchBox = (label) => {
+  const row = sw().find((node) => node.textContent.includes(label));
+  return row ? row.querySelector('input[type="checkbox"]') : null;
+};
+const fieldText = (label) => {
+  const fields = [...er().querySelectorAll(".field")];
+  const row = fields.find((node) => node.querySelector(".label")?.textContent.includes(label));
+  return row ? row.querySelector("input, select") : null;
+};
+const fire = (node, type = "change") => node.dispatchEvent(new Event(type, { bubbles: true }));
+async function setSelect(label, value) {
+  const node = fieldText(label);
+  if (!node) return false;
+  node.value = value;
+  fire(node, "change");
+  await wait(35);
+  return true;
+}
+async function setText(label, value, type = "change") {
+  const node = fieldText(label);
+  if (!node) return false;
+  node.value = value;
+  fire(node, type);
+  await wait(35);
+  return true;
+}
+async function toggle(label, desired) {
+  const node = switchBox(label);
+  if (!node) return false;
+  if (node.checked !== desired) node.click();
+  await wait(35);
+  return true;
+}
+const dockRows = () => [...er().querySelectorAll(".dock-row")];
+const dockRow = (label) => dockRows().find((row) => row.textContent.includes(label));
+const dockCheck = (label) => dockRow(label)?.querySelector('input[type="checkbox"]') || null;
+const dockPicker = (label) => dockRow(label)?.querySelector("ha-entity-picker") || null;
+const dockTheme = (label) => dockRow(label)?.querySelector("select") || null;
+
+(async () => {
+  // ---------- 1. 初始回显 ----------
+  check("init/language-first-render", er().querySelector(".section-title")?.textContent.trim() === "播放器", er().querySelector(".section-title")?.textContent);
+  check("init/language-field-label", [...er().querySelectorAll(".field .label")].some((n) => n.textContent.includes("布局")), [...er().querySelectorAll(".field .label")].map((n) => n.textContent.trim()).slice(0, 4).join("|"));
+  check("init/player-rows", er().querySelectorAll(".entity-row").length === 2, er().querySelectorAll(".entity-row").length);
+  check("init/player-pickers", er().querySelectorAll(".entity-row ha-entity-picker").length === 2, er().querySelectorAll(".entity-row ha-entity-picker").length);
+  check("init/entity-1", er().querySelectorAll(".entity-row ha-entity-picker")[0]?.value === "media_player.living", er().querySelectorAll(".entity-row ha-entity-picker")[0]?.value);
+  check("init/entity-2", er().querySelectorAll(".entity-row ha-entity-picker")[1]?.value === "media_player.study", er().querySelectorAll(".entity-row ha-entity-picker")[1]?.value);
+  check("init/layout", fieldText("布局")?.value === "compact", fieldText("布局")?.value);
+  check("init/theme", fieldText("主题")?.value === "ocean", fieldText("主题")?.value);
+  check("init/cover", fieldText("背景")?.value === "palette", fieldText("背景")?.value);
+  check("init/visualizer", fieldText("频谱动效")?.value === "orbit", fieldText("频谱动效")?.value);
+  check("init/name", fieldText("标题")?.value === "测试卡片", fieldText("标题")?.value);
+  check("init/accent", er().querySelector('input[type="color"]')?.value === "#ff8800", er().querySelector('input[type="color"]')?.value);
+  check("init/palette", er().querySelector("#ha-music-palette")?.checked === false, er().querySelector("#ha-music-palette")?.checked);
+  check("init/volume-entity", fieldText("音量实体")?.value === "number.amp_volume", fieldText("音量实体")?.value);
+  check("init/spectrum-playlist", fieldText("频谱歌单")?.value === "/local/community/ha-music/playlist.json", fieldText("频谱歌单")?.value);
+  check("init/spectrum-audio", fieldText("频谱音频源")?.value === "https://example.com/track.mp3", fieldText("频谱音频源")?.value);
+  check("init/lyrics-source", fieldText("歌词源")?.value === "wy", fieldText("歌词源")?.value);
+  check("init/option-counts", [4, 7, 4, 4].every((n, i) => selects()[i]?.options.length === n) && selects()[4]?.options.length === 3, selects().slice(0, 5).map((s) => s.options.length).join(","));
+  check("init/option-values", ["adaptive", "full", "compact", "mini"].every((v) => [...selects()[0].options].some((o) => o.value === v)) && ["qq", "wy", "auto"].every((v) => [...selects()[4].options].some((o) => o.value === v)), "layout/lyrics options");
+  check("init/ma-url", fieldText("MA 面板地址")?.value === "/b93b5321_music_assistant", fieldText("MA 面板地址")?.value);
+  check("init/switch-count", sw().length === 8, sw().length);
+  const switchExpect = {
+    "显示音量条": false, "显示音源选择": false, "显示播放队列": false, "显示媒体库浏览": false,
+    "自动识别歌词": false, "全局歌词悬浮窗": false, "显示分组信息": false, "显示 Music Assistant 歌单入口": true,
+  };
+  for (const [label, expected] of Object.entries(switchExpect)) {
+    check(`init/switch/${label}`, switchBox(label)?.checked === expected, switchBox(label)?.checked);
+  }
+  check("init/dock-count", dockRows().length === 3, dockRows().length);
+  check("init/dock-all-on", dockRows().every((row) => row.querySelector('input[type="checkbox"]')?.checked), dockRows().map((row) => row.querySelector('input[type="checkbox"]')?.checked).join(","));
+  check("init/dock-top-entity", dockPicker("顶部播放器")?.value === "media_player.living", dockPicker("顶部播放器")?.value);
+  check("init/dock-sidebar-entity", dockPicker("侧边栏播放器")?.value === "media_player.study", dockPicker("侧边栏播放器")?.value);
+  check("init/dock-fab-entity", dockPicker("右下角播放器")?.value === "media_player.bedroom", dockPicker("右下角播放器")?.value);
+  check("init/dock-theme-count", er().querySelectorAll(".dock-theme").length === 3, er().querySelectorAll(".dock-theme").length);
+  check("init/dock-top-theme", dockTheme("顶部播放器")?.value === "cyber", dockTheme("顶部播放器")?.value);
+  check("init/dock-sidebar-theme", dockTheme("侧边栏播放器")?.value === "liquid", dockTheme("侧边栏播放器")?.value);
+  check("init/dock-fab-theme", dockTheme("右下角播放器")?.value === "velvet", dockTheme("右下角播放器")?.value);
+  check("init/card-layout", layoutCard._layoutKey() === "compact" && layoutCard.shadowRoot.querySelector(".hm-card")?.dataset.layout === "compact", `${layoutCard._layoutKey()} / ${layoutCard.shadowRoot.querySelector(".hm-card")?.dataset.layout}`);
+  check("init/card-theme", cr().querySelector(".hm-card")?.dataset.theme === "ocean", cr().querySelector(".hm-card")?.dataset.theme);
+  check("init/card-cover", cr().querySelector(".hm-card")?.dataset.cover === "palette", cr().querySelector(".hm-card")?.dataset.cover);
+  check("init/card-visualizer", cr().querySelector(".hm-vis")?.dataset.style === "orbit", cr().querySelector(".hm-vis")?.dataset.style);
+
+  // ---------- 2. 每个控件改值 ----------
+  const expectConfig = async (name, key, value, verify) => {
+    check(name, lastConfig?.[key] === value && (verify ? verify() : true), `${JSON.stringify(lastConfig?.[key])} / ${verify ? verify() : ""}`);
+  };
+
+  await setSelect("布局", "adaptive");
+  await expectConfig("set/layout", "layout", "adaptive", () => layoutCard._layoutKey() === "full");
+  await setSelect("布局", "mini");
+  await expectConfig("set/layout-mini", "layout", "mini", () => layoutCard._layoutKey() === "mini");
+  await setSelect("布局", "compact");
+  await expectConfig("set/layout-compact", "layout", "compact", () => layoutCard._layoutKey() === "compact");
+  await setSelect("主题", "cyber");
+  await expectConfig("set/theme", "theme", "cyber", () => cr().querySelector(".hm-card")?.dataset.theme === "cyber");
+  await setSelect("背景", "ambient");
+  await expectConfig("set/cover", "cover", "ambient", () => cr().querySelector(".hm-card")?.dataset.cover === "ambient");
+  await setSelect("频谱动效", "bars");
+  await expectConfig("set/visualizer", "visualizer", "bars", () => cr().querySelector(".hm-vis")?.dataset.style === "bars");
+  await setSelect("频谱动效", "none");
+  await expectConfig("set/visualizer-none", "visualizer", "none", () => !cr().querySelector(".hm-vis"));
+  await setSelect("频谱动效", "wave");
+  await expectConfig("set/visualizer-wave", "visualizer", "wave", () => cr().querySelector(".hm-vis")?.dataset.style === "wave");
+
+  await setText("标题", "阳台音箱", "input");
+  await expectConfig("set/name", "name", "阳台音箱", () => /阳台音箱/.test(cr().querySelector(".hm-status")?.textContent || ""));
+  await setText("标题", "", "input");
+  await expectConfig("set/name-empty", "name", undefined, () => !lastConfig?.name);
+
+  const color = er().querySelector('input[type="color"]');
+  color.value = "#00ff88";
+  fire(color, "input");
+  await wait(35);
+  check("set/accent", lastConfig?.accent === "#00ff88" && cr().querySelector(".hm-card")?.style.getPropertyValue("--hm-a1") === "#00ff88", `${lastConfig?.accent} / ${cr().querySelector(".hm-card")?.style.getPropertyValue("--hm-a1")}`);
+
+  const palette = er().querySelector("#ha-music-palette");
+  if (!palette.checked) palette.click(); else { palette.checked = false; fire(palette, "change"); }
+  await wait(35);
+  check("set/palette-on", lastConfig?.palette === true, lastConfig?.palette);
+  palette.click();
+  await wait(35);
+  check("set/palette-off", lastConfig?.palette === false, lastConfig?.palette);
+
+  await setText("音量实体", "number.amp_volume");
+  await expectConfig("set/volume-entity", "volume_entity", "number.amp_volume", () => card._config.volume_entity === "number.amp_volume");
+  await setText("音量实体", "");
+  await expectConfig("set/volume-entity-empty", "volume_entity", undefined, () => !lastConfig?.volume_entity);
+
+  await setText("频谱歌单", "/local/x.json");
+  await expectConfig("set/spectrum-playlist", "spectrum_playlist_url", "/local/x.json");
+  await setText("频谱歌单", "");
+  await expectConfig("set/spectrum-playlist-empty", "spectrum_playlist_url", undefined, () => !lastConfig?.spectrum_playlist_url);
+  await setText("频谱音频源", "https://cdn.example.com/a.mp3");
+  await expectConfig("set/spectrum-audio", "spectrum_audio_url", "https://cdn.example.com/a.mp3");
+  await setText("频谱音频源", "");
+  await expectConfig("set/spectrum-audio-empty", "spectrum_audio_url", undefined, () => !lastConfig?.spectrum_audio_url);
+
+  await setSelect("歌词源", "qq");
+  await expectConfig("set/lyrics-source-qq", "lyrics_source", "qq");
+  await setSelect("歌词源", "auto");
+  await expectConfig("set/lyrics-source-auto", "lyrics_source", "auto");
+  await setSelect("歌词源", "wy");
+  await expectConfig("set/lyrics-source-wy", "lyrics_source", "wy");
+
+  const switchKeys = [
+    ["显示音量条", "show_volume", (on) => (on ? Boolean(cr().querySelector(".hm-volume")) : !cr().querySelector(".hm-volume"))],
+    ["显示音源选择", "show_source", (on) => (on ? [...cr().querySelectorAll(".hm-chip-label")].some((n) => n.textContent.includes("音源")) : ![...cr().querySelectorAll(".hm-chip-label")].some((n) => n.textContent.includes("音源")))],
+    ["显示播放队列", "show_queue", (on) => (on ? [...cr().querySelectorAll(".hm-icon-btn")].some((b) => b.getAttribute("aria-label") === "播放队列") : ![...cr().querySelectorAll(".hm-icon-btn")].some((b) => b.getAttribute("aria-label") === "播放队列"))],
+    ["显示媒体库浏览", "show_library", (on) => (on ? [...cr().querySelectorAll(".hm-icon-btn")].some((b) => b.getAttribute("aria-label") === "媒体库") : ![...cr().querySelectorAll(".hm-icon-btn")].some((b) => b.getAttribute("aria-label") === "媒体库"))],
+    ["自动识别歌词", "show_lyrics", (on) => card._lyricsEnabled() === on],
+    ["全局歌词悬浮窗", "floating_lyrics", (on) => lastConfig?.floating_lyrics === on],
+    ["显示分组信息", "show_group", (on) => card._config.show_group === on],
+    ["显示 Music Assistant 歌单入口", "music_assistant", (on) => (on ? lastConfig?.music_assistant !== false : lastConfig?.music_assistant === false)],
+  ];
+  for (const [label, key, verify] of switchKeys) {
+    const start = switchBox(label).checked;
+    switchBox(label).click();
+    await wait(40);
+    const target = !start;
+    const valueOk = key === "music_assistant" ? (target ? lastConfig?.[key] !== false : lastConfig?.[key] === false) : lastConfig?.[key] === target;
+    check(`switch/${key}-${target ? "on" : "off"}`, valueOk && verify(target), `${JSON.stringify(lastConfig?.[key])} / ${verify(target)}`);
+    if (switchBox(label).checked !== start) { switchBox(label).click(); await wait(40); }
+  }
+  check("switch/restored", switchKeys.every(([label, key]) => {
+    const expected = key === "show_lyrics" || key === "floating_lyrics" || key === "show_group" ? false : false;
+    return key === "music_assistant" ? lastConfig?.[key] !== false : lastConfig?.[key] === expected;
+  }), switchKeys.map(([label, key]) => `${key}=${JSON.stringify(lastConfig?.[key])}`).join(","));
+
+  // MA 地址：change 事件
+  await setText("MA 面板地址", "/b93b5321_music_assistant", "input");
+  await expectConfig("set/ma-url", "music_assistant", "/b93b5321_music_assistant", () => Boolean(cr().querySelector(".hm-ma")));
+  await setText("MA 面板地址", "", "input");
+  await expectConfig("set/ma-url-empty", "music_assistant", true, () => Boolean(cr().querySelector(".hm-ma")));
+  const maInput = fieldText("MA 面板地址");
+  maInput.value = "/typed-without-blur";
+  fire(maInput, "input");
+  await wait(40);
+  check("set/ma-url-input-event", lastConfig?.music_assistant === "/typed-without-blur", `${JSON.stringify(lastConfig?.music_assistant)}`);
+
+  // 歌词源实际生效
+  await setSelect("歌词源", "qq");
+  check("lyrics/source-qq-card", card._lyricsSource() === "qq", card._lyricsSource());
+  await setSelect("歌词源", "wy");
+  check("lyrics/source-wy-card", card._lyricsSource() === "wy", card._lyricsSource());
+  await setSelect("歌词源", "auto");
+  check("lyrics/source-auto-card", card._lyricsSource() === "auto", card._lyricsSource());
+
+  // ---------- 3. 三个迷你播放器 ----------
+  for (const [label, mode] of [["顶部播放器", "top"], ["侧边栏播放器", "sidebar"], ["右下角播放器", "fab"]]) {
+    const box = dockCheck(label);
+    if (box.checked) box.click(); else box.click();
+    await wait(40);
+    check(`dock/${mode}-toggle-off`, !lastConfig?.dock?.includes?.(mode), JSON.stringify(lastConfig?.dock));
+    check(`dock/${mode}-theme-hidden`, !dockTheme(label), Boolean(dockTheme(label)));
+    dockCheck(label).click();
+    await wait(40);
+    check(`dock/${mode}-toggle-on`, Array.isArray(lastConfig?.dock) && lastConfig.dock.includes(mode), JSON.stringify(lastConfig?.dock));
+    check(`dock/${mode}-theme-visible`, Boolean(dockTheme(label)), Boolean(dockTheme(label)));
+  }
+  dockPicker("顶部播放器").pick("media_player.bedroom");
+  await wait(40);
+  check("dock/top-entity", lastConfig?.dock_entities?.top === "media_player.bedroom", lastConfig?.dock_entities?.top);
+  dockTheme("顶部播放器").value = "mono";
+  fire(dockTheme("顶部播放器"), "change");
+  await wait(40);
+  check("dock/top-theme", lastConfig?.dock_themes?.top === "mono", lastConfig?.dock_themes?.top);
+  dockPicker("侧边栏播放器").pick("media_player.living");
+  await wait(40);
+  check("dock/sidebar-entity", lastConfig?.dock_entities?.sidebar === "media_player.living", lastConfig?.dock_entities?.sidebar);
+  dockPicker("右下角播放器").pick("media_player.study");
+  await wait(40);
+  check("dock/fab-entity", lastConfig?.dock_entities?.fab === "media_player.study", lastConfig?.dock_entities?.fab);
+  // 全部关闭再全部打开
+  for (const label of ["顶部播放器", "侧边栏播放器", "右下角播放器"]) { if (dockCheck(label).checked) dockCheck(label).click(); await wait(25); }
+  check("dock/all-off", lastConfig?.dock === "none", JSON.stringify(lastConfig?.dock));
+  for (const label of ["顶部播放器", "侧边栏播放器", "右下角播放器"]) { if (!dockCheck(label).checked) dockCheck(label).click(); await wait(25); }
+  check("dock/all-on", Array.isArray(lastConfig?.dock) && lastConfig.dock.length === 3, JSON.stringify(lastConfig?.dock));
+
+  // ---------- 4. 播放器列表增删 ----------
+  const addBtn = [...er().querySelectorAll(".mini-btn")].find((b) => b.classList.contains("add"));
+  addBtn.click();
+  await wait(40);
+  const pendingRows = er().querySelectorAll(".entity-row ha-entity-picker");
+  check("entities/add-row", pendingRows.length === 3, pendingRows.length);
+  check("entities/add-row-empty", pendingRows[2]?.value === "", pendingRows[2]?.value);
+  check("entities/add-does-not-pollute", Array.isArray(lastConfig?.entities) && lastConfig.entities.length === 2, JSON.stringify(lastConfig?.entities));
+  const cancelBtn = [...er().querySelectorAll(".entity-row .mini-btn")].pop();
+  cancelBtn.click();
+  await wait(40);
+  check("entities/cancel-pending", er().querySelectorAll(".entity-row ha-entity-picker").length === 2 && lastConfig.entities.length === 2, `${er().querySelectorAll(".entity-row ha-entity-picker").length}/${lastConfig.entities.length}`);
+  addBtn.click();
+  await wait(40);
+  const rowsAfterAdd = er().querySelectorAll(".entity-row ha-entity-picker");
+  check("entities/add-row-again", rowsAfterAdd.length === 3, rowsAfterAdd.length);
+  rowsAfterAdd[2]?.pick("media_player.bedroom");
+  await wait(50);
+  check("entities/add-commit", Array.isArray(lastConfig?.entities) && lastConfig.entities.length === 3 && lastConfig.entities[2] === "media_player.bedroom", JSON.stringify(lastConfig?.entities));
+  check("entities/chips", cr().querySelectorAll(".hm-entity-chip").length === 3, cr().querySelectorAll(".hm-entity-chip").length);
+  const removeBtns = [...er().querySelectorAll(".entity-row .mini-btn")];
+  check("entities/remove-buttons", removeBtns.length === 3, removeBtns.length);
+  removeBtns[2].click();
+  await wait(45);
+  check("entities/remove", Array.isArray(lastConfig?.entities) && lastConfig.entities.length === 2, JSON.stringify(lastConfig?.entities));
+  check("entities/chips-back", cr().querySelectorAll(".hm-entity-chip").length === 2, cr().querySelectorAll(".hm-entity-chip").length);
+
+  // ---------- 5. 配置回读 ----------
+  const clone = JSON.parse(JSON.stringify(lastConfig));
+  const editor2 = document.createElement("ha-music-editor");
+  editor2.hass = hass;
+  editor2.setConfig(clone);
+  document.body.appendChild(editor2);
+  await editor2.updateComplete;
+  await wait(60);
+  const er2 = editor2.shadowRoot;
+  check("roundtrip/layout", er2.querySelectorAll("select")[0]?.value === clone.layout, er2.querySelectorAll("select")[0]?.value);
+  check("roundtrip/theme", er2.querySelectorAll("select")[1]?.value === clone.theme, er2.querySelectorAll("select")[1]?.value);
+  check("roundtrip/cover", er2.querySelectorAll("select")[2]?.value === clone.cover, er2.querySelectorAll("select")[2]?.value);
+  check("roundtrip/visualizer", er2.querySelectorAll("select")[3]?.value === clone.visualizer, er2.querySelectorAll("select")[3]?.value);
+  check("roundtrip/switch-counts", er2.querySelectorAll(".switch-row").length === 8 && er2.querySelectorAll(".dock-row").length === 3, `${er2.querySelectorAll(".switch-row").length}/${er2.querySelectorAll(".dock-row").length}`);
+  check("roundtrip/entity-values", [...er2.querySelectorAll(".entity-row ha-entity-picker")].map((p) => p.value).join("|") === clone.entities.join("|"), [...er2.querySelectorAll(".entity-row ha-entity-picker")].map((p) => p.value).join("|"));
+  check("roundtrip/language", er2.querySelector(".section-title")?.textContent.trim() === "播放器", er2.querySelector(".section-title")?.textContent);
+  const rtSwitches = [...er2.querySelectorAll(".switch-row")].map((row) => [row.textContent.trim(), row.querySelector("input").checked]);
+  check("roundtrip/switch-values", rtSwitches.every(([text, checked]) => {
+    const keyMap = {"显示音量条": "show_volume", "显示音源选择": "show_source", "显示播放队列": "show_queue", "显示媒体库浏览": "show_library", "自动识别歌词": "show_lyrics", "全局歌词悬浮窗（单行 / 长按拖动）": "floating_lyrics", "显示分组信息": "show_group", "显示 Music Assistant 歌单入口": "music_assistant"};
+    const key = Object.entries(keyMap).find(([label]) => text.includes(label))?.[1];
+    if (!key) return false;
+    return key === "music_assistant" ? checked === (clone[key] !== false) : checked === clone[key];
+  }), rtSwitches.map(([t, c]) => `${t}:${c}`).join("|"));
+  const rtTexts = [...er2.querySelectorAll('input[type="text"], input[type="url"]')].map((n) => n.value);
+  check("roundtrip/text-values", rtTexts[0] === (clone.spectrum_playlist_url || "") && rtTexts[1] === (clone.spectrum_audio_url || "") && rtTexts[2] === (clone.name || "") && rtTexts[3] === (clone.volume_entity || ""), rtTexts.join("|"));
+  check("roundtrip/dock-values", [...er2.querySelectorAll(".dock-row ha-entity-picker")].map((p) => p.value).join("|") === [clone.dock_entities.top, clone.dock_entities.sidebar, clone.dock_entities.fab].join("|"), [...er2.querySelectorAll(".dock-row ha-entity-picker")].map((p) => p.value).join("|"));
+
+  check("config/no-undefined", Object.keys(lastConfig || {}).every((k) => lastConfig[k] !== undefined), JSON.stringify(Object.entries(lastConfig || {}).filter(([, v]) => v === undefined)));
+
+  const pass = results.filter((r) => r.ok).length;
+  window.__editorAudit = { results, pass, total: results.length, lastConfig, changeCount };
+  document.getElementById("out").textContent = results
+    .map((r) => `${r.ok ? "PASS" : "FAIL"}  ${r.name}${r.ok ? "" : "   → " + r.detail}`)
+    .join("\n") + `\n\n${pass}/${results.length} passed`;
+})();
+</script>
+</body>
+</html>

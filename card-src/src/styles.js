@@ -1454,7 +1454,7 @@ export const cardStyles = css`
     }
 
     .hm-card[data-layout="full"] .hm-volume {
-      flex: 1 1 auto;
+      flex: 0 0 auto;
       margin: 0 auto;
       width: min(100%, 320px);
     }
@@ -2492,14 +2492,17 @@ export const cardStyles = css`
   .hm-card[data-thumb="sm"] .hm-cover {
     width: var(--hm-cover-size);
     height: var(--hm-cover-size);
-    border-radius: 18px;
+    border-radius: 50%;
+    border-color: rgba(var(--hm-a1-rgb), 0.28);
     box-shadow:
       0 22px 46px -18px rgba(0, 0, 0, 0.9),
+      0 0 0 1px rgba(var(--hm-a1-rgb), 0.14),
+      0 0 32px -10px rgba(var(--hm-a1-rgb), 0.55),
       inset 0 1px 0 rgba(255, 255, 255, 0.24);
   }
 
   .hm-card[data-thumb="sm"] .hm-cover {
-    border-radius: 12px;
+    border-radius: 50%;
   }
 
   .hm-card[data-thumb="lg"] .hm-cover::before,
@@ -2564,6 +2567,17 @@ export const cardStyles = css`
     gap: 16px;
   }
 
+  /* 编辑弹窗/选择器中预览保持单行控制，音量条不再被纵向拉伸成巨幅胶囊 */
+  .hm-card[data-thumb="md"] .hm-controls {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .hm-card[data-thumb="md"] .hm-transport {
+    justify-content: flex-start;
+  }
+
   .hm-card[data-thumb="md"] .hm-tags {
     display: none;
   }
@@ -2601,7 +2615,12 @@ export const cardStyles = css`
   }
 
   .hm-card[data-thumb="md"] .hm-volume {
-    flex: 0 1 140px;
+    flex: 0 1 148px;
+    width: auto;
+    height: 44px;
+    box-sizing: border-box;
+    padding: 3px 10px 3px 3px;
+    margin-left: auto;
   }
 
   /* 小预览：只保留封面、标题、进度和基本控制 */
@@ -2631,6 +2650,13 @@ export const cardStyles = css`
 
   .hm-card[data-thumb="sm"] .hm-main {
     gap: 12px;
+  }
+
+  .hm-card[data-thumb="sm"] .hm-controls {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
 
   .hm-card[data-thumb="sm"] .hm-title {
@@ -2668,6 +2694,8 @@ export const cardStyles = css`
 
   .hm-card[data-thumb="sm"] .hm-volume {
     flex: 0 0 34px;
+    width: 34px;
+    max-width: 34px;
     padding: 0;
     border: none;
     background: transparent;

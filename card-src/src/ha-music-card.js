@@ -30,7 +30,9 @@ import {
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
-import { cleanLyricText, lyricIndex, lyricProgress, parseLyrics } from "./lyrics.js";
+import { lyricIndex, lyricProgress, parseLyrics } from "./lyrics.js";
+
+const LYRICS_API = "/api/netease_lyrics/lyrics";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -441,8 +443,9 @@ class HaMusicCard extends LitElement {
   _loadLyricsCache() {
     const cache = new Map();
     try {
+      localStorage.removeItem("ha-music-lyrics-cache-v3");
       const list = JSON.parse(
-        localStorage.getItem("ha-music-lyrics-cache-v3") || "[]"
+        localStorage.getItem("ha-music-lyrics-cache-v4") || "[]"
       );
       if (!Array.isArray(list)) return cache;
       for (const item of list) {
@@ -454,7 +457,7 @@ class HaMusicCard extends LitElement {
           lines: Array.isArray(value.lines) ? value.lines : [],
           plain: Array.isArray(value.plain) ? value.plain : [],
           instrumental: Boolean(value.instrumental),
-          source: String(value.source || "LRCLIB"),
+          source: String(value.source || "歌词接口"),
         });
       }
     } catch (error) {
@@ -466,7 +469,7 @@ class HaMusicCard extends LitElement {
   _saveLyricsCache() {
     try {
       const list = [...this._lyricsCache.entries()].slice(-24);
-      localStorage.setItem("ha-music-lyrics-cache-v3", JSON.stringify(list));
+      localStorage.setItem("ha-music-lyrics-cache-v4", JSON.stringify(list));
     } catch (error) {
       /* 忽略配额或隐私模式错误 */
     }
@@ -476,165 +479,106 @@ class HaMusicCard extends LitElement {
     return Math.max(0, (Number(position) || 0) + this._lyricsOffset);
   }
 
-  _lyricsApiPath() {
-    const configured = this._config?.lyrics_api;
-    if (!configured || typeof configured !== "string") return "";
-    try {
-      const url = new URL(configured, window.location.origin);
-      if (url.origin !== window.location.origin) return "";
-      if (!url.pathname.startsWith("/api/")) return "";
-      return url.pathname + url.search;
-    } catch (error) {
-      return "";
-    }
-  }
-
-  async _fetchConfiguredLyrics(media, signal) {
-    const path = this._lyricsApiPath();
-    const token = this._hass?.auth?.data?.access_token;
-    if (!path || !token || !media.title || !media.artist) return null;
-    const url = new URL(path, window.location.origin);
-    url.searchParams.set("title", media.title);
-    url.searchParams.set("artist", media.artist);
-    const response = await fetch(url.toString(), {
-      signal,
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      credentials: "same-origin",
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    const raw =
-      data?.lyrics ??
-      data?.syncedLyrics ??
-      data?.synced_lyrics ??
-      data?.plainLyrics ??
-      "";
-    if (!raw || typeof raw !== "string") return null;
-    const parsed = parseLyrics(raw);
-    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
-      return null;
-    }
-    const source =
-      data?.source === "qq"
-        ? "QQ"
-        : data?.source === "netease"
-          ? "网易云"
-          : data?.source || "HA";
-    return { parsed, source };
-  }
-
-  _lyricsSearchVariants(media) {
-    const title = String(media.title || "").trim();
-    const artist = String(media.artist || "").trim();
-    const cleanTitle = cleanLyricText(title) || title;
-    const cleanArtist = cleanLyricText(artist) || artist;
-    const baseTitle = title.split(/\s*[-–—|｜]\s*/)[0].trim();
-    const primaryArtist = artist
-      .split(/\s+(?:feat\.?|ft\.?|with)\s+|[ ,/&、，]+/i)[0]
+  _cleanLyricsQuery(value) {
+    return String(value || "")
+      .replace(/\(.*?\)|\[.*?\]|（.*?）/g, "")
+      .replace(/[\s\-_～〜]+/g, " ")
       .trim();
-    const variants = [];
-    const add = (nextTitle, nextArtist, nextAlbum = "") => {
-      if (!nextTitle) return;
-      const key = `${nextTitle}|${nextArtist}|${nextAlbum}`.toLowerCase();
-      if (variants.some((variant) => variant.key === key)) return;
-      variants.push({
-        key,
-        title: nextTitle,
-        artist: nextArtist,
-        album: nextAlbum,
-        duration: media.duration,
-      });
-    };
-    add(title, artist, media.album || "");
-    add(cleanTitle, artist, "");
-    add(title, cleanArtist, "");
-    add(cleanTitle, cleanArtist, "");
-    if (baseTitle && baseTitle !== title) {
-      add(baseTitle, artist, "");
-      add(baseTitle, cleanArtist, "");
-    }
-    if (primaryArtist && primaryArtist !== artist) {
-      add(cleanTitle, primaryArtist, "");
-      add(title, primaryArtist, "");
-    }
-    return variants;
   }
 
-  _pickLyricsCandidate(candidates, media) {
-    const targetTitle = cleanLyricText(media.title);
-    const targetArtist = cleanLyricText(media.artist);
-    const duration = Number(media.duration || 0);
-    return (
-      candidates
-        .slice()
-        .sort((a, b) => {
-          const score = (item) => {
-            const name = cleanLyricText(
-              item.trackName || item.track_name || ""
-            ).toLowerCase();
-            const author = cleanLyricText(
-              item.artistName || item.artist_name || ""
-            ).toLowerCase();
-            const exactTitle =
-              targetTitle && name === targetTitle.toLowerCase()
-                ? 14
-                : targetTitle && name.includes(targetTitle.toLowerCase())
-                  ? 6
-                  : 0;
-            const exactArtist =
-              targetArtist && author === targetArtist.toLowerCase()
-                ? 8
-                : targetArtist && author.includes(targetArtist.toLowerCase())
-                  ? 3
-                  : 0;
-            const diff = duration
-              ? -Math.min(8, Math.abs(Number(item.duration || 0) - duration))
-              : 0;
-            const synced = item.syncedLyrics ? 8 : item.plainLyrics ? 2 : 0;
-            const lineCount = item.syncedLyrics
-              ? Math.min(7, String(item.syncedLyrics).split("\n").length / 5)
-              : 0;
-            return exactTitle + exactArtist + diff + synced + lineCount;
-          };
-          return score(b) - score(a);
-        })[0] || null
-    );
+  _lyricsQueries(media) {
+    const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
+    const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
+    const cleanTitle = this._cleanLyricsQuery(rawTitle);
+    const cleanArtist = this._cleanLyricsQuery(rawArtist);
+    const list = [
+      { title: cleanTitle || rawTitle, artist: cleanArtist },
+      { title: cleanTitle || rawTitle, artist: "" },
+      { title: rawTitle, artist: rawArtist },
+    ];
+    const seen = new Set();
+    return list.filter((item) => {
+      if (!item.title) return false;
+      const key = `${item.title}|${item.artist}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
-  _embeddedLyrics() {
-    const attrs = this._state()?.attributes || {};
-    const meta = attrs.media_metadata || {};
-    let raw =
-      attrs.media_lyrics ??
-      attrs.lyrics ??
-      meta.lyrics ??
-      meta.lyrics_text ??
-      meta.media_lyrics;
-    if (!raw || typeof raw !== "string") {
-      if (raw && typeof raw === "object") {
-        raw =
-          raw.synced ??
-          raw.syncedLyrics ??
-          raw.synced_lyrics ??
-          raw.lines ??
-          raw.plain ??
-          raw.plainLyrics ??
-          "";
+  async _refreshLyricsToken() {
+    const auth = this._hass?.auth;
+    if (typeof auth?.refreshAccessToken !== "function") return;
+    try {
+      await auth.refreshAccessToken();
+    } catch (error) {
+      /* 刷新失败时由下一次请求继续处理 */
+    }
+  }
+
+  async _requestNeteaseLyrics(query, signal) {
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const token = this._hass?.auth?.data?.access_token;
+        if (!token) throw new Error("歌词接口未认证");
+        const url = new URL(LYRICS_API, window.location.origin);
+        url.searchParams.set("title", query.title);
+        url.searchParams.set("artist", query.artist || "");
+        const response = await fetch(url.toString(), {
+          signal,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          credentials: "same-origin",
+        });
+        if (response.status === 401 && attempt < 2) {
+          await this._refreshLyricsToken();
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+        if (!response.ok) {
+          lastError = new Error(`lyrics HTTP ${response.status}`);
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            continue;
+          }
+          break;
+        }
+        const data = await response.json();
+        const raw = data?.lyrics;
+        if (!raw || typeof raw !== "string") return null;
+        const parsed = parseLyrics(raw);
+        if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
+          return null;
+        }
+        const source =
+          data?.source === "qq"
+            ? "QQ音乐"
+            : data?.source === "netease"
+              ? "网易云"
+              : "歌词接口";
+        return { parsed, source };
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        lastError = error;
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
       }
     }
-    if (!raw || typeof raw !== "string") return null;
-    const parsed = parseLyrics(raw);
-    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) return null;
-    return parsed;
+    throw lastError || new Error("歌词接口请求失败");
   }
 
   _lyricsKeyFor(media) {
-    return [media.title, media.artist, media.album, Math.round(media.duration || 0)]
-      .map((value) => String(value || "").trim().toLowerCase())
-      .join("|");
+    return [
+      this._cleanLyricsQuery(Array.isArray(media.title) ? media.title[0] : media.title),
+      this._cleanLyricsQuery(Array.isArray(media.artist) ? media.artist[0] : media.artist),
+    ]
+      .join("|")
+      .toLowerCase();
   }
 
   _setLyrics(key, lyrics, source) {
@@ -674,19 +618,6 @@ class HaMusicCard extends LitElement {
     }
     this._lyricsKey = key;
 
-    const embedded = this._embeddedLyrics();
-    if (embedded) {
-      this._lyrics = {
-        status: "ready",
-        lines: embedded.lines,
-        plain: embedded.plain,
-        instrumental: embedded.instrumental,
-        source: "HA",
-      };
-      this.requestUpdate();
-      return;
-    }
-
     const cached = this._lyricsCache.get(key);
     if (cached) {
       this._lyrics = { ...cached };
@@ -699,7 +630,7 @@ class HaMusicCard extends LitElement {
       lines: [],
       plain: [],
       instrumental: false,
-      source: "LRCLIB",
+      source: "歌词接口",
     };
     this.requestUpdate();
     this._fetchLyrics(media, key);
@@ -708,194 +639,51 @@ class HaMusicCard extends LitElement {
   async _fetchLyrics(media, key) {
     const controller = new AbortController();
     this._lyricsAbort = controller;
-    const timer = setTimeout(() => controller.abort(), 9000);
-
-    const accept = async (url) => {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error(`lyrics HTTP ${response.status}`);
-      }
-      return response.json();
-    };
-
-    let picked = null;
-    let parsedCandidate = null;
+    const timer = setTimeout(() => controller.abort(), 12000);
+    let lastError = null;
     try {
-      // 可选：优先走 HA 内的歌词后端（例如 knoop7/lyrics-card 的
-      // /api/netease_lyrics/lyrics），失败或未配置时再回退 LRCLIB。
-      const configured = await this._fetchConfiguredLyrics(
-        media,
-        controller.signal
-      ).catch((error) => {
-        if (error?.name === "AbortError") throw error;
-        return null;
-      });
-      if (controller.signal.aborted || key !== this._lyricsKey) return;
-      if (configured) {
-        this._setLyrics(key, configured.parsed, configured.source);
-        return;
-      }
-
-      const variants = this._lyricsSearchVariants(media);
-      const queryFor = (variant) => {
-        const query = new URLSearchParams();
-        query.set("track_name", variant.title);
-        if (variant.artist) query.set("artist_name", variant.artist);
-        if (variant.album) query.set("album_name", variant.album);
-        if (media.duration) query.set("duration", String(Math.round(media.duration)));
-        return query.toString();
-      };
-
-      let syncedPick = null;
-      let syncedParsed = null;
-      let plainPick = null;
-      let plainParsed = null;
-      for (const variant of variants) {
-        if (!variant.title || !variant.artist) continue;
+      for (const query of this._lyricsQueries(media)) {
+        if (controller.signal.aborted || key !== this._lyricsKey) return;
         try {
-          let exact = await accept(
-            `https://lrclib.net/api/get?${queryFor(variant)}`
-          );
-          if (!exact) {
-            const noDuration = new URLSearchParams();
-            noDuration.set("track_name", variant.title);
-            noDuration.set("artist_name", variant.artist);
-            if (variant.album) noDuration.set("album_name", variant.album);
-            exact = await accept(
-              `https://lrclib.net/api/get?${noDuration.toString()}`
-            );
-          }
-          if (exact && !Array.isArray(exact)) {
-            const parsed = parseLyrics(
-              exact.syncedLyrics || exact.plainLyrics || ""
-            );
-            if (parsed.instrumental || parsed.lines.length >= 3) {
-              syncedPick = exact;
-              syncedParsed = parsed;
-              break;
-            }
-            if (
-              parsed.lines.length &&
-              (!syncedParsed || parsed.lines.length > syncedParsed.lines.length)
-            ) {
-              syncedPick = exact;
-              syncedParsed = parsed;
-            }
-            if (!plainPick && parsed.plain.length >= 3) {
-              plainPick = exact;
-              plainParsed = parsed;
-            }
+          const result = await this._requestNeteaseLyrics(query, controller.signal);
+          if (controller.signal.aborted || key !== this._lyricsKey) return;
+          if (result) {
+            this._setLyrics(key, result.parsed, result.source);
+            return;
           }
         } catch (error) {
           if (error?.name === "AbortError") throw error;
+          lastError = error;
         }
-      }
-
-      if (syncedPick) {
-        picked = syncedPick;
-        parsedCandidate = syncedParsed;
-      } else if (plainPick) {
-        picked = plainPick;
-        parsedCandidate = plainParsed;
-      }
-
-      const needSearch =
-        !parsedCandidate ||
-        (!parsedCandidate.instrumental && parsedCandidate.lines.length < 3);
-      if (needSearch) {
-        const variant = variants[1] || variants[0] || {
-          title: media.title,
-          artist: media.artist,
-        };
-        const query = new URLSearchParams();
-        query.set("track_name", variant.title);
-        if (variant.artist) query.set("artist_name", variant.artist);
-        const list = await accept(
-          `https://lrclib.net/api/search?${query.toString()}`
-        );
-        let candidates = Array.isArray(list) ? list : list ? [list] : [];
-        const best = this._pickLyricsCandidate(candidates, media);
-        if (best && best.syncedLyrics) {
-          picked = best;
-        } else {
-          const general = new URLSearchParams();
-          general.set(
-            "q",
-            [variant.title, variant.artist].filter(Boolean).join(" ")
-          );
-          const broad = await accept(
-            `https://lrclib.net/api/search?${general.toString()}`
-          );
-          const broadList = Array.isArray(broad) ? broad : broad ? [broad] : [];
-          const broadBest = this._pickLyricsCandidate(broadList, media);
-          if (broadBest && (broadBest.syncedLyrics || !best)) {
-            picked = broadBest;
-          } else if (best) {
-            picked = best;
-          }
-        }
-      }
-
-      if (controller.signal.aborted || key !== this._lyricsKey) return;
-      if (!picked) {
-        this._lyrics = {
-          status: "none",
-          lines: [],
-          plain: [],
-          instrumental: false,
-          source: "LRCLIB",
-        };
-        this.requestUpdate();
-        return;
-      }
-      if (picked.instrumental) {
-        this._setLyrics(
-          key,
-          { lines: [], plain: [], instrumental: true },
-          "LRCLIB"
-        );
-        return;
-      }
-      const parsed = parseLyrics(
-        picked.syncedLyrics || picked.plainLyrics || ""
-      );
-      if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
-        this._lyrics = {
-          status: "none",
-          lines: [],
-          plain: [],
-          instrumental: false,
-          source: "LRCLIB",
-        };
-        this.requestUpdate();
-        return;
-      }
-      this._setLyrics(key, parsed, "LRCLIB");
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        if (this._lyricsAbort === controller && key === this._lyricsKey) {
-          this._lyrics = {
-            status: "error",
-            lines: [],
-            plain: [],
-            instrumental: false,
-            source: this._lyricsApiPath() ? "歌词接口" : "LRCLIB",
-          };
-          this.requestUpdate();
-        }
-        return;
       }
       if (key !== this._lyricsKey) return;
+      this._lyrics = {
+        status: lastError ? "error" : "none",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "歌词接口",
+      };
+      this.requestUpdate();
+    } catch (error) {
+      if (key !== this._lyricsKey) return;
+      if (error?.name === "AbortError") {
+        this._lyrics = {
+          status: "error",
+          lines: [],
+          plain: [],
+          instrumental: false,
+          source: "歌词接口",
+        };
+        this.requestUpdate();
+        return;
+      }
       this._lyrics = {
         status: "error",
         lines: [],
         plain: [],
         instrumental: false,
-        source: this._lyricsApiPath() ? "歌词接口" : "LRCLIB",
+        source: "歌词接口",
       };
       this.requestUpdate();
     } finally {

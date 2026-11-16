@@ -2446,26 +2446,44 @@ export const cardStyles = css`
   }
 
   @container (max-width: 520px) {
+    /* 手机面板底部控制坞：播控与音量同宽、同一块玻璃底板，避免两行宽度错位 */
     .hm-card[data-panel="true"] .hm-controls {
       flex-direction: column;
       align-items: stretch;
-      gap: 8px;
+      gap: 6px;
+      width: 100%;
+      max-width: 360px;
+      box-sizing: border-box;
+      margin: 0 auto;
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.035);
+      box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
     }
 
     .hm-card[data-panel="true"] .hm-transport {
+      width: 100%;
       justify-content: center;
+      gap: 8px;
     }
 
     .hm-card[data-panel="true"] .hm-volume {
       flex: 1 1 auto;
-      width: min(100%, 300px);
-      max-width: none;
-      margin: 0 auto;
+      width: 100%;
+      max-width: 100%;
+      min-height: 38px;
+      margin: 0;
+      padding: 0 2px 0 0;
+      border: none;
+      background: transparent;
     }
 
     .hm-card[data-panel="true"] .hm-btn {
-      width: 42px;
-      height: 42px;
+      width: 44px;
+      height: 44px;
     }
 
     .hm-card[data-panel="true"] .hm-play {

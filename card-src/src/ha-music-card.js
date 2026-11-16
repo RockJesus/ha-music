@@ -1973,11 +1973,15 @@ class HaMusicCard extends LitElement {
     const mainW = Math.round(main.clientWidth || 0);
     if (mainH < 80 || mainW < 80) return;
     const stack = card.clientWidth < 820;
+    const cardH = Math.round(card.clientHeight || 0);
     let size;
     if (stack) {
-      // 窄屏/竖屏：封面在上、信息在下，封面尽量大但不挤掉底部信息。
-      const reserve = Math.min(180, Math.max(96, mainH * 0.3));
-      size = Math.max(120, Math.min(mainW * 0.88, mainH - reserve));
+      // 窄屏/竖屏：封面在上、信息在下。手机面板不再让封面吃掉大半屏，
+      // 宽度上限约 58%，高度按整卡高度的 30% 封顶，给标题/频谱/进度留空间。
+      const narrow = mainW < 560;
+      const widthRatio = narrow ? 0.58 : 0.68;
+      const heightBudget = cardH * (narrow ? 0.3 : 0.45);
+      size = Math.max(120, Math.min(mainW * widthRatio, heightBudget));
     } else {
       // 宽屏：封面以主区可用高度为上限，同时保留 34% 宽度上限。
       size = Math.max(120, Math.min(mainH, mainW * 0.34));

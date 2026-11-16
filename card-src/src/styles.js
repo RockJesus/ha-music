@@ -2367,6 +2367,26 @@ export const cardStyles = css`
       gap: 8px;
     }
 
+    /* 手机上状态和操作按钮分两行，避免状态文字被挤成“正…” */
+    .hm-card[data-panel="true"] .hm-status-player,
+    .hm-card[data-panel="true"] .hm-status .hm-kicker-sep {
+      display: none;
+    }
+
+    .hm-card[data-panel="true"] .hm-top {
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+
+    .hm-card[data-panel="true"] .hm-status {
+      flex: 1 1 100%;
+    }
+
+    .hm-card[data-panel="true"] .hm-top-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+
     .hm-card[data-panel="true"] .hm-main {
       grid-template-columns: minmax(0, var(--hm-panel-cover, 42%)) minmax(0, 1fr);
       justify-items: stretch;
@@ -2456,14 +2476,19 @@ export const cardStyles = css`
     }
   }
 
-  /* 窄屏/竖屏面板：封面在上、信息在下，占满剩余高度 */
+  /* 窄屏/竖屏面板：封面在上、信息在下，整体居中；不再让主区独占全部剩余高度 */
   @container (max-width: 820px) {
     .hm-card[data-panel="true"] .hm-main {
       display: flex;
       flex-direction: column;
+      flex: 0 0 auto;
       justify-content: center;
       align-items: center;
-      gap: clamp(10px, 3cqi, 20px);
+      gap: clamp(10px, 3cqi, 18px);
+    }
+
+    .hm-card[data-panel="true"] .hm-vis {
+      height: clamp(36px, 8vh, 76px);
     }
 
     .hm-card[data-panel="true"] .hm-cover-wrap {

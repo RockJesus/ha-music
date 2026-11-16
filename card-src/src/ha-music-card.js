@@ -131,6 +131,11 @@ class HaMusicCard extends LitElement {
     this._lyricsAbort = null;
     this._lyricsOffset = this._loadLyricsOffset();
     this._lyricsCache = this._loadLyricsCache();
+    this._coverPress = null;
+    this._coverGesture = "";
+    this._coverGestureTimer = null;
+    this._coverSuppressClick = false;
+    this._coverSuppressTimer = null;
     this._positionClock = null;
   }
 
@@ -253,6 +258,11 @@ class HaMusicCard extends LitElement {
       this._onViewportResize = null;
     }
     this._stopTimer();
+    if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
+    this._coverGestureTimer = null;
+    this._coverSuppressTimer = null;
+    this._coverPress = null;
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
@@ -932,6 +942,95 @@ class HaMusicCard extends LitElement {
     const state = this._state()?.state;
     const playing = state === "playing" || state === "buffering";
     this._guard(this._call(playing ? "media_pause" : "media_play"));
+  }
+
+  _coverCue(gesture) {
+    this._coverGesture = gesture;
+    if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    this._coverGestureTimer = setTimeout(() => {
+      if (this._coverGesture === gesture) {
+        this._coverGesture = "";
+        this.requestUpdate();
+      }
+    }, 420);
+    this.requestUpdate();
+  }
+
+  _coverSwipe(direction) {
+    this._coverCue(direction);
+    this._guard(this._call(direction === "next" ? "media_next_track" : "media_previous_track"));
+  }
+
+  _onCoverPointerDown(event) {
+    if (this._thumbMode() || (event.pointerType === "mouse" && event.button !== 0)) return;
+    this._coverSuppressClick = false;
+    if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
+    this._coverPress = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      at: Date.now(),
+      moved: false,
+      captured: false,
+    };
+  }
+
+  _onCoverPointerMove(event) {
+    const press = this._coverPress;
+    if (!press || press.id !== event.pointerId) return;
+    const dx = event.clientX - press.x;
+    const dy = event.clientY - press.y;
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      press.moved = true;
+      if (!press.captured) {
+        press.captured = true;
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch (error) {
+          /* 忽略不支持 pointer capture 的浏览器 */
+        }
+      }
+      if (event.cancelable) event.preventDefault();
+    }
+  }
+
+  _onCoverPointerUp(event) {
+    const press = this._coverPress;
+    if (!press || press.id !== event.pointerId) return;
+    this._coverPress = null;
+    const dx = event.clientX - press.x;
+    const dy = event.clientY - press.y;
+    const horizontal = Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.25;
+    if (horizontal) {
+      this._coverSuppressClick = true;
+      if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
+      this._coverSuppressTimer = setTimeout(() => {
+        this._coverSuppressClick = false;
+      }, 450);
+      this._coverSwipe(dx < 0 ? "next" : "prev");
+      return;
+    }
+    if (press.moved || Math.hypot(dx, dy) > 12) {
+      this._coverSuppressClick = true;
+      if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
+      this._coverSuppressTimer = setTimeout(() => {
+        this._coverSuppressClick = false;
+      }, 450);
+    }
+  }
+
+  _onCoverPointerCancel() {
+    this._coverPress = null;
+  }
+
+  _onCoverClick() {
+    if (this._thumbMode()) return;
+    if (this._coverSuppressClick) {
+      this._coverSuppressClick = false;
+      return;
+    }
+    this._coverCue("tap");
+    this._togglePlay();
   }
 
   _power() {
@@ -2252,12 +2351,18 @@ class HaMusicCard extends LitElement {
               <button
                 class="hm-cover"
                 data-playing=${playing ? "true" : "false"}
-                aria-label=${t("more")}
+                data-gesture=${this._coverGesture || ""}
+                aria-label=${playing ? t("pause") : t("play")}
                 title=${mediaTitle || t("noMedia")}
-                @click=${() => this._moreInfo()}
+                @pointerdown=${(event) => this._onCoverPointerDown(event)}
+                @pointermove=${(event) => this._onCoverPointerMove(event)}
+                @pointerup=${(event) => this._onCoverPointerUp(event)}
+                @pointercancel=${() => this._onCoverPointerCancel()}
+                @dragstart=${(event) => event.preventDefault()}
+                @click=${() => this._onCoverClick()}
               >
                 ${coverUrl
-                  ? html`<img src=${coverUrl} alt=${mediaTitle || ""} />`
+                  ? html`<img src=${coverUrl} alt=${mediaTitle || ""} draggable="false" />`
                   : html`<span class="hm-cover-ph">${icon("music", 40)}</span>`}
               </button>
               <div class="hm-cover-halo"></div>

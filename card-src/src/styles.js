@@ -304,6 +304,11 @@ export const cardStyles = css`
       0 18px 38px -14px rgba(0, 0, 0, 0.9),
       inset 0 1px 0 rgba(255, 255, 255, 0.22);
     cursor: pointer;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    will-change: transform;
     transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
@@ -317,6 +322,9 @@ export const cardStyles = css`
     height: 100%;
     object-fit: cover;
     transform-origin: 50% 50%;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
   }
 
   .hm-cover .hm-cover-ph {
@@ -384,6 +392,71 @@ export const cardStyles = css`
     mask-composite: exclude;
     animation: hmSpin 8s linear infinite;
     pointer-events: none;
+  }
+
+  .hm-cover[data-gesture="next"] {
+    animation: hmCoverNext 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .hm-cover[data-gesture="prev"] {
+    animation: hmCoverPrev 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .hm-cover[data-gesture="tap"] {
+    animation: hmCoverTap 0.3s ease-out;
+  }
+
+  @keyframes hmCoverNext {
+    0% {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+    34% {
+      transform: translateX(-15%) rotate(-2.5deg) scale(0.94);
+      opacity: 0.82;
+    }
+    70% {
+      transform: translateX(3%) rotate(0.6deg) scale(1.01);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes hmCoverPrev {
+    0% {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+    34% {
+      transform: translateX(15%) rotate(2.5deg) scale(0.94);
+      opacity: 0.82;
+    }
+    70% {
+      transform: translateX(-3%) rotate(-0.6deg) scale(1.01);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes hmCoverTap {
+    0% {
+      transform: scale(1);
+    }
+    38% {
+      transform: scale(0.93);
+    }
+    72% {
+      transform: scale(1.025);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 
   .hm-info {
@@ -2733,6 +2806,10 @@ export const cardStyles = css`
     .hm-btn,
     .hm-icon-btn {
       transition: none;
+    }
+
+    .hm-cover[data-gesture] {
+      animation: none !important;
     }
   }
 `;

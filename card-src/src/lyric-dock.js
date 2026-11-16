@@ -27,13 +27,12 @@ function loadPositions() {
 
 function savePosition(x, y) {
   try {
-    window.localStorage.setItem(
-      POS_KEY,
-      JSON.stringify({
-        x: Number(clamp(x, 0, 1).toFixed(4)),
-        y: Number(clamp(y, 0, 1).toFixed(4)),
-      })
-    );
+    const positions = loadPositions();
+    positions.lyric = {
+      x: Number(clamp(x, 0, 1).toFixed(4)),
+      y: Number(clamp(y, 0, 1).toFixed(4)),
+    };
+    window.localStorage.setItem(POS_KEY, JSON.stringify(positions));
   } catch {
     /* localStorage 不可用时只影响跨页面位置记忆 */
   }
@@ -304,7 +303,7 @@ class HaMusicLyric extends HTMLElement {
     }
     this._applyTheme();
     this._sync();
-    this._applyPosition();
+    if (!this._dragging) this._applyPosition();
   }
 
   connectedCallback() {
@@ -409,12 +408,18 @@ class HaMusicLyric extends HTMLElement {
   }
 
   _applyPosition() {
-    if (!this._pill?.isConnected) return;
+    if (!this._pill?.isConnected || this._dragging) return;
     const rect = this._pill.getBoundingClientRect();
     const width = rect.width || 240;
     const height = rect.height || 42;
     const positions = loadPositions();
-    const pos = positions.lyric;
+    // 兼容早期误存成顶层 { x, y } 的格式。
+    const pos =
+      positions.lyric && Number.isFinite(positions.lyric.x) && Number.isFinite(positions.lyric.y)
+        ? positions.lyric
+        : Number.isFinite(positions.x) && Number.isFinite(positions.y)
+          ? positions
+          : null;
     const vw = window.innerWidth || 1;
     const vh = window.innerHeight || 1;
     const topbar = findTopBarRect();

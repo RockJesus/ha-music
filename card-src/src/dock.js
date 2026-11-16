@@ -1246,7 +1246,7 @@ class HaMusicMini extends HTMLElement {
   }
 
   _applySavedPosition() {
-    if (!this._mini || !this._mini.isConnected) return;
+    if (!this._mini || !this._mini.isConnected || this._dragging) return;
     if (this._mode === "fab") {
       const mini = this._mini;
       const rect = mini.getBoundingClientRect();

@@ -138,11 +138,16 @@ class HaMusicCard extends LitElement {
     const entityId = this._eid();
     const state = hass.states?.[entityId];
     const attrs = state?.attributes || {};
-    const base = Number(attrs.media_position) || 0;
-    const stamp = attrs.media_position_updated_at || "";
+    const trackKey = this._trackKey(state);
     const prior = this._positionClock;
+    const trackChanged = Boolean(prior && prior.trackKey !== trackKey);
+    // 换歌时播放器有时仍 report 上一首的 media_position；
+    // 新曲目一律从 0 建立本地播放时钟，避免进度条/歌词跳到中段。
+    const base = trackChanged ? 0 : Number(attrs.media_position) || 0;
+    const stamp = attrs.media_position_updated_at || "";
     if (
       !prior ||
+      trackChanged ||
       prior.entityId !== entityId ||
       prior.state !== state?.state ||
       prior.base !== base ||
@@ -151,6 +156,7 @@ class HaMusicCard extends LitElement {
       this._positionClock = {
         entityId,
         state: state?.state,
+        trackKey,
         base,
         stamp,
         at: Date.now(),
@@ -274,16 +280,27 @@ class HaMusicCard extends LitElement {
     return this._hass?.states?.[entityId];
   }
 
+  _trackKey(state) {
+    const attrs = state?.attributes || {};
+    return [
+      this._eid(),
+      attrs.media_title || "",
+      attrs.media_artist || "",
+      attrs.media_album_name || "",
+      attrs.media_duration || 0,
+      attrs.media_content_id || "",
+    ]
+      .map((value) => String(value))
+      .join("|");
+  }
+
   _readMedia() {
     const state = this._state();
     const media = readMedia(state);
-    const attrs = state?.attributes || {};
-    const updatedAt = attrs.media_position_updated_at;
-    const stampTime = updatedAt ? new Date(updatedAt).getTime() : NaN;
-    const hasValidStamp =
-      Number.isFinite(stampTime) && stampTime <= Date.now() + 3000;
-    if (state?.state === "playing" && !hasValidStamp) {
+    if (state?.state === "playing") {
       const clock = this._positionClock;
+      // 播放中以本地时钟为准：既处理没有 media_position_updated_at 的播放器，
+      // 也避免换歌后沿用上一首的时间戳把进度算到中段。
       if (clock && clock.entityId === this._eid()) {
         const elapsed = Math.max(0, (Date.now() - clock.at) / 1000);
         const position = clock.base + elapsed;

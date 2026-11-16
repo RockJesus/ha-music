@@ -1894,9 +1894,8 @@ class HaMusicCard extends LitElement {
 
     let body = nothing;
     if (lyrics.status === "loading") {
-      body = html`<div class="hm-lyrics-empty hm-lyrics-loading">
-        <span class="hm-lyrics-pulse"></span>${t("lyricsLoading")}
-      </div>`;
+      // 歌词匹配期间不显示「正在匹配歌词」占位框，避免侧边歌词/完整面板出现空框。
+      body = nothing;
     } else if (lyrics.status === "none") {
       body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
     } else if (lyrics.status === "error") {
@@ -2071,7 +2070,10 @@ class HaMusicCard extends LitElement {
         this._lyrics.status === "error" ||
         this._lyricsOpen);
     const sideLyrics =
-      showLyrics && !this._lyricsOpen && this._sideLyricsVisible();
+      showLyrics &&
+      !this._lyricsOpen &&
+      this._lyrics.status === "ready" &&
+      this._sideLyricsVisible();
 
     const lyricLine =
       this._lyrics.status === "ready" && this._lyrics.lines.length

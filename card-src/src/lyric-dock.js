@@ -182,6 +182,11 @@ const STYLE = `
     text-overflow: ellipsis;
     text-shadow: 0 0 16px rgba(var(--hm-accent-rgb), 0.28);
   }
+  .lyric[data-empty="true"] {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
   .lyric[data-dragging="true"] {
     cursor: grabbing;
     box-shadow:
@@ -318,12 +323,12 @@ class HaMusicLyric extends HTMLElement {
     const hass = resolveHass() || this._hass;
     if (hass?.states) this._hass = hass;
     if (!this._entity) {
-      this._setText("等待播放");
+      this._setText("");
       return;
     }
     const state = this._hass?.states?.[this._entity];
     if (!state) {
-      this._setText("实体不可用");
+      this._setText("");
       return;
     }
     const attrs = state.attributes || {};
@@ -352,14 +357,19 @@ class HaMusicLyric extends HTMLElement {
       const index = lyricIndex(this._lines, position);
       line = this._lines[Math.max(0, index)]?.text || "";
     }
-    this._setText(line || "暂无歌词");
+    this._setText(line);
   }
 
   _setText(text) {
-    const value = String(text || "暂无歌词");
+    const value = String(text || "").trim();
+    if (!this._pill) return;
+    const empty = !value;
+    this._pill.dataset.empty = empty ? "true" : "false";
     if (this._text.textContent !== value) {
       this._text.textContent = value;
-      if (!this._dragging) window.requestAnimationFrame(() => this._applyPosition());
+      if (!empty && !this._dragging) {
+        window.requestAnimationFrame(() => this._applyPosition());
+      }
     }
   }
 

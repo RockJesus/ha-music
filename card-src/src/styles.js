@@ -223,8 +223,8 @@ export const cardStyles = css`
   .hm-icon-btn {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border-radius: 11px;
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -677,7 +677,7 @@ export const cardStyles = css`
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 24px;
+    height: 30px;
     margin: 0;
     padding: 0;
     background: transparent;
@@ -686,7 +686,7 @@ export const cardStyles = css`
   }
 
   .hm-range::-webkit-slider-runnable-track {
-    height: 5px;
+    height: 7px;
     border-radius: 999px;
     background: linear-gradient(
       90deg,
@@ -700,9 +700,9 @@ export const cardStyles = css`
 
   .hm-range::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 13px;
-    height: 13px;
-    margin-top: -4px;
+    width: 18px;
+    height: 18px;
+    margin-top: -5.5px;
     border: none;
     border-radius: 50%;
     background: #fff;
@@ -721,13 +721,13 @@ export const cardStyles = css`
   }
 
   .hm-range::-moz-range-track {
-    height: 5px;
+    height: 7px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.13);
   }
 
   .hm-range::-moz-range-progress {
-    height: 5px;
+    height: 7px;
     border-radius: 999px;
     background: linear-gradient(
       90deg,
@@ -737,8 +737,8 @@ export const cardStyles = css`
   }
 
   .hm-range::-moz-range-thumb {
-    width: 13px;
-    height: 13px;
+    width: 18px;
+    height: 18px;
     border: none;
     border-radius: 50%;
     background: #fff;
@@ -769,8 +769,8 @@ export const cardStyles = css`
   .hm-btn {
     display: grid;
     place-items: center;
-    width: clamp(34px, 9cqi, 44px);
-    height: clamp(34px, 9cqi, 44px);
+    width: clamp(42px, 10.5cqi, 52px);
+    height: clamp(42px, 10.5cqi, 52px);
     padding: 0;
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.09);
@@ -812,8 +812,8 @@ export const cardStyles = css`
     position: relative;
     display: grid;
     place-items: center;
-    width: clamp(50px, 14cqi, 68px);
-    height: clamp(50px, 14cqi, 68px);
+    width: clamp(60px, 15cqi, 78px);
+    height: clamp(60px, 15cqi, 78px);
     padding: 0;
     border: none;
     border-radius: 50%;
@@ -865,10 +865,10 @@ export const cardStyles = css`
   .hm-volume {
     display: flex;
     align-items: center;
-    gap: 7px;
-    flex: 0 1 168px;
+    gap: 8px;
+    flex: 0 1 220px;
     min-width: 0;
-    padding: 3px 10px 3px 3px;
+    padding: 4px 12px 4px 4px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.07);
     background: rgba(255, 255, 255, 0.045);
@@ -877,8 +877,8 @@ export const cardStyles = css`
   .hm-volume .hm-icon-btn {
     border: none;
     background: transparent;
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     flex: 0 0 auto;
   }
@@ -888,22 +888,22 @@ export const cardStyles = css`
   }
 
   .hm-volume .hm-range {
-    height: 20px;
+    height: 26px;
     flex: 1 1 auto;
     min-width: 40px;
   }
 
   .hm-volume .hm-range::-webkit-slider-thumb {
-    width: 11px;
-    height: 11px;
-    margin-top: -3px;
+    width: 17px;
+    height: 17px;
+    margin-top: -5px;
   }
 
   .hm-vol-pct {
     flex: 0 0 auto;
     min-width: 26px;
     text-align: right;
-    font-size: 10.5px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
     color: rgba(246, 248, 255, 0.5);
   }
@@ -1230,21 +1230,21 @@ export const cardStyles = css`
 
   .hm-card[data-layout="compact"] .hm-volume {
     margin-left: auto;
-    flex: 0 1 132px;
+    flex: 0 1 150px;
   }
 
   .hm-card[data-layout="compact"] .hm-btn {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
   }
 
   .hm-card[data-layout="compact"] .hm-play {
-    width: 48px;
-    height: 48px;
+    width: 54px;
+    height: 54px;
   }
 
   .hm-card[data-layout="compact"] .hm-transport {
-    gap: 6px;
+    gap: 7px;
   }
 
   /* ---------- 布局：迷你 ---------- */
@@ -1304,13 +1304,13 @@ export const cardStyles = css`
 
   .hm-card[data-layout="mini"] .hm-btn,
   .hm-card[data-layout="mini"] .hm-icon-btn {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
   }
 
   .hm-card[data-layout="mini"] .hm-play {
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
   }
 
   .hm-card[data-layout="mini"] .hm-volume {
@@ -1361,6 +1361,9 @@ export const cardStyles = css`
       display: none;
     }
 
+  }
+
+  @container (max-width: 470px) {
     .hm-card[data-layout="full"] .hm-controls {
       flex-direction: column;
       gap: 10px;
@@ -1374,7 +1377,7 @@ export const cardStyles = css`
     .hm-card[data-layout="full"] .hm-volume {
       flex: 1 1 auto;
       margin: 0 auto;
-      width: min(100%, 240px);
+      width: min(100%, 320px);
     }
   }
 
@@ -1667,20 +1670,20 @@ export const cardStyles = css`
     }
 
     .hm-icon-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 13px;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
     }
 
     .hm-btn {
-      width: 46px;
-      height: 46px;
+      width: 52px;
+      height: 52px;
       flex: 0 0 auto;
     }
 
     .hm-play {
-      min-width: 58px;
-      min-height: 58px;
+      min-width: 68px;
+      min-height: 68px;
     }
 
     .hm-entity-chip {
@@ -1705,48 +1708,48 @@ export const cardStyles = css`
     }
 
     .hm-range {
-      height: 40px;
+      height: 44px;
     }
 
     .hm-volume .hm-range {
-      height: 40px;
+      height: 44px;
       min-width: 64px;
     }
 
     .hm-volume .hm-icon-btn {
-      width: 40px;
-      height: 40px;
+      width: 46px;
+      height: 46px;
     }
 
     .hm-volume {
       gap: 8px;
-      flex: 0 1 186px;
+      flex: 0 1 230px;
     }
 
     .hm-volume .hm-range::-webkit-slider-thumb {
-      width: 19px;
-      height: 19px;
-      margin-top: -7px;
+      width: 22px;
+      height: 22px;
+      margin-top: -8px;
     }
 
     .hm-volume .hm-range::-moz-range-thumb {
-      width: 19px;
-      height: 19px;
+      width: 22px;
+      height: 22px;
     }
 
     .hm-card[data-layout="compact"] .hm-volume {
-      flex: 0 1 156px;
+      flex: 0 1 150px;
     }
 
     .hm-range::-webkit-slider-thumb {
-      width: 19px;
-      height: 19px;
-      margin-top: -7px;
+      width: 22px;
+      height: 22px;
+      margin-top: -8px;
     }
 
     .hm-range::-moz-range-thumb {
-      width: 19px;
-      height: 19px;
+      width: 22px;
+      height: 22px;
     }
 
     .hm-time {
@@ -1778,23 +1781,27 @@ export const cardStyles = css`
     }
 
     .hm-card[data-layout="compact"] .hm-play {
-      width: 54px;
-      height: 54px;
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      min-height: 56px;
     }
 
     .hm-card[data-layout="mini"] .hm-btn {
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
     }
 
     .hm-card[data-layout="mini"] .hm-volume .hm-icon-btn {
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
     }
 
     .hm-card[data-layout="mini"] .hm-play {
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      min-height: 48px;
     }
   }
 
@@ -1807,8 +1814,8 @@ export const cardStyles = css`
     }
 
     .hm-card[data-layout="compact"] .hm-volume {
-      flex: 0 1 112px;
-      max-width: 112px;
+      flex: 0 1 96px;
+      max-width: 96px;
       margin-left: auto;
       box-sizing: border-box;
     }
@@ -2291,20 +2298,53 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-volume {
-      flex: 0 1 124px;
+      flex: 0 1 128px;
       width: auto;
-      max-width: 124px;
+      max-width: 128px;
       margin-left: auto;
     }
 
     .hm-card[data-panel="true"] .hm-btn {
-      width: 32px;
-      height: 32px;
+      width: 38px;
+      height: 38px;
     }
 
     .hm-card[data-panel="true"] .hm-play {
-      width: 44px;
-      height: 44px;
+      width: 52px;
+      height: 52px;
+      min-width: 52px;
+      min-height: 52px;
+    }
+  }
+
+  @container (max-width: 520px) {
+    .hm-card[data-panel="true"] .hm-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport {
+      justify-content: center;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume {
+      flex: 1 1 auto;
+      width: min(100%, 300px);
+      max-width: none;
+      margin: 0 auto;
+    }
+
+    .hm-card[data-panel="true"] .hm-btn {
+      width: 42px;
+      height: 42px;
+    }
+
+    .hm-card[data-panel="true"] .hm-play {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      min-height: 56px;
     }
   }
 
@@ -2654,6 +2694,26 @@ export const cardStyles = css`
     .hm-card[data-thumb="md"] .hm-kicker {
       font-size: 10px;
       letter-spacing: 0.6px;
+    }
+  }
+
+  /* 触屏紧凑卡片：控制区拆成两行，保证按钮和音量都有足够触控面积 */
+  @media (pointer: coarse) {
+    .hm-card[data-layout="compact"] .hm-controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .hm-card[data-layout="compact"] .hm-transport {
+      justify-content: center;
+    }
+
+    .hm-card[data-layout="compact"] .hm-volume {
+      flex: 1 1 auto;
+      width: min(100%, 280px);
+      max-width: none;
+      margin: 0 auto;
     }
   }
 

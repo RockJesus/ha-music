@@ -1850,7 +1850,7 @@ export const cardStyles = css`
   }
 
   .hm-lyrics-inline .hm-lyrics-head {
-    padding: 0 4px;
+    display: none;
   }
 
   .hm-lyrics-inline .hm-lyrics-line {

@@ -413,7 +413,7 @@ const STYLE = `
     border-radius: 14px;
   }
   .mini[data-mode="sidebar"][data-compact="true"] {
-    width: var(--hm-sidebar-compact-size, 56px) !important;
+    width: var(--hm-sidebar-compact-size, 56px);
     height: var(--hm-sidebar-compact-size, 56px);
     padding: 4px;
     gap: 0;
@@ -795,20 +795,27 @@ const STYLE = `
   .mini[data-dragging="true"] * { cursor: grabbing; }
   /* 顶部 / 侧边栏双击折叠成小圆盘，再次双击展开 */
   .mini[data-mode][data-folded="true"] {
-    width: 56px !important;
+    width: 56px;
     height: 56px;
-    padding: 4px;
+    min-width: 0;
+    min-height: 0;
+    padding: 2px;
     gap: 0;
+    aspect-ratio: 1 / 1;
     border-radius: 50%;
     justify-content: center;
+    overflow: hidden;
   }
   .mini[data-mode][data-folded="true"] .meta,
   .mini[data-mode][data-folded="true"] .controls,
   .mini[data-mode][data-folded="true"] .progress { display: none; }
   .mini[data-mode][data-folded="true"] .art {
-    width: 46px;
-    height: 46px;
+    width: calc(100% - 2px);
+    height: calc(100% - 2px);
+    max-width: none;
+    max-height: none;
     border-radius: 50%;
+    flex: 0 0 auto;
   }
   @keyframes fabRingSpin {
     to { transform: rotate(1turn); }
@@ -1332,6 +1339,27 @@ class HaMusicMini extends HTMLElement {
     const mini = this._mini;
 
     if (this._mode === "top") {
+      if (this._folded) {
+        const size = Math.round(Math.min(44, Math.max(36, bounds.height - 8)));
+        mini.style.width = `${size}px`;
+        mini.style.height = `${size}px`;
+        mini.style.removeProperty("max-height");
+        delete mini.dataset.compact;
+        const addRect = findTopBarAddRect(bounds);
+        const defaultX = addRect
+          ? addRect.left - 8 - size
+          : bounds.right - size - 80;
+        const x = clampNumber(
+          pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
+          bounds.left + margin,
+          bounds.right - size - margin,
+        );
+        mini.style.left = `${Math.round(x)}px`;
+        mini.style.top = `${Math.round(bounds.top + Math.max(2, (bounds.height - size) / 2))}px`;
+        mini.style.right = "auto";
+        mini.style.bottom = "auto";
+        return;
+      }
       const h = Math.round(Math.min(44, Math.max(38, bounds.height - 8)));
       const maxW = Math.max(150, bounds.width - margin * 2);
       const w = Math.round(Math.min(300, Math.max(200, bounds.width - 140), maxW));
@@ -1359,7 +1387,12 @@ class HaMusicMini extends HTMLElement {
     const w = Math.round(Math.max(56, Math.min(236, bounds.width - 16)));
     const compact = w < 170;
     const compactSize = Math.round(Math.max(40, Math.min(56, bounds.width - 4)));
-    if (compact) {
+    const foldedSize = compact ? compactSize : 56;
+    if (this._folded) {
+      mini.style.width = `${foldedSize}px`;
+      mini.style.height = `${foldedSize}px`;
+      delete mini.dataset.compact;
+    } else if (compact) {
       mini.style.setProperty("--hm-sidebar-compact-size", `${compactSize}px`);
       mini.style.width = `${compactSize}px`;
       mini.style.height = `${compactSize}px`;
@@ -1370,12 +1403,14 @@ class HaMusicMini extends HTMLElement {
       mini.style.height = "auto";
       mini.dataset.compact = "false";
     }
-    mini.style.maxHeight = `${Math.max(56, bounds.height - 16)}px`;
+    mini.style.maxHeight = this._folded
+      ? `${foldedSize}px`
+      : `${Math.max(56, bounds.height - 16)}px`;
     const left = Math.round(bounds.left + (compact ? 4 : margin));
     mini.style.left = `${left}px`;
     mini.style.right = "auto";
     mini.style.bottom = "auto";
-    const height = mini.getBoundingClientRect().height || 58;
+    const height = this._folded ? foldedSize : (mini.getBoundingClientRect().height || 58);
     const settingsRect = findSidebarSettingsRect(bounds);
     const defaultY = settingsRect
       ? settingsRect.top - 8 - height

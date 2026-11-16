@@ -10,6 +10,10 @@ import {
   readMedia,
   readQueue,
   visualizerFrame,
+  canTapSpectrumAudio,
+  normalizeSpectrumPlaylist,
+  findSpectrumTrack,
+  trackMatchScore,
 } from "../src/util.js";
 import { mediaClassLabel } from "../src/const.js";
 
@@ -150,4 +154,68 @@ test("visualizerFrame 随 media_position 改变脉冲", () => {
   assert.ok(Math.abs(p2.pulse - p1.pulse) > 0.05);
   assert.ok(p0.pulse >= 0 && p0.pulse <= 1);
   assert.ok(p0.low >= 0 && p0.low <= 1);
+});
+
+test("canTapSpectrumAudio 只放行同源与已知 CORS 音频源", () => {
+  const base = "https://ha.example:8123/lovelace/music";
+  assert.equal(canTapSpectrumAudio("/local/community/ha-music/track.mp3", base), true);
+  assert.equal(
+    canTapSpectrumAudio("https://aqqmusic.tc.qq.com/M500x.mp3?vkey=x", base),
+    true
+  );
+  assert.equal(
+    canTapSpectrumAudio("https://ws.stream.qqmusic.qq.com/M500x.mp3", base),
+    true
+  );
+  assert.equal(
+    canTapSpectrumAudio("https://m10.music.126.net/2026/x.mp3", base),
+    true
+  );
+  assert.equal(canTapSpectrumAudio("https://example.com/track.mp3", base), false);
+  assert.equal(canTapSpectrumAudio("http://aqqmusic.tc.qq.com/x.mp3", base), false);
+  assert.equal(canTapSpectrumAudio("", base), false);
+});
+
+test("normalizeSpectrumPlaylist 兼容 tracks/audios 与数组", () => {
+  const fromTracks = normalizeSpectrumPlaylist({
+    tracks: [
+      { mid: "0035", name: "You", artist: "Appleby", url: "https://a/1.mp3" },
+      { name: "No URL", artist: "x" },
+    ],
+  });
+  assert.equal(fromTracks.length, 1);
+  assert.equal(fromTracks[0].mid, "0035");
+  assert.equal(fromTracks[0].name, "You");
+  const fromAudios = normalizeSpectrumPlaylist([
+    { title: "Neon", author: ["A", "B"], src: "https://a/2.mp3", duration: "12" },
+  ]);
+  assert.equal(fromAudios[0].name, "Neon");
+  assert.equal(fromAudios[0].artist, "A B");
+  assert.equal(fromAudios[0].duration, 12);
+});
+
+test("findSpectrumTrack 优先 content_id mid，再按标题/歌手模糊匹配", () => {
+  const tracks = [
+    { mid: "aaa", name: "You", artist: "Other", url: "https://a/1.mp3" },
+    { mid: "0035wcNh2hOzbE", name: "You", artist: "Appleby", url: "https://a/2.mp3" },
+    { mid: "bbb", name: "旧绪难平-Slowed", artist: "Agera", url: "https://a/3.mp3" },
+  ];
+  assert.equal(
+    findSpectrumTrack(tracks, {
+      title: "You",
+      artist: "Appleby",
+      contentId: "qqmusic://track/0035wcNh2hOzbE",
+    }).url,
+    "https://a/2.mp3"
+  );
+  assert.equal(
+    findSpectrumTrack(tracks, { title: "You", artist: "Appleby" }).url,
+    "https://a/2.mp3"
+  );
+  assert.equal(
+    findSpectrumTrack(tracks, { title: "旧绪难平", artist: "Agera" }).url,
+    "https://a/3.mp3"
+  );
+  assert.equal(findSpectrumTrack(tracks, { title: "完全无关", artist: "x" }), null);
+  assert.ok(trackMatchScore(tracks[1], { title: "You", artist: "Appleby" }) > 0.9);
 });

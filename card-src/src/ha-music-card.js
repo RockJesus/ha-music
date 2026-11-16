@@ -26,6 +26,9 @@ import {
   mixHsl,
   hashString,
   visualizerFrame,
+  canTapSpectrumAudio,
+  normalizeSpectrumPlaylist,
+  findSpectrumTrack,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
@@ -142,6 +145,15 @@ class HaMusicCard extends LitElement {
     this._spectrumLast = 0;
     this._spectrumKey = "";
     this._spectrumAudioUrl = "";
+    this._spectrumPlaylistUrl = "";
+    this._spectrumPlaylist = null;
+    this._spectrumPlaylistAt = 0;
+    this._spectrumPlaylistLoading = false;
+    this._spectrumPlaylistAbort = null;
+    this._spectrumPlaylistErrorAt = 0;
+    this._spectrumResolvedUrl = "";
+    this._spectrumTrack = null;
+    this._audioShape = null;
     this._audioEl = null;
     this._audioCtx = null;
     this._audioAnalyser = null;
@@ -154,6 +166,15 @@ class HaMusicCard extends LitElement {
     this._audioStartedAt = 0;
     this._audioGestureArmed = false;
     this._positionClock = null;
+    // Music Assistant 音频分析（wave_form RMS 能量包络 + BPM）。
+    // 通过 HA 侧 ha_music_analysis.get_track_analysis 服务取数；
+    // 服务不可用时退回原来的程序化律动，不影响卡片加载。
+    this._maAnalysis = null;
+    this._maAnalysisKey = "";
+    this._maAnalysisLoadingKey = "";
+    this._maAnalysisFailedKey = "";
+    this._maAnalysisFailedAt = 0;
+    this._maAnalysisAt = 0;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -218,9 +239,25 @@ class HaMusicCard extends LitElement {
       typeof config.spectrum_audio_url === "string"
         ? config.spectrum_audio_url.trim()
         : "";
-    if (spectrumAudioUrl !== this._spectrumAudioUrl) {
+    const spectrumPlaylistUrl =
+      typeof config.spectrum_playlist_url === "string"
+        ? config.spectrum_playlist_url.trim()
+        : "";
+    if (
+      spectrumAudioUrl !== this._spectrumAudioUrl ||
+      spectrumPlaylistUrl !== this._spectrumPlaylistUrl
+    ) {
       this._spectrumAudioUrl = spectrumAudioUrl;
+      this._spectrumPlaylistUrl = spectrumPlaylistUrl;
+      this._spectrumPlaylist = null;
+      this._spectrumPlaylistAt = 0;
+      this._spectrumPlaylistErrorAt = 0;
+      this._spectrumPlaylistAbort?.abort?.();
+      this._spectrumPlaylistAbort = null;
+      this._spectrumResolvedUrl = "";
+      this._spectrumTrack = null;
       this._audioFailedUrl = "";
+      this._resetAudioShape();
       this._teardownAudioSpectrum();
     }
     if (!list.includes(this._activeEntity)) {
@@ -249,6 +286,12 @@ class HaMusicCard extends LitElement {
       }
     };
     window.addEventListener("keydown", this._onKeyDown);
+    this._onSpectrumGesture = () => {
+      if (this._spectrumPlaying() && (this._config?.visualizer || "bars") === "bars") {
+        this._primeAudioSpectrum();
+      }
+    };
+    this.addEventListener("pointerdown", this._onSpectrumGesture, { passive: true });
     this._onViewportResize = () => this._queuePanelFit();
     window.addEventListener("resize", this._onViewportResize);
     window.visualViewport?.addEventListener("resize", this._onViewportResize);
@@ -282,6 +325,10 @@ class HaMusicCard extends LitElement {
       window.removeEventListener("resize", this._onViewportResize);
       window.visualViewport?.removeEventListener("resize", this._onViewportResize);
       this._onViewportResize = null;
+    }
+    if (this._onSpectrumGesture) {
+      this.removeEventListener("pointerdown", this._onSpectrumGesture);
+      this._onSpectrumGesture = null;
     }
     this._stopTimer();
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
@@ -2749,26 +2796,132 @@ class HaMusicCard extends LitElement {
     return state === "playing" || state === "buffering";
   }
 
-  _primeAudioSpectrum() {
+  _resetAudioShape() {
+    this._audioShape = {
+      bars: [],
+      mean: [],
+      prev: [],
+      peak: 0,
+      lowFast: 0,
+      lowSlow: 0,
+      fluxMean: 0.02,
+      beatEnv: 0,
+      punch: 0,
+      low: 0,
+    };
+  }
+
+  _ensureAudioShape(count) {
+    if (!this._audioShape) this._resetAudioShape();
+    const shape = this._audioShape;
+    if (shape.mean.length !== count) {
+      shape.mean = new Array(count).fill(0);
+      shape.prev = new Array(count).fill(0);
+      shape.bars = new Array(count).fill(0);
+      shape.peak = 0;
+      shape.lowFast = 0;
+      shape.lowSlow = 0;
+      shape.fluxMean = 0.02;
+      shape.beatEnv = 0;
+    }
+    return shape;
+  }
+
+  _ensureSpectrumPlaylist() {
+    const url = this._spectrumPlaylistUrl;
+    if (!url || this._spectrumPlaylistLoading) return;
+    const now = Date.now();
     if (
-      !this._spectrumAudioUrl ||
-      (this._config?.visualizer || "bars") !== "bars"
+      this._spectrumPlaylist &&
+      now - this._spectrumPlaylistAt < 10 * 60 * 1000
     ) {
       return;
     }
+    if (
+      !this._spectrumPlaylist &&
+      this._spectrumPlaylistErrorAt &&
+      now - this._spectrumPlaylistErrorAt < 60 * 1000
+    ) {
+      return;
+    }
+
+    this._spectrumPlaylistLoading = true;
+    const controller =
+      typeof AbortController !== "undefined" ? new AbortController() : null;
+    this._spectrumPlaylistAbort = controller;
+    fetch(url, { cache: "no-store", signal: controller?.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status));
+        return response.json();
+      })
+      .then((data) => {
+        const tracks = normalizeSpectrumPlaylist(data);
+        if (!tracks.length) throw new Error("empty playlist");
+        this._spectrumPlaylist = tracks;
+        this._spectrumPlaylistAt = Date.now();
+        this._spectrumPlaylistErrorAt = 0;
+        this._spectrumResolvedUrl = "";
+        this._spectrumTrack = null;
+        this._syncSpectrumTrack(this._readMedia());
+        this._syncSpectrum();
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        this._spectrumPlaylistErrorAt = Date.now();
+      })
+      .finally(() => {
+        if (this._spectrumPlaylistAbort === controller) {
+          this._spectrumPlaylistAbort = null;
+        }
+        this._spectrumPlaylistLoading = false;
+      });
+  }
+
+  _syncSpectrumTrack(media = this._readMedia()) {
+    let url = this._spectrumAudioUrl;
+    let track = null;
+    if (this._spectrumPlaylistUrl) {
+      this._ensureSpectrumPlaylist();
+      if (this._spectrumPlaylist) {
+        track = findSpectrumTrack(this._spectrumPlaylist, media);
+        if (track?.url) url = track.url;
+      }
+    }
+    if (url === this._spectrumResolvedUrl && track === this._spectrumTrack) {
+      return url;
+    }
+    this._spectrumResolvedUrl = url || "";
+    this._spectrumTrack = track;
+    this._audioFailedUrl = "";
+    const wasArmed = this._audioGestureArmed;
+    this._resetAudioShape();
+    this._teardownAudioSpectrum();
+    if (wasArmed && this._spectrumResolvedUrl) {
+      this._audioGestureArmed = true;
+      this._ensureAudioSpectrum();
+      this._startAudioElement();
+    }
+    return this._spectrumResolvedUrl;
+  }
+
+  _primeAudioSpectrum() {
+    if ((this._config?.visualizer || "bars") !== "bars") return;
+    // 先记住这次用户手势：歌单可能还没拉完，等匹配到源后自动接着启动分析音频。
+    this._audioGestureArmed = true;
     this._audioFailedUrl = "";
     this._audioZeroFrames = 0;
-    this._audioGestureArmed = true;
+    if (!this._spectrumResolvedUrl) {
+      this._syncSpectrumTrack(this._readMedia());
+    }
+    if (!this._spectrumResolvedUrl) return;
     this._ensureAudioSpectrum();
     this._resumeAudioContext();
     this._startAudioElement();
   }
 
   _ensureAudioSpectrum() {
-    if (
-      !this._spectrumAudioUrl ||
-      this._audioFailedUrl === this._spectrumAudioUrl
-    ) {
+    const url = this._spectrumResolvedUrl;
+    if (!url || this._audioFailedUrl === url) {
       return null;
     }
     if (this._audioEl && this._audioAnalyser && this._audioBins) {
@@ -2781,20 +2934,31 @@ class HaMusicCard extends LitElement {
         this._failAudioSpectrum();
         return null;
       }
+      // 不是同源、也不在已知 CORS 白名单里的源不接 Web Audio：
+      // 接进去浏览器会把音频输出置零，表现为“进度在走、完全没声”。
+      if (
+        !canTapSpectrumAudio(
+          url,
+          typeof location !== "undefined" ? location.href : ""
+        )
+      ) {
+        this._audioFailedUrl = url;
+        return null;
+      }
       const audio = new Audio();
       audio.crossOrigin = "anonymous";
       audio.preload = "auto";
       audio.setAttribute("playsinline", "");
       audio.addEventListener("error", () => this._failAudioSpectrum());
-      audio.src = this._spectrumAudioUrl;
+      audio.src = url;
       audio.load();
       const ctx = new Ctx();
       const source = ctx.createMediaElementSource(audio);
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.78;
-      analyser.minDecibels = -90;
-      analyser.maxDecibels = -10;
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.55;
+      analyser.minDecibels = -84;
+      analyser.maxDecibels = -30;
       source.connect(analyser);
       // 分析节点后接 0 增益再落到 destination：保持媒体时钟推进，但完全静音，
       // 不会和远程播放器重复出声。
@@ -2808,6 +2972,7 @@ class HaMusicCard extends LitElement {
       this._audioAnalyser = analyser;
       this._audioMute = mute;
       this._audioBins = new Uint8Array(analyser.frequencyBinCount);
+      this._resetAudioShape();
       return analyser;
     } catch {
       this._failAudioSpectrum();
@@ -2865,11 +3030,12 @@ class HaMusicCard extends LitElement {
     this._audioPeak = 0;
     this._audioStartedAt = 0;
     this._audioGestureArmed = false;
+    this._resetAudioShape();
   }
 
   _failAudioSpectrum() {
-    if (!this._spectrumAudioUrl) return;
-    this._audioFailedUrl = this._spectrumAudioUrl;
+    if (!this._spectrumResolvedUrl) return;
+    this._audioFailedUrl = this._spectrumResolvedUrl;
     this._teardownAudioSpectrum();
   }
 
@@ -2889,8 +3055,16 @@ class HaMusicCard extends LitElement {
       Number.isFinite(remoteDuration) &&
       remoteDuration > 0 &&
       Math.abs(audioDuration - remoteDuration) < 5;
+    const canSeekByPosition =
+      !comparable &&
+      !remoteDuration &&
+      Number.isFinite(audioDuration) &&
+      audioDuration > 0 &&
+      Number.isFinite(media.position) &&
+      media.position > 0 &&
+      media.position < audioDuration - 1;
     if (
-      comparable &&
+      (comparable || canSeekByPosition) &&
       audio.readyState >= 1 &&
       Number.isFinite(audio.currentTime) &&
       Number.isFinite(media.position) &&
@@ -2912,7 +3086,7 @@ class HaMusicCard extends LitElement {
         this._audioAnalyser &&
         this._audioBins &&
         this._audioCtx?.state === "running" &&
-        this._audioFailedUrl !== this._spectrumAudioUrl
+        this._audioFailedUrl !== this._spectrumResolvedUrl
     );
   }
 
@@ -2923,23 +3097,27 @@ class HaMusicCard extends LitElement {
     if (!analyser || !bins || !ctx) return null;
     analyser.getByteFrequencyData(bins);
     const nyquist = ctx.sampleRate / 2;
-    const lowHz = 30;
-    const highHz = Math.min(16000, nyquist);
-    const ratio = highHz / lowHz;
+    const lowHz = 100;
+    const highHz = Math.min(6500, nyquist);
+    const binHz = ctx.sampleRate / analyser.fftSize;
+    const lo = Math.max(1, Math.floor(lowHz / binHz));
+    const hi = Math.min(bins.length - 1, Math.max(lo + 1, Math.ceil(highHz / binHz)));
+    const ratio = hi / lo;
     const levels = new Array(count);
     let peak = 0;
     for (let index = 0; index < count; index += 1) {
-      const f0 = lowHz * Math.pow(ratio, index / count);
-      const f1 = lowHz * Math.pow(ratio, (index + 1) / count);
-      const b0 = clamp(Math.floor((f0 / nyquist) * bins.length), 0, bins.length - 1);
+      // 100–6500Hz 对数分频；越靠右的高频越弱，按站点方式做等响度补偿。
+      const t0 = count > 1 ? index / (count - 1) : 0;
+      const t1 = count > 1 ? (index + 1) / (count - 1) : 1;
+      const b0 = clamp(Math.floor(lo * Math.pow(ratio, Math.pow(t0, 0.6))), lo, hi);
       const b1 = clamp(
-        Math.ceil((f1 / nyquist) * bins.length) - 1,
+        Math.max(b0 + 1, Math.ceil(lo * Math.pow(ratio, Math.pow(t1, 0.6)))),
         b0,
-        bins.length - 1
+        hi
       );
-      let max = 0;
       let sum = 0;
       let n = 0;
+      let max = 0;
       for (let bin = b0; bin <= b1; bin += 1) {
         const value = bins[bin] || 0;
         if (value > max) max = value;
@@ -2947,13 +3125,74 @@ class HaMusicCard extends LitElement {
         n += 1;
       }
       const avg = n ? sum / n : 0;
-      const raw = (max * 0.72 + avg * 0.28) / 255;
-      const level = clamp(Math.pow(raw, 0.88) * 1.5, 0.04, 1);
-      levels[index] = level;
+      const weight =
+        0.7 + 3.5 * Math.pow(count > 1 ? index / (count - 1) : 0, 1.15);
+      levels[index] = clamp((avg / 255) * weight, 0, 1.6);
       if (max > peak) peak = max;
     }
     this._audioPeak = peak;
     return levels;
+  }
+
+  _shapeAudioBars(raw) {
+    const count = raw.length;
+    const shape = this._ensureAudioShape(count);
+    let peak = 0;
+    let lowSum = 0;
+    let lowCount = 0;
+    for (let index = 0; index < count; index += 1) {
+      const value = raw[index] || 0;
+      if (value > peak) peak = value;
+      if (index < Math.max(3, Math.floor(count / 12))) {
+        lowSum += value;
+        lowCount += 1;
+      }
+    }
+    // 全局慢包络留住频段之间的相对差异；低频再走快/慢双包络做冲击检测。
+    const gEnv = Math.max(peak, shape.peak * 0.978, 0.05);
+    shape.peak = gEnv;
+    const low = lowCount ? lowSum / lowCount : 0;
+    shape.lowFast += (low - shape.lowFast) * 0.42;
+    shape.lowSlow += (low - shape.lowSlow) * 0.052;
+    let punch =
+      shape.lowSlow > 0.001 ? (shape.lowFast - shape.lowSlow) / shape.lowSlow : 0;
+    punch = clamp(punch, 0, 1.6);
+
+    // 频谱通量（帧间正增量）检测鼓点/节拍，再压成快攻击、慢衰减的视觉包络。
+    let flux = 0;
+    for (let index = 0; index < count; index += 1) {
+      const delta = raw[index] - (shape.prev[index] || 0);
+      if (delta > 0) flux += delta;
+      shape.prev[index] = raw[index] || 0;
+    }
+    shape.fluxMean += (flux - shape.fluxMean) * 0.04;
+    let beat = shape.fluxMean > 0.004 ? flux / (shape.fluxMean * 2.6) - 0.4 : 0;
+    beat = clamp(beat, 0, 1);
+    shape.beatEnv = beat > shape.beatEnv ? beat : shape.beatEnv * 0.86;
+
+    const bars = new Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const value = raw[index] || 0;
+      const d = count > 1 ? index / (count - 1) : 0; // 0 = 低频，1 = 高频
+      const abs = Math.min(0.60, value / gEnv);
+      const mean = shape.mean[index] || (value > 0 ? value : 0.02);
+      const rel = value / Math.max(0.015, mean);
+      shape.mean[index] = mean + (value - mean) * 0.035;
+      const dd = Math.pow(d, 0.6);
+      const span = 0.12 + (1.45 - 0.12) * dd;
+      const mid = 0.94 + (0.45 - 0.94) * dd;
+      const ag = clamp((rel - mid) / span, 0, 1);
+      const weight = 0.72 + 0.22 * d;
+      const mix = abs * (1 - weight) + ag * weight;
+      const gain = 1.35 + 0.42 * (1 - d);
+      const kickW = Math.pow(1 - d, 2);
+      const puls =
+        mix * (1 - 0.28 * kickW * (1 - shape.beatEnv)) + 0.65 * shape.beatEnv * kickW;
+      bars[index] = clamp(puls * gain * (1 + 0.12 * punch), 0, 1);
+    }
+    shape.punch = punch;
+    shape.low = clamp((bars[0] + bars[1] + bars[2]) / 3, 0, 1);
+    return { bars, punch, low: shape.low };
   }
 
   _syncSpectrum() {
@@ -2979,6 +3218,7 @@ class HaMusicCard extends LitElement {
       return;
     }
     const media = this._readMedia();
+    this._syncSpectrumTrack(media);
     this._ensureAudioSpectrum();
     this._syncAudioPlayback(true, media);
     if (this._spectrumRaf) return;
@@ -2995,6 +3235,134 @@ class HaMusicCard extends LitElement {
       const level = Math.min(0.24, base + frame.energy * 0.04);
       this._spectrumBars[index]?.style.setProperty("--h", level.toFixed(3));
     }
+  }
+
+  _maAnalysisAvailable() {
+    const services = this._hass?.services;
+    return Boolean(
+      services?.ha_music_analysis?.get_track_analysis ||
+        services?.["ha_music_analysis"]?.["get_track_analysis"]
+    );
+  }
+
+  _ensureMaAnalysis(media, key) {
+    if (!this._maAnalysisAvailable() || !key || !this._eid()) return;
+    if (this._maAnalysis?.key === key || this._maAnalysisLoadingKey === key) {
+      return;
+    }
+    if (
+      this._maAnalysisFailedKey === key &&
+      Date.now() - this._maAnalysisFailedAt < 60 * 1000
+    ) {
+      return;
+    }
+    this._maAnalysisLoadingKey = key;
+    const entityId = this._eid();
+    let request;
+    try {
+      request = this._hass.callService(
+        "ha_music_analysis",
+        "get_track_analysis",
+        { entity_id: entityId },
+        undefined,
+        false,
+        true
+      );
+    } catch {
+      this._maAnalysisLoadingKey = "";
+      this._maAnalysisFailedKey = key;
+      this._maAnalysisFailedAt = Date.now();
+      return;
+    }
+    Promise.resolve(request)
+      .then((response) => {
+        const payload =
+          response?.service_response ?? response?.response ?? response;
+        const record = payload?.[entityId] ?? payload;
+        const wave = Array.isArray(record?.waveform)
+          ? record.waveform
+          : Array.isArray(record)
+            ? record
+            : null;
+        if (!wave?.length) {
+          this._maAnalysisFailedKey = key;
+          this._maAnalysisFailedAt = Date.now();
+          return;
+        }
+        this._maAnalysis = {
+          key,
+          waveform: wave,
+          bpm: Number(record?.bpm) || 0,
+          energy: Number(record?.energy) || 0,
+          duration: Number(record?.duration) || Number(media.duration) || 0,
+          title: record?.title || "",
+          artist: record?.artist || "",
+          source: record?.bpm_source || "",
+        };
+        this._maAnalysisKey = key;
+        this._maAnalysisAt = Date.now();
+        this._maAnalysisFailedKey = "";
+        this._maAnalysisFailedAt = 0;
+        this._resetAudioShape();
+      })
+      .catch(() => {
+        this._maAnalysisFailedKey = key;
+        this._maAnalysisFailedAt = Date.now();
+      })
+      .finally(() => {
+        if (this._maAnalysisLoadingKey === key) {
+          this._maAnalysisLoadingKey = "";
+        }
+      });
+  }
+
+  _maSpectrumShaped(count, media) {
+    const data = this._maAnalysis;
+    if (!data || data.key !== this._spectrumKey || !data.waveform?.length) {
+      return null;
+    }
+    const wave = data.waveform;
+    const duration = data.duration || Number(media.duration) || 0;
+    const position = Number(media.position) || 0;
+    const ratio = duration > 0 ? clamp(position / duration, 0, 0.999) : 0;
+    const posIndex = ratio * (wave.length - 1);
+    const binsPerSecond =
+      duration > 0 ? wave.length / Math.max(1, duration) : wave.length / 180;
+    const span = clamp(
+      Math.round(binsPerSecond * 2.8),
+      8,
+      Math.min(wave.length, 240)
+    );
+    const step = Math.max(1, span / Math.max(1, count - 1));
+    const raiseSpan = Math.max(1, Math.round(binsPerSecond * 0.14));
+    const raw = new Array(count);
+    const bpm = Number(data.bpm) || 0;
+    const period = bpm > 20 ? 60 / bpm : 0;
+    for (let index = 0; index < count; index += 1) {
+      const d = count > 1 ? index / (count - 1) : 0;
+      const sample = clamp(
+        Math.round(posIndex - (count - 1 - index) * step),
+        0,
+        wave.length - 1
+      );
+      const previous = clamp(sample - raiseSpan, 0, wave.length - 1);
+      const rms = Number(wave[sample]) || 0;
+      const prev = Number(wave[previous]) || 0;
+      const rise = Math.max(0, rms - prev);
+      const profile = 1.0 - 0.52 * Math.pow(d, 0.85);
+      const lowWeight = Math.pow(1 - d, 2);
+      let beat = clamp(rise * 4.2, 0, 1);
+      if (period > 0) {
+        const phase = ((((position % period) + period) % period) / period);
+        beat = Math.max(beat, Math.exp(-phase * 5.2));
+      }
+      raw[index] = clamp(
+        rms * (1.42 * profile + 0.2) + beat * 0.56 * lowWeight,
+        0,
+        1.6
+      );
+    }
+    return this._shapeAudioBars(raw);
   }
 
   _spectrumTick(now) {
@@ -3018,12 +3386,18 @@ class HaMusicCard extends LitElement {
     if (key !== this._spectrumKey) {
       this._spectrumKey = key;
       this._spectrumLevels = this._spectrumBars.map(() => 0.12);
+      this._syncSpectrumTrack(media);
     }
+    this._ensureMaAnalysis(media, key);
     const time = now / 1000;
     const levels = this._spectrumLevels;
     const count = this._spectrumBars.length;
     const audioReady = this._audioSpectrumReady();
-    const audioTargets = audioReady ? this._readAudioLevels(count) : null;
+    const audioRaw = audioReady ? this._readAudioLevels(count) : null;
+    const shaped = audioRaw ? this._shapeAudioBars(audioRaw) : null;
+    const audioTargets = shaped?.bars || null;
+    const maShaped = audioTargets ? null : this._maSpectrumShaped(count, media);
+    const maTargets = maShaped?.bars || null;
     if (audioReady) {
       if (
         !this._audioPeak &&
@@ -3041,6 +3415,8 @@ class HaMusicCard extends LitElement {
       let target;
       if (audioTargets) {
         target = audioTargets[index];
+      } else if (maTargets) {
+        target = maTargets[index];
       } else {
         const band = index < 12 ? 0 : index < 24 ? 1 : 2;
         const seed = hashString(`${frame.seed}#${index}`);
@@ -3071,7 +3447,8 @@ class HaMusicCard extends LitElement {
         );
       }
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
-      const attack = target > current ? (audioTargets ? 0.72 : 0.52) : audioTargets ? 0.22 : 0.24;
+      const realTargets = audioTargets || maTargets;
+      const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;
       const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
       levels[index] = next;
       this._spectrumBars[index]?.style.setProperty("--h", next.toFixed(3));

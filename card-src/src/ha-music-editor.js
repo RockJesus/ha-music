@@ -429,6 +429,20 @@ class HaMusicEditor extends LitElement {
           </div>
           <label class="field">
             <span class="label">
+              ${this._zh ? "频谱歌单 JSON（可选）" : "Spectrum playlist JSON (optional)"}
+            </span>
+            <input
+              type="url"
+              .value=${config.spectrum_playlist_url || ""}
+              placeholder="/local/community/ha-music/playlist.json"
+              @change=${(e) =>
+                this._update({
+                  spectrum_playlist_url: e.target.value.trim() || undefined,
+                })}
+            />
+          </label>
+          <label class="field">
+            <span class="label">
               ${this._zh ? "频谱音频源（可选）" : "Spectrum audio URL (optional)"}
             </span>
             <input
@@ -443,8 +457,8 @@ class HaMusicEditor extends LitElement {
           </label>
           <div class="hint">
             ${this._zh
-              ? "填写可直接访问且允许跨域的音频直链后，卡片用 Web Audio 读取真实频谱；留空或加载失败时自动回退到逐帧律动。"
-              : "Add a CORS-enabled audio URL for true Web Audio FFT. Leave empty or on failure, the card falls back to the procedural live motion."}
+              ? "歌单 JSON 支持 tracks/audios 数组，卡片按当前曲目的 QQ mid、歌名和歌手匹配 url；匹配不到再回退单曲音频源，最后回退逐帧律动。音频源必须允许跨域。"
+              : "Playlist JSON may contain tracks/audios arrays; the card matches the current QQ mid, title and artist to choose its url. If no match, it falls back to the single audio URL, then to procedural motion. Audio sources must allow CORS."}
           </div>
           <label class="field">
             <span class="label">${this._zh ? "标题（留空用实体名称）" : "Title (optional)"}</span>

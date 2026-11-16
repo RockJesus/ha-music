@@ -639,7 +639,7 @@ const STYLE = `
     width: 52px;
     height: 52px;
   }
-  /* rockjesus.cn 左下角播放器的环形音频律动：36 根柱围绕唱片，12 点低频、6 点高频。 */
+  /* 唱片环形音频律动参考实现：36 根柱围绕唱片，12 点低频、6 点高频。 */
   .fab-eq {
     position: absolute;
     left: 50%;

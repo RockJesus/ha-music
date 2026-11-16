@@ -54,6 +54,121 @@ export function hueFromString(input) {
   return hashString(input) % 360;
 }
 
+// —— 真实频谱：歌单匹配与 CORS 判定 ——
+
+// 只放行实测会给 Access-Control-Allow-Origin 的音频 CDN。
+// 其他源即使能播放，接进 Web Audio 也会被浏览器把输出置零（整首歌变哑），
+// 所以必须先判断，拿不到 CORS 就退回程序化律动。
+const CORS_AUDIO_HOST =
+  /^([a-z0-9-_.]+\.(stream\.qqmusic\.qq\.com|qqmusic\.qq\.com)|aqqmusic\.tc\.qq\.com|[a-z0-9-_.]+\.music\.126\.net)$/i;
+
+export function canTapSpectrumAudio(url, baseUrl = "") {
+  if (!url) return false;
+  if (/^(data|blob):/i.test(url)) return true;
+  try {
+    const docBase =
+      baseUrl || (typeof location !== "undefined" ? location.href : "http://local/");
+    const base = new URL(docBase, "http://local/");
+    const target = new URL(url, base.href);
+    if (target.protocol !== "http:" && target.protocol !== "https:") return false;
+    // HTTPS 页面里的 HTTP 音频会被混合内容拦掉，不要把它算成可接源。
+    if (base.protocol === "https:" && target.protocol === "http:") return false;
+    if (target.origin === base.origin) return true;
+    return CORS_AUDIO_HOST.test(target.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeTrackText(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\([^)]*\)|\[[^\]]*\]|【[^】]*】|（[^）]*）/g, " ")
+    .replace(/\b(feat|ft|featuring)\b\.?/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function normalizeSpectrumPlaylist(data) {
+  const raw = Array.isArray(data)
+    ? data
+    : data?.tracks || data?.audios || data?.songs || data?.list || [];
+  return raw
+    .map((item) => {
+      const artistValue = item?.artist ?? item?.author ?? item?.singer ?? "";
+      const artist = Array.isArray(artistValue)
+        ? artistValue.filter(Boolean).join(" ")
+        : artistValue;
+      return {
+        mid: String(item?.mid || item?.songmid || item?.songMid || "").trim(),
+        name: String(item?.name || item?.title || "").trim(),
+        artist: String(artist).trim(),
+        url: String(item?.url || item?.src || "").trim(),
+        duration: Number(item?.duration ?? 0) || 0,
+        cover: String(item?.cover || item?.pic || item?.image || "").trim(),
+      };
+    })
+    .filter((item) => item.url);
+}
+
+function mediaContentMid(media = {}) {
+  const text = String(
+    media.contentId || media.media_content_id || media.content_id || ""
+  );
+  const match =
+    text.match(/track\/([0-9A-Za-z]+)/) || text.match(/id=([0-9A-Za-z]+)/);
+  return match ? match[1] : "";
+}
+
+export function trackMatchScore(track, media = {}) {
+  if (!track?.url) return 0;
+  const mid = mediaContentMid(media);
+  if (mid && track.mid && mid === track.mid) return 1;
+
+  const title = normalizeTrackText(media.title || media.media_title || "");
+  const artist = normalizeTrackText(media.artist || media.media_artist || "");
+  const tTitle = normalizeTrackText(track.name || track.title || "");
+  const tArtist = normalizeTrackText(track.artist || "");
+  if (!tTitle) return 0;
+
+  let score = 0;
+  if (title && tTitle === title) {
+    score = 0.9;
+  } else if (title && (tTitle.startsWith(title) || title.startsWith(tTitle))) {
+    score = 0.78;
+  } else if (title) {
+    const wanted = title.split(" ").filter(Boolean);
+    const candidates = new Set(tTitle.split(" ").filter(Boolean));
+    const common = wanted.filter((token) => candidates.has(token)).length;
+    const coverage = wanted.length ? common / wanted.length : 0;
+    if (coverage >= 0.8) score = 0.68;
+    else if (coverage >= 0.5) score = 0.5;
+  }
+
+  if (artist && tArtist) {
+    if (artist === tArtist) score += 0.1;
+    else if (tArtist.includes(artist) || artist.includes(tArtist)) score += 0.06;
+    else score -= 0.08;
+  }
+  return clamp(score, 0, 1);
+}
+
+export function findSpectrumTrack(tracks, media = {}) {
+  const list = Array.isArray(tracks) ? tracks : normalizeSpectrumPlaylist(tracks);
+  let best = null;
+  let bestScore = 0;
+  for (const track of list) {
+    const score = trackMatchScore(track, media);
+    if (score > bestScore) {
+      best = track;
+      bestScore = score;
+    }
+  }
+  return bestScore >= 0.66 ? best : null;
+}
+
 export function hasFeature(state, flag) {
   const supported = Number(state?.attributes?.supported_features ?? 0);
   if (!Number.isFinite(supported) || !flag) return false;

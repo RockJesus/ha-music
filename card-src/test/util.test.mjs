@@ -15,6 +15,7 @@ import {
   findSpectrumTrack,
   trackMatchScore,
   pickPlayingEntity,
+  pickAutoFollowEntity,
 } from "../src/util.js";
 import { mediaClassLabel } from "../src/const.js";
 
@@ -259,4 +260,89 @@ test("pickPlayingEntity 没有播放实体时保持当前选择", () => {
     },
   };
   assert.equal(pickPlayingEntity(hass, ["media_player.a", "media_player.b"], "media_player.a"), "media_player.a");
+});
+
+test("pickAutoFollowEntity 首次加载跟随正在播放的实体", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "idle", attributes: {} },
+      "media_player.b": { state: "playing", attributes: {} },
+    },
+  };
+  assert.equal(
+    pickAutoFollowEntity(hass, ["media_player.a", "media_player.b"], "media_player.a", null),
+    "media_player.b"
+  );
+});
+
+test("pickAutoFollowEntity 已播放的实体不抢回手动选择", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "idle", attributes: {} },
+      "media_player.b": { state: "playing", attributes: {} },
+    },
+  };
+  assert.equal(
+    pickAutoFollowEntity(
+      hass,
+      ["media_player.a", "media_player.b"],
+      "media_player.a",
+      { "media_player.a": "idle", "media_player.b": "playing" }
+    ),
+    ""
+  );
+});
+
+test("pickAutoFollowEntity 目标刚开始播放时跟随", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "idle", attributes: {} },
+      "media_player.b": { state: "playing", attributes: {} },
+    },
+  };
+  assert.equal(
+    pickAutoFollowEntity(
+      hass,
+      ["media_player.a", "media_player.b"],
+      "media_player.a",
+      { "media_player.a": "idle", "media_player.b": "idle" }
+    ),
+    "media_player.b"
+  );
+});
+
+test("pickAutoFollowEntity 当前正在播放时保持不动", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "playing", attributes: {} },
+      "media_player.b": { state: "playing", attributes: {} },
+    },
+  };
+  assert.equal(
+    pickAutoFollowEntity(
+      hass,
+      ["media_player.a", "media_player.b"],
+      "media_player.a",
+      { "media_player.a": "playing", "media_player.b": "idle" }
+    ),
+    ""
+  );
+});
+
+test("pickAutoFollowEntity 缓冲开始也可跟随", () => {
+  const hass = {
+    states: {
+      "media_player.a": { state: "idle", attributes: {} },
+      "media_player.b": { state: "buffering", attributes: {} },
+    },
+  };
+  assert.equal(
+    pickAutoFollowEntity(
+      hass,
+      ["media_player.a", "media_player.b"],
+      "media_player.a",
+      { "media_player.a": "idle", "media_player.b": "idle" }
+    ),
+    "media_player.b"
+  );
 });

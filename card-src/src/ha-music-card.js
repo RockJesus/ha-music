@@ -30,6 +30,7 @@ import {
   normalizeSpectrumPlaylist,
   findSpectrumTrack,
   pickPlayingEntity,
+  pickAutoFollowEntity,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
@@ -106,6 +107,8 @@ class HaMusicCard extends LitElement {
     this._width = 0;
     this._height = 0;
     this._panel = false;
+    this._autoPrevStates = null;
+    this._manualSwitchAt = 0;
     this._fitPanelRaf = null;
     this._panelHeight = 0;
     this._tickTimer = null;
@@ -1285,12 +1288,27 @@ class HaMusicCard extends LitElement {
   _autoSwitchToPlaying(hass) {
     const list = this._entities();
     if (list.length < 2) return;
-    const target = pickPlayingEntity(hass, list, this._eid());
-    if (target && target !== this._eid()) this._switchEntity(target);
+    const first = !this._autoPrevStates;
+    const snapshot = {};
+    for (const entityId of list) {
+      snapshot[entityId] = hass?.states?.[entityId]?.state || "";
+    }
+    const target = pickAutoFollowEntity(
+      hass,
+      list,
+      this._eid(),
+      this._autoPrevStates
+    );
+    this._autoPrevStates = snapshot;
+    if (!target) return;
+    // 手动切换后的短暂保护：避免点完待机播放器又被播放事件立刻抢回。
+    if (!first && Date.now() - this._manualSwitchAt < 15000) return;
+    this._switchEntity(target, false);
   }
 
-  _switchEntity(entityId) {
+  _switchEntity(entityId, manual = false) {
     if (entityId === this._activeEntity) return;
+    if (manual) this._manualSwitchAt = Date.now();
     this._activeEntity = entityId;
     this._palette = null;
     this._paletteKey = "";
@@ -2424,7 +2442,7 @@ class HaMusicCard extends LitElement {
                     return html`<button
                       class="hm-entity-chip"
                       data-active=${id === entityId ? "true" : "false"}
-                      @click=${() => this._switchEntity(id)}
+                      @click=${() => this._switchEntity(id, true)}
                     >
                       <span
                         class="hm-entity-dot"

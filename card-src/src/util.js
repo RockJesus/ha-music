@@ -213,6 +213,25 @@ export function pickPlayingEntity(hass, entities = [], current = "") {
   return bestRank > 0 ? best : active;
 }
 
+// 多播放器自动跟随的“非打扰”版本：
+// 只在首次加载、或目标播放器刚开始 playing/buffering 时跟随一次。
+// 当前播放器已在播放则保持不动；已经播放的其它播放器不会把用户手动选择抢回去。
+export function pickAutoFollowEntity(
+  hass,
+  entities = [],
+  current = "",
+  previousStates = null
+) {
+  const list = Array.isArray(entities) ? entities.filter(Boolean) : [];
+  if (list.length < 2) return "";
+  const target = pickPlayingEntity(hass, list, current);
+  if (!target || target === current) return "";
+  const targetState = hass?.states?.[target]?.state;
+  if (targetState !== "playing" && targetState !== "buffering") return "";
+  if (previousStates && previousStates[target] === targetState) return "";
+  return target;
+}
+
 export function friendlyName(hass, entityId, fallback = "") {
   const state = stateOf(hass, entityId);
   return state?.attributes?.friendly_name || entityId || fallback;

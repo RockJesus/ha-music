@@ -961,15 +961,24 @@ export const cardStyles = css`
   }
 
   .hm-volume .hm-range {
-    height: 26px;
+    height: 36px;
     flex: 1 1 auto;
     min-width: 40px;
   }
 
+  .hm-volume .hm-range::-webkit-slider-runnable-track {
+    height: 13px;
+  }
+
+  .hm-volume .hm-range::-moz-range-track,
+  .hm-volume .hm-range::-moz-range-progress {
+    height: 13px;
+  }
+
   .hm-volume .hm-range::-webkit-slider-thumb {
-    width: 17px;
-    height: 17px;
-    margin-top: -5px;
+    width: 26px;
+    height: 26px;
+    margin-top: -6.5px;
   }
 
   .hm-vol-pct {
@@ -1799,15 +1808,24 @@ export const cardStyles = css`
       flex: 0 1 230px;
     }
 
+    .hm-volume .hm-range::-webkit-slider-runnable-track {
+      height: 16px;
+    }
+
+    .hm-volume .hm-range::-moz-range-track,
+    .hm-volume .hm-range::-moz-range-progress {
+      height: 16px;
+    }
+
     .hm-volume .hm-range::-webkit-slider-thumb {
-      width: 22px;
-      height: 22px;
+      width: 32px;
+      height: 32px;
       margin-top: -8px;
     }
 
     .hm-volume .hm-range::-moz-range-thumb {
-      width: 22px;
-      height: 22px;
+      width: 32px;
+      height: 32px;
     }
 
     .hm-card[data-layout="compact"] .hm-volume {

@@ -425,7 +425,7 @@ class HaMusicCard extends LitElement {
     const cache = new Map();
     try {
       const list = JSON.parse(
-        localStorage.getItem("ha-music-lyrics-cache-v2") || "[]"
+        localStorage.getItem("ha-music-lyrics-cache-v3") || "[]"
       );
       if (!Array.isArray(list)) return cache;
       for (const item of list) {
@@ -449,7 +449,7 @@ class HaMusicCard extends LitElement {
   _saveLyricsCache() {
     try {
       const list = [...this._lyricsCache.entries()].slice(-24);
-      localStorage.setItem("ha-music-lyrics-cache-v2", JSON.stringify(list));
+      localStorage.setItem("ha-music-lyrics-cache-v3", JSON.stringify(list));
     } catch (error) {
       /* 忽略配额或隐私模式错误 */
     }
@@ -514,7 +514,10 @@ class HaMusicCard extends LitElement {
     const artist = String(media.artist || "").trim();
     const cleanTitle = cleanLyricText(title) || title;
     const cleanArtist = cleanLyricText(artist) || artist;
-    const primaryArtist = cleanArtist.split(/[ ,/&、，]+/)[0].trim();
+    const baseTitle = title.split(/\s*[-–—|｜]\s*/)[0].trim();
+    const primaryArtist = artist
+      .split(/\s+(?:feat\.?|ft\.?|with)\s+|[ ,/&、，]+/i)[0]
+      .trim();
     const variants = [];
     const add = (nextTitle, nextArtist, nextAlbum = "") => {
       if (!nextTitle) return;
@@ -532,8 +535,13 @@ class HaMusicCard extends LitElement {
     add(cleanTitle, artist, "");
     add(title, cleanArtist, "");
     add(cleanTitle, cleanArtist, "");
-    if (primaryArtist && primaryArtist !== cleanArtist) {
+    if (baseTitle && baseTitle !== title) {
+      add(baseTitle, artist, "");
+      add(baseTitle, cleanArtist, "");
+    }
+    if (primaryArtist && primaryArtist !== artist) {
       add(cleanTitle, primaryArtist, "");
+      add(title, primaryArtist, "");
     }
     return variants;
   }
@@ -732,9 +740,18 @@ class HaMusicCard extends LitElement {
       for (const variant of variants) {
         if (!variant.title || !variant.artist) continue;
         try {
-          const exact = await accept(
+          let exact = await accept(
             `https://lrclib.net/api/get?${queryFor(variant)}`
           );
+          if (!exact) {
+            const noDuration = new URLSearchParams();
+            noDuration.set("track_name", variant.title);
+            noDuration.set("artist_name", variant.artist);
+            if (variant.album) noDuration.set("album_name", variant.album);
+            exact = await accept(
+              `https://lrclib.net/api/get?${noDuration.toString()}`
+            );
+          }
           if (exact && !Array.isArray(exact)) {
             const parsed = parseLyrics(
               exact.syncedLyrics || exact.plainLyrics || ""
@@ -783,9 +800,27 @@ class HaMusicCard extends LitElement {
         const list = await accept(
           `https://lrclib.net/api/search?${query.toString()}`
         );
-        const candidates = Array.isArray(list) ? list : list ? [list] : [];
+        let candidates = Array.isArray(list) ? list : list ? [list] : [];
         const best = this._pickLyricsCandidate(candidates, media);
-        if (best) picked = best;
+        if (best && best.syncedLyrics) {
+          picked = best;
+        } else {
+          const general = new URLSearchParams();
+          general.set(
+            "q",
+            [variant.title, variant.artist].filter(Boolean).join(" ")
+          );
+          const broad = await accept(
+            `https://lrclib.net/api/search?${general.toString()}`
+          );
+          const broadList = Array.isArray(broad) ? broad : broad ? [broad] : [];
+          const broadBest = this._pickLyricsCandidate(broadList, media);
+          if (broadBest && (broadBest.syncedLyrics || !best)) {
+            picked = broadBest;
+          } else if (best) {
+            picked = best;
+          }
+        }
       }
 
       if (controller.signal.aborted || key !== this._lyricsKey) return;

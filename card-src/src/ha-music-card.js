@@ -30,6 +30,7 @@ import {
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
+import { parseLyrics, lyricIndex } from "./lyrics.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -117,6 +118,13 @@ class HaMusicCard extends LitElement {
     this._thumbPreview = false;
     this.preview = false;
     this.editMode = false;
+    this._lyricsOpen = false;
+    this._lyricsKey = "";
+    this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
+    this._lyricsActive = -1;
+    this._lyricsScrolled = -2;
+    this._lyricsAbort = null;
+    this._lyricsCache = new Map();
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -154,7 +162,9 @@ class HaMusicCard extends LitElement {
       this._palette = null;
       this._paletteKey = "";
       this._artUrl = "";
+      this._resetLyrics();
     }
+    if (this._config.show_lyrics === false) this._lyricsOpen = false;
     this._sig = "";
     if (this._hass) this._sig = this._computeSig(this._hass);
     this._syncTimer();
@@ -213,6 +223,10 @@ class HaMusicCard extends LitElement {
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
     this._fitPanelRaf = null;
     if (this._toastTimer) clearTimeout(this._toastTimer);
+    if (this._lyricsAbort) {
+      this._lyricsAbort.abort();
+      this._lyricsAbort = null;
+    }
   }
 
   /* ---------------- 状态推导 ---------------- */
@@ -311,6 +325,223 @@ class HaMusicCard extends LitElement {
       clearInterval(this._tickTimer);
       this._tickTimer = null;
     }
+  }
+
+  /* ---------------- 歌词 ---------------- */
+
+  _lyricsEnabled() {
+    return this._config?.show_lyrics !== false;
+  }
+
+  _resetLyrics() {
+    if (this._lyricsAbort) {
+      this._lyricsAbort.abort();
+      this._lyricsAbort = null;
+    }
+    this._lyricsKey = "";
+    this._lyricsOpen = false;
+    this._lyricsActive = -1;
+    this._lyricsScrolled = -2;
+    this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
+  }
+
+  _embeddedLyrics() {
+    const attrs = this._state()?.attributes || {};
+    const meta = attrs.media_metadata || {};
+    let raw =
+      attrs.media_lyrics ??
+      attrs.lyrics ??
+      meta.lyrics ??
+      meta.lyrics_text ??
+      meta.media_lyrics;
+    if (!raw || typeof raw !== "string") {
+      if (raw && typeof raw === "object") {
+        raw =
+          raw.synced ??
+          raw.syncedLyrics ??
+          raw.synced_lyrics ??
+          raw.lines ??
+          raw.plain ??
+          raw.plainLyrics ??
+          "";
+      }
+    }
+    if (!raw || typeof raw !== "string") return null;
+    const parsed = parseLyrics(raw);
+    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) return null;
+    return parsed;
+  }
+
+  _lyricsKeyFor(media) {
+    return [media.title, media.artist, media.album, Math.round(media.duration || 0)]
+      .map((value) => String(value || "").trim().toLowerCase())
+      .join("|");
+  }
+
+  _setLyrics(key, lyrics, source) {
+    if (key !== this._lyricsKey) return;
+    this._lyrics = {
+      status: "ready",
+      lines: lyrics.lines || [],
+      plain: lyrics.plain || [],
+      instrumental: Boolean(lyrics.instrumental),
+      source,
+    };
+    if (this._lyricsCache.size > 32) {
+      this._lyricsCache.delete(this._lyricsCache.keys().next().value);
+    }
+    this._lyricsCache.set(key, this._lyrics);
+    this.requestUpdate();
+  }
+
+  _maybeLoadLyrics() {
+    if (!this._lyricsEnabled() || this._thumbMode()) return;
+    const media = readMedia(this._state());
+    if (!media.title) {
+      if (this._lyrics.status !== "idle") {
+        this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
+        this._lyricsKey = "";
+        this.requestUpdate();
+      }
+      return;
+    }
+    const key = this._lyricsKeyFor(media);
+    if (key === this._lyricsKey) return;
+
+    if (this._lyricsAbort) {
+      this._lyricsAbort.abort();
+      this._lyricsAbort = null;
+    }
+    this._lyricsKey = key;
+
+    const embedded = this._embeddedLyrics();
+    if (embedded) {
+      this._lyrics = {
+        status: "ready",
+        lines: embedded.lines,
+        plain: embedded.plain,
+        instrumental: embedded.instrumental,
+        source: "HA",
+      };
+      this.requestUpdate();
+      return;
+    }
+
+    const cached = this._lyricsCache.get(key);
+    if (cached) {
+      this._lyrics = { ...cached };
+      this.requestUpdate();
+      return;
+    }
+
+    this._lyrics = {
+      status: "loading",
+      lines: [],
+      plain: [],
+      instrumental: false,
+      source: "LRCLIB",
+    };
+    this.requestUpdate();
+    this._fetchLyrics(media, key);
+  }
+
+  async _fetchLyrics(media, key) {
+    const controller = new AbortController();
+    this._lyricsAbort = controller;
+    const timer = setTimeout(() => controller.abort(), 9000);
+    const params = new URLSearchParams();
+    if (media.title) params.set("track_name", media.title);
+    if (media.artist) params.set("artist_name", media.artist);
+    if (media.album) params.set("album_name", media.album);
+    if (media.duration) params.set("duration", String(Math.round(media.duration)));
+
+    const accept = async (url) => {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`lyrics HTTP ${response.status}`);
+      }
+      return response.json();
+    };
+
+    let picked = null;
+    try {
+      if (media.title && media.artist) {
+        try {
+          const exact = await accept(`https://lrclib.net/api/get?${params.toString()}`);
+          if (exact && !Array.isArray(exact)) picked = exact;
+        } catch (error) {
+          if (error.name === "AbortError") throw error;
+        }
+      }
+      if (!picked) {
+        const query = new URLSearchParams();
+        if (media.title) query.set("track_name", media.title);
+        if (media.artist) query.set("artist_name", media.artist);
+        if (!media.title && media.artist) query.set("q", media.artist);
+        const list = await accept(`https://lrclib.net/api/search?${query.toString()}`);
+        const candidates = Array.isArray(list) ? list : list ? [list] : [];
+        const title = String(media.title || "").trim().toLowerCase();
+        const duration = Number(media.duration || 0);
+        picked =
+          candidates
+            .slice()
+            .sort((a, b) => {
+              const score = (item) => {
+                const name = String(item.trackName || item.track_name || "").trim().toLowerCase();
+                const exact = name && name === title ? 12 : name.includes(title) ? 5 : 0;
+                const diff = duration
+                  ? -Math.min(8, Math.abs(Number(item.duration || 0) - duration))
+                  : 0;
+                const synced = item.syncedLyrics ? 8 : item.plainLyrics ? 2 : 0;
+                return exact + diff + synced;
+              };
+              return score(b) - score(a);
+            })[0] || null;
+      }
+      if (controller.signal.aborted || key !== this._lyricsKey) return;
+      if (!picked) {
+        this._lyrics = { status: "none", lines: [], plain: [], instrumental: false, source: "LRCLIB" };
+        this.requestUpdate();
+        return;
+      }
+      if (picked.instrumental) {
+        this._setLyrics(
+          key,
+          { lines: [], plain: [], instrumental: true },
+          picked.syncedLyrics || picked.plainLyrics ? "LRCLIB" : "LRCLIB"
+        );
+        return;
+      }
+      const parsed = parseLyrics(picked.syncedLyrics || picked.plainLyrics || "");
+      if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
+        this._lyrics = { status: "none", lines: [], plain: [], instrumental: false, source: "LRCLIB" };
+        this.requestUpdate();
+        return;
+      }
+      this._setLyrics(key, parsed, "LRCLIB");
+    } catch (error) {
+      if (controller.signal.aborted || error.name === "AbortError") return;
+      if (key !== this._lyricsKey) return;
+      this._lyrics = { status: "error", lines: [], plain: [], instrumental: false, source: "LRCLIB" };
+      this.requestUpdate();
+    } finally {
+      clearTimeout(timer);
+      if (this._lyricsAbort === controller) this._lyricsAbort = null;
+    }
+  }
+
+  _toggleLyrics() {
+    this._lyricsOpen = !this._lyricsOpen;
+    this._lyricsScrolled = -2;
+    if (this._lyricsOpen) {
+      this._lyricsActive = -1;
+      this._maybeLoadLyrics();
+    }
+    this.requestUpdate();
   }
 
   _layoutKey() {
@@ -657,6 +888,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._menu = null;
     this._seekPreview = null;
+    this._resetLyrics();
     this._syncTimer();
     this._sig = this._computeSig(this._hass);
     this.requestUpdate();
@@ -1083,6 +1315,28 @@ class HaMusicCard extends LitElement {
       this.renderRoot?.querySelector?.(".hm-cover img"),
       this._state()?.state === "playing",
     );
+    this._maybeLoadLyrics();
+    if (this._lyricsOpen && this._lyricsActive !== this._lyricsScrolled) {
+      this._lyricsScrolled = this._lyricsActive;
+      if (typeof requestAnimationFrame !== "undefined") {
+        requestAnimationFrame(() => {
+          const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
+          const line = this.renderRoot?.querySelector?.(
+            '.hm-lyrics-line[data-active="true"]'
+          );
+          if (!scroll || !line) return;
+          const scrollRect = scroll.getBoundingClientRect();
+          const lineRect = line.getBoundingClientRect();
+          const top =
+            scroll.scrollTop +
+            lineRect.top -
+            scrollRect.top -
+            scrollRect.height / 2 +
+            lineRect.height / 2;
+          scroll.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        });
+      }
+    }
   }
 
   _queuePanelFit() {
@@ -1385,6 +1639,71 @@ class HaMusicCard extends LitElement {
 
   /* ---------------- 渲染 ---------------- */
 
+  _renderLyrics(media, position) {
+    const t = translator(this._hass?.language);
+    const lyrics = this._lyrics;
+    const timed = lyrics.lines.length > 0;
+    const plain = lyrics.plain || [];
+    const active = timed
+      ? Math.max(0, lyricIndex(lyrics.lines, position))
+      : -1;
+    this._lyricsActive = active;
+    const canSeek = hasFeature(this._state(), FEATURES.SEEK);
+
+    let body = nothing;
+    if (lyrics.status === "loading") {
+      body = html`<div class="hm-lyrics-empty hm-lyrics-loading">
+        <span class="hm-lyrics-pulse"></span>${t("lyricsLoading")}
+      </div>`;
+    } else if (lyrics.status === "none") {
+      body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
+    } else if (lyrics.status === "error") {
+      body = html`<div class="hm-lyrics-empty">${t("lyricsError")}</div>`;
+    } else if (lyrics.instrumental) {
+      body = html`<div class="hm-lyrics-empty">${t("lyricsInstrumental")}</div>`;
+    } else if (timed) {
+      body = lyrics.lines.map(
+        (line, index) => html`<button
+          class="hm-lyrics-line"
+          data-active=${index === active ? "true" : "false"}
+          data-time=${line.time}
+          @click=${() => {
+            if (canSeek) this._seekTo(line.time);
+          }}
+        >
+          ${line.text}
+        </button>`
+      );
+    } else if (plain.length) {
+      body = plain.map(
+        (line) => html`<div class="hm-lyrics-line" data-static="true">${line}</div>`
+      );
+    } else {
+      body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
+    }
+
+    return html`<section class="hm-lyrics" data-status=${lyrics.status}>
+      <div class="hm-lyrics-head">
+        <span class="hm-lyrics-title">${t("lyrics")}</span>
+        ${lyrics.source
+          ? html`<span class="hm-lyrics-source">${lyrics.source}</span>`
+          : nothing}
+        <button
+          class="hm-lyrics-close"
+          aria-label=${t("close")}
+          title=${t("close")}
+          @click=${(event) => {
+            event.stopPropagation();
+            this._toggleLyrics();
+          }}
+        >
+          ${icon("close", 14)}
+        </button>
+      </div>
+      <div class="hm-lyrics-scroll">${body}</div>
+    </section>`;
+  }
+
   render() {
     const hass = this._hass;
     const config = this._config || {};
@@ -1466,7 +1785,20 @@ class HaMusicCard extends LitElement {
     const repeat = this._repeatValue();
     const mediaTitle = media.title || (isOff ? "" : "");
     const entities = this._entities();
+    const showLyrics =
+      this._lyricsEnabled() &&
+      !this._thumbMode() &&
+      layout !== "mini" &&
+      (this._lyrics.status === "ready" ||
+        this._lyrics.status === "loading" ||
+        this._lyricsOpen);
 
+    const lyricLine =
+      this._lyrics.status === "ready" && this._lyrics.lines.length
+        ? this._lyrics.lines[
+            Math.max(0, lyricIndex(this._lyrics.lines, position))
+          ]?.text || ""
+        : "";
     const coverUrl = normalizeArt(hass, media.art);
 
     return html`
@@ -1500,6 +1832,18 @@ class HaMusicCard extends LitElement {
               <span class="hm-status-text hm-status-player">${config.name || friendlyName(hass, entityId, entityId)}</span>
             </div>
             <div class="hm-top-actions">
+              ${showLyrics
+                ? html`<button
+                    class="hm-icon-btn hm-lyrics-btn"
+                    data-role="lyrics"
+                    data-active=${this._lyricsOpen ? "true" : "false"}
+                    aria-label=${t("lyrics")}
+                    title=${t("lyrics")}
+                    @click=${() => this._toggleLyrics()}
+                  >
+                    ${icon("lyrics", 16)}
+                  </button>`
+                : nothing}
               ${maShow
                 ? html`<button
                     class="hm-icon-btn hm-ma"
@@ -1574,7 +1918,9 @@ class HaMusicCard extends LitElement {
                 </div>`
             : nothing}
 
-          <section class="hm-main">
+          ${this._lyricsOpen
+            ? this._renderLyrics(media, position)
+            : html`<section class="hm-main">
             <div class="hm-cover-wrap">
               <button
                 class="hm-cover"
@@ -1662,10 +2008,16 @@ class HaMusicCard extends LitElement {
                       : nothing}
                   </div>`
                 : nothing}
+              ${lyricLine && layout === "full" && !this._thumbMode() && (this._panel || this._height >= 360)
+                ? html`<div class="hm-now-lyric">
+                    <span class="hm-now-lyric-mark">${icon("lyrics", 12)}</span>
+                    <span>${lyricLine}</span>
+                  </div>`
+                : nothing}
             </div>
-          </section>
+          </section>`}
 
-          ${visualizer !== "none"
+          ${visualizer !== "none" && !this._lyricsOpen
             ? html`<div
                 class="hm-vis"
                 data-playing=${playing ? "true" : "false"}

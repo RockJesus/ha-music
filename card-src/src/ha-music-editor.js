@@ -490,6 +490,11 @@ class HaMusicEditor extends LitElement {
             (checked) => this._update({ show_library: checked })
           )}
           ${this._switch(
+            this._zh ? "自动识别歌词" : "Auto lyrics",
+            config.show_lyrics !== false,
+            (checked) => this._update({ show_lyrics: checked })
+          )}
+          ${this._switch(
             this._zh ? "显示分组信息" : "Show group info",
             config.show_group !== false,
             (checked) => this._update({ show_group: checked })

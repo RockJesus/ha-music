@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.3.10";
+export const CARD_VERSION = "1.3.11";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -154,6 +154,11 @@ const EN = {
   volumeEntityMissing: "Volume entity unavailable",
   seek: "Seek",
   remaining: "Toggle remaining time",
+  lyrics: "Lyrics",
+  lyricsLoading: "Matching lyrics…",
+  lyricsNone: "No lyrics found",
+  lyricsError: "Lyrics unavailable",
+  lyricsInstrumental: "Instrumental · no lyrics",
 };
 
 const ZH = {
@@ -203,6 +208,11 @@ const ZH = {
   volumeEntityMissing: "音量实体不可用",
   seek: "进度",
   remaining: "切换剩余时间",
+  lyrics: "歌词",
+  lyricsLoading: "正在匹配歌词…",
+  lyricsNone: "未找到歌词",
+  lyricsError: "歌词暂不可用",
+  lyricsInstrumental: "纯音乐 · 无歌词",
 };
 
 export function isChinese(language) {

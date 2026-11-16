@@ -1821,6 +1821,212 @@ export const cardStyles = css`
   }
 
 
+  /* ---------- 歌词 ---------- */
+  .hm-lyrics {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 2px 2px 4px;
+    overflow: hidden;
+  }
+
+  .hm-lyrics-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    flex: 0 0 auto;
+  }
+
+  .hm-lyrics-title {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 650;
+    color: rgba(246, 248, 255, 0.56);
+  }
+
+  .hm-lyrics-source {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: rgba(246, 248, 255, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    padding: 2px 7px;
+  }
+
+  .hm-lyrics-close {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-left: auto;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(246, 248, 255, 0.7);
+    cursor: pointer;
+  }
+
+  .hm-lyrics-close:hover {
+    background: rgba(255, 255, 255, 0.13);
+    color: #fff;
+  }
+
+  .hm-lyrics-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding: 4px 2px 18px;
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 20px,
+      #000 calc(100% - 26px),
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 20px,
+      #000 calc(100% - 26px),
+      transparent 100%
+    );
+  }
+
+  .hm-lyrics-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hm-lyrics-line {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 3px;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: rgba(246, 248, 255, 0.48);
+    font: inherit;
+    font-size: clamp(14px, 2.5cqi, 21px);
+    line-height: 1.38;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      color 0.25s ease,
+      background 0.25s ease,
+      transform 0.25s ease;
+  }
+
+  .hm-lyrics-line:hover {
+    color: rgba(246, 248, 255, 0.82);
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .hm-lyrics-line[data-active="true"] {
+    color: #fff;
+    font-weight: 650;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--hm-a1-rgb), 0.18),
+      rgba(var(--hm-a2-rgb), 0.06) 62%,
+      transparent
+    );
+    box-shadow: inset 3px 0 0 var(--hm-a1);
+    transform: translateX(2px);
+  }
+
+  .hm-lyrics-line[data-static="true"] {
+    cursor: default;
+    color: rgba(246, 248, 255, 0.66);
+  }
+
+  .hm-lyrics-line[data-static="true"]:hover {
+    background: transparent;
+  }
+
+  .hm-lyrics-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 84px;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    color: rgba(246, 248, 255, 0.5);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+
+  .hm-lyrics-loading {
+    gap: 8px;
+  }
+
+  .hm-lyrics-pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--hm-a1);
+    box-shadow: 0 0 0 0 rgba(var(--hm-a1-rgb), 0.45);
+    animation: hmLyricPulse 1.2s ease-out infinite;
+  }
+
+  @keyframes hmLyricPulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(var(--hm-a1-rgb), 0.45);
+    }
+    70% {
+      box-shadow: 0 0 0 7px rgba(var(--hm-a1-rgb), 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(var(--hm-a1-rgb), 0);
+    }
+  }
+
+  .hm-card[data-layout="compact"] .hm-lyrics-line {
+    font-size: 14px;
+    padding: 5px 9px;
+  }
+
+  .hm-now-lyric {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    margin-top: 6px;
+    color: rgba(246, 248, 255, 0.5);
+    font-size: 12px;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+  }
+
+  .hm-now-lyric-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    color: var(--hm-a1);
+    opacity: 0.8;
+  }
+
+  .hm-now-lyric span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hm-icon-btn[data-active="true"] {
+    color: var(--hm-a1);
+    border-color: rgba(var(--hm-a1-rgb), 0.42);
+    background: rgba(var(--hm-a1-rgb), 0.12);
+  }
+
   /* ---------- 面板视图：自动铺满可用区域 ---------- */
   :host([data-panel="true"]) {
     --hm-panel-height: 100%;
@@ -1834,7 +2040,7 @@ export const cardStyles = css`
     height: 100%;
     min-height: 0;
     max-height: 100%;
-    border-radius: 0;
+    border-radius: var(--hm-radius);
   }
 
   .hm-card[data-panel="true"] .hm-body {

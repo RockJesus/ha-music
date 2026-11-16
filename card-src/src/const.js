@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.5.6";
+export const CARD_VERSION = "1.5.7";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -56,7 +56,7 @@ export const COVER_MODES = {
 };
 
 export const VISUALIZERS = {
-  bars: { en: "Bars", zh: "柱状" },
+  bars: { en: "Live spectrum", zh: "实时频谱" },
   wave: { en: "Wave", zh: "波形" },
   orbit: { en: "Orbit", zh: "光环" },
   none: { en: "Off", zh: "关闭" },

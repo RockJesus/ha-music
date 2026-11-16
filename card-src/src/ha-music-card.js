@@ -136,6 +136,11 @@ class HaMusicCard extends LitElement {
     this._coverGestureTimer = null;
     this._coverSuppressClick = false;
     this._coverSuppressTimer = null;
+    this._spectrumRaf = null;
+    this._spectrumBars = [];
+    this._spectrumLevels = [];
+    this._spectrumLast = 0;
+    this._spectrumKey = "";
     this._positionClock = null;
   }
 
@@ -260,6 +265,7 @@ class HaMusicCard extends LitElement {
     this._stopTimer();
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
     if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
+    this._stopSpectrum();
     this._coverGestureTimer = null;
     this._coverSuppressTimer = null;
     this._coverPress = null;
@@ -1660,6 +1666,7 @@ class HaMusicCard extends LitElement {
         });
       }
     }
+    this._syncSpectrum();
   }
 
   _queuePanelFit() {
@@ -2700,6 +2707,114 @@ class HaMusicCard extends LitElement {
         ></span>`;
       })}
     </div>`;
+  }
+
+  _stopSpectrum() {
+    if (this._spectrumRaf) cancelAnimationFrame(this._spectrumRaf);
+    this._spectrumRaf = null;
+    this._spectrumLast = 0;
+  }
+
+  _spectrumPlaying() {
+    const state = this._state()?.state;
+    return state === "playing" || state === "buffering";
+  }
+
+  _syncSpectrum() {
+    const bars = Array.from(this.renderRoot?.querySelectorAll?.(".hm-bar") || []);
+    if (
+      !bars.length ||
+      this._thumbPreview ||
+      (this._config?.visualizer || "bars") !== "bars"
+    ) {
+      this._spectrumBars = [];
+      this._stopSpectrum();
+      return;
+    }
+    this._spectrumBars = bars;
+    const reduceMotion =
+      typeof matchMedia === "function" &&
+      matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!this._spectrumPlaying() || reduceMotion) {
+      this._stopSpectrum();
+      this._applySpectrumIdle();
+      return;
+    }
+    if (this._spectrumRaf) return;
+    this._spectrumLast = 0;
+    this._spectrumRaf = requestAnimationFrame((now) => this._spectrumTick(now));
+  }
+
+  _applySpectrumIdle() {
+    const frame = visualizerFrame(this._readMedia());
+    const count = this._spectrumBars.length;
+    for (let index = 0; index < count; index += 1) {
+      const band = index < 12 ? 0 : index < 24 ? 1 : 2;
+      const base = 0.12 + [0.1, 0.06, 0.03][band];
+      const level = Math.min(0.24, base + frame.energy * 0.04);
+      this._spectrumBars[index]?.style.setProperty("--h", level.toFixed(3));
+    }
+  }
+
+  _spectrumTick(now) {
+    if (!this._spectrumBars.length) {
+      this._stopSpectrum();
+      return;
+    }
+    if (!this._spectrumPlaying()) {
+      this._applySpectrumIdle();
+      this._stopSpectrum();
+      return;
+    }
+    const dt = this._spectrumLast
+      ? Math.min(0.05, Math.max(0.001, (now - this._spectrumLast) / 1000))
+      : 0.016;
+    this._spectrumLast = now;
+    const media = this._readMedia();
+    const frame = visualizerFrame(media);
+    const key = this._trackKey(this._state());
+    if (key !== this._spectrumKey) {
+      this._spectrumKey = key;
+      this._spectrumLevels = this._spectrumBars.map(() => 0.12);
+    }
+    const time = now / 1000;
+    const levels = this._spectrumLevels;
+    const count = this._spectrumBars.length;
+    for (let index = 0; index < count; index += 1) {
+      const band = index < 12 ? 0 : index < 24 ? 1 : 2;
+      const seed = hashString(`${frame.seed}#${index}`);
+      const phase = ((seed % 360) / 360) * Math.PI * 2;
+      const x = index / Math.max(1, count - 1);
+      const profile = 1.02 - x * 0.5 + Math.sin(index * 1.7 + phase) * 0.1;
+      const slow = 0.5 + 0.5 * Math.sin(time * 2.35 + phase + index * 0.28);
+      const fast = 0.5 + 0.5 * Math.sin(time * 7.6 + phase * 1.7 + index * 0.62);
+      const beat =
+        0.5 +
+        0.5 *
+          Math.sin(
+            (media.position / (1.65 + (frame.hash % 45) / 100)) *
+              Math.PI * 2 +
+            phase
+          );
+      const bandDrive = band === 0 ? frame.low : band === 1 ? frame.pulse : 0.45;
+      const transient = Math.sin(time * 3.3 + seed * 0.0007) > 0.88 ? 1.16 : 1;
+      const target = clamp(
+        profile *
+          (0.52 + slow * 0.54) *
+          (0.76 + fast * 0.34) *
+          (0.8 + beat * 0.4) *
+          (0.86 + bandDrive * 0.24) *
+          transient,
+        0.1,
+        1
+      );
+      const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
+      const attack = target > current ? 0.52 : 0.24;
+      const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
+      levels[index] = next;
+      this._spectrumBars[index]?.style.setProperty("--h", next.toFixed(3));
+    }
+    this._spectrumRaf = requestAnimationFrame((nextNow) => this._spectrumTick(nextNow));
   }
 
   _renderDrawer() {

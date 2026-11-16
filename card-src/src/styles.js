@@ -609,22 +609,19 @@ export const cardStyles = css`
   .hm-bar {
     flex: 1 1 0;
     min-width: 2.5px;
-    height: calc(var(--h) * 100%);
+    height: 100%;
     border-radius: 2px 2px 1px 1px;
     background: linear-gradient(
       180deg,
       rgba(var(--hm-a1-rgb), 0.95),
       rgba(var(--hm-a2-rgb), 0.45)
     );
+    opacity: calc(0.55 + var(--h) * 0.45);
+    transform: scaleY(var(--h));
     transform-origin: bottom center;
-    animation: hmBar var(--dur) ease-in-out var(--delay) infinite alternate;
-    animation-play-state: var(--run, running);
-    transition: height 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition: transform 0.07s linear, opacity 0.07s linear;
+    will-change: transform, opacity;
     box-shadow: 0 0 10px -2px rgba(var(--hm-a1-rgb), 0.55);
-  }
-
-  .hm-vis[data-playing="false"] .hm-bar {
-    --run: paused;
   }
 
   .hm-wave-wrap {
@@ -2822,7 +2819,8 @@ export const cardStyles = css`
     .hm-cover,
     .hm-play,
     .hm-btn,
-    .hm-icon-btn {
+    .hm-icon-btn,
+    .hm-bar {
       transition: none;
     }
 

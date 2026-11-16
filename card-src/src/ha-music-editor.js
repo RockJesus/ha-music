@@ -495,6 +495,15 @@ class HaMusicEditor extends LitElement {
             (checked) => this._update({ show_lyrics: checked })
           )}
           ${this._switch(
+            this._zh ? "全局歌词悬浮窗（单行 / 长按拖动）" : "Global floating lyric (one line, long-press drag)",
+            config.floating_lyrics === true,
+            (checked) =>
+              this._update({
+                floating_lyrics: checked,
+                floating_lyrics_edited: Date.now(),
+              })
+          )}
+          ${this._switch(
             this._zh ? "显示分组信息" : "Show group info",
             config.show_group !== false,
             (checked) => this._update({ show_group: checked })

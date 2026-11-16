@@ -29,6 +29,7 @@ import {
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
+import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { lyricIndex, lyricProgress, parseLyrics } from "./lyrics.js";
 
@@ -114,6 +115,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._artSlot = 0;
     this._dockOwner = false;
+    this._lyricDockOwner = false;
     this._palette = null;
     this._paletteKey = "";
     this._resizeObserver = null;
@@ -1484,6 +1486,7 @@ class HaMusicCard extends LitElement {
     this._syncPanelFlag();
     this._queuePanelFit();
     this._installDock();
+    this._installLyricDock();
     syncCoverSpin(
       this.renderRoot?.querySelector?.(".hm-cover img"),
       this._state()?.state === "playing",
@@ -1704,6 +1707,65 @@ class HaMusicCard extends LitElement {
       updated: editedAt || pref?.updated,
     });
     this._dockOwner = true;
+  }
+
+  _installLyricDock() {
+    const configOn = this._config?.floating_lyrics === true;
+    const editedAt = Number(this._config?.floating_lyrics_edited) || 0;
+    const pref = loadLyricDockPref();
+    // 与三个迷你播放器一致：只有最近在编辑器里改过开关的卡片能覆盖全局记忆。
+    const useConfig = editedAt > 0 && editedAt >= (pref?.updated || 0);
+    const enabled = useConfig ? configOn : pref ? pref.enabled : configOn;
+    const fallback =
+      this._eid?.() ||
+      this._config?.entity ||
+      (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
+    if (!enabled) {
+      if (!this._isPreviewContext() && (useConfig || this._lyricDockOwner)) {
+        saveLyricDockPref({
+          enabled: false,
+          entity: fallback,
+          updated: editedAt || Date.now(),
+        });
+        uninstallLyricDock();
+        this._lyricDockOwner = false;
+      }
+      return;
+    }
+    if (!this._hass || !this.isConnected || !fallback) return;
+    if (this._isPreviewContext()) return;
+    const state = this._state(fallback);
+    const trackKey = this._trackKeyFor(fallback, state);
+    const lines = this._lyrics.status === "ready" ? this._lyrics.lines : [];
+    installLyricDock({
+      enabled: true,
+      entity: fallback,
+      theme: this._themeKey(),
+      hass: this._hass,
+      lines,
+      trackKey,
+      offset: this._lyricsOffset,
+    });
+    saveLyricDockPref({
+      enabled: true,
+      entity: fallback,
+      updated: editedAt || pref?.updated || Date.now(),
+    });
+    this._lyricDockOwner = true;
+  }
+
+  _trackKeyFor(entity, state) {
+    const attrs = state?.attributes || {};
+    return [
+      entity,
+      attrs.media_title || "",
+      attrs.media_artist || "",
+      attrs.media_album_name || "",
+      attrs.media_duration || 0,
+      attrs.media_content_id || "",
+    ]
+      .map((value) => String(value))
+      .join("|");
   }
 
   _artUrlFor() {

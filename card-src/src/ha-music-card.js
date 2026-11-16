@@ -33,7 +33,7 @@ import {
   pickAutoFollowEntity,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
-import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
+import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { lyricIndex, lyricProgress, parseLyrics } from "./lyrics.js";
@@ -123,6 +123,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._artSlot = 0;
     this._dockOwner = false;
+    this._unsubscribeDockPref = null;
     this._lyricDockOwner = false;
     this._palette = null;
     this._paletteKey = "";
@@ -297,6 +298,14 @@ class HaMusicCard extends LitElement {
       }
     };
     this.addEventListener("pointerdown", this._onSpectrumGesture, { passive: true });
+    this._unsubscribeDockPref?.();
+    this._unsubscribeDockPref = subscribeDockPref(() => {
+      // 任意一张卡片的编辑器改动都会广播到这里；重装全局迷你播放器，
+      // 让同一页面/其他仪表盘里的卡片立即使用同一份开关、实体和主题。
+      this._dockOwner = false;
+      this._installDock();
+      this.requestUpdate();
+    });
     this._onViewportResize = () => this._queuePanelFit();
     window.addEventListener("resize", this._onViewportResize);
     window.visualViewport?.addEventListener("resize", this._onViewportResize);
@@ -322,6 +331,8 @@ class HaMusicCard extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    this._unsubscribeDockPref?.();
+    this._unsubscribeDockPref = null;
     if (this._onKeyDown) {
       window.removeEventListener("keydown", this._onKeyDown);
       this._onKeyDown = null;
@@ -1463,6 +1474,11 @@ class HaMusicCard extends LitElement {
   _openPlaylists() {
     const t = translator(this._hass?.language);
     if (!this._isMaPlayer()) {
+      // 非 MA 播放器也保留 MA 入口：直接打开 MA 面板，而不是只弹一句提示。
+      if (this._maUrl()) {
+        this._openAssistant();
+        return;
+      }
       this._notify(t("maPlayerRequired"));
       return;
     }
@@ -1896,50 +1912,28 @@ class HaMusicCard extends LitElement {
   }
 
   _installDock() {
+    if (this._isPreviewContext()) return;
     const configDock = this._config?.dock;
     const configEntities = normalizeDockEntities(this._config?.dock_entities);
     const configThemes = normalizeDockThemes(this._config?.dock_themes);
-    const editedAt = Number(this._config?.dock_edited) || 0;
     const pref = loadDockPref();
-    // 只有编辑器里真正改过开关/实体/主题的那张卡片，才允许用本地 dock 配置
-    // 覆盖全局记忆；其他仪表盘上的旧 `dock: none` 不能把全局播放器清掉。
-    const useConfig = editedAt > 0 && editedAt >= (pref?.updated || 0);
-    const modes = useConfig
-      ? normalizeDockModes(configDock)
-      : pref
-        ? pref.modes
-        : normalizeDockModes(configDock);
-    const dockEntities = useConfig
-      ? configEntities
-      : pref
-        ? pref.entities
-        : configEntities;
-    const dockThemes = useConfig
-      ? configThemes
-      : pref
-        ? pref.themes
-        : configThemes;
+    // 全局设置一旦存在，所有卡片都以它为准：同一页面/不同仪表盘里
+    // 复制出来的多张卡片不会再各自用本地 dock 配置互相覆盖。
+    const modes = pref ? pref.modes : normalizeDockModes(configDock);
+    const dockEntities = pref ? pref.entities : configEntities;
+    const dockThemes = pref ? pref.themes : configThemes;
     const fallback =
       this._eid?.() ||
       this._config?.entity ||
       (Array.isArray(this._config?.entities) ? this._config.entities[0] : "");
     if (!modes.length) {
-      // 用户显式把三个位置都关掉时写入 disabled 全局状态；这样其他视图里
-      // 旧卡片的 dock 配置就不会在切换页面时把播放器重新装回来。
-      if (!this._isPreviewContext() && (useConfig || this._dockOwner)) {
-        saveDockPref({
-          modes: [],
-          entities: dockEntities,
-          themes: dockThemes,
-          updated: editedAt || Date.now(),
-        });
+      if (pref && !this._isPreviewContext()) {
         uninstallDock();
         this._dockOwner = false;
       }
       return;
     }
     if (!this._hass || !this.isConnected || !fallback) return;
-    if (this._isPreviewContext()) return;
     const entities = {};
     for (const mode of modes) {
       const entity = dockEntities[mode] || fallback;
@@ -1952,14 +1946,17 @@ class HaMusicCard extends LitElement {
       theme: dockThemes[mode] || this._themeKey(),
     }));
     installDocks(configs);
-    saveDockPref({
-      modes: Object.keys(entities),
-      entities,
-      themes: Object.fromEntries(
-        Object.keys(entities).map((mode) => [mode, dockThemes[mode] || this._themeKey()])
-      ),
-      updated: editedAt || pref?.updated,
-    });
+    // 只有在还没有全局设置时才用当前卡片做一次初始化；之后一律由
+    // 编辑器写入全局设置并广播，卡片本身不再回写，避免多卡片抢覆盖。
+    if (!pref) {
+      saveDockPref({
+        modes: Object.keys(entities),
+        entities,
+        themes: Object.fromEntries(
+          Object.keys(entities).map((mode) => [mode, dockThemes[mode] || this._themeKey()])
+        ),
+      });
+    }
     this._dockOwner = true;
   }
 
@@ -2287,7 +2284,8 @@ class HaMusicCard extends LitElement {
       ? hasFeature(state, FEATURES.TURN_ON)
       : hasFeature(state, FEATURES.TURN_OFF);
     const canBrowse = hasFeature(state, FEATURES.BROWSE_MEDIA);
-    const maShow = this._maEnabled() && this._isMaPlayer(entityId);
+    const maPlayer = this._isMaPlayer(entityId);
+    const maShow = this._maEnabled();
     const canSeek = hasFeature(state, FEATURES.SEEK);
     const sourceList = Array.isArray(state.attributes?.source_list)
       ? state.attributes.source_list
@@ -2383,11 +2381,11 @@ class HaMusicCard extends LitElement {
               ${maShow
                 ? html`<button
                     class="hm-icon-btn hm-ma"
-                    aria-label=${t("playlists")}
-                    title=${t("playlists")}
+                    aria-label=${maPlayer ? t("playlists") : t("openAssistant")}
+                    title=${maPlayer ? t("playlists") : t("openAssistant")}
                     @click=${() => this._openPlaylists()}
                   >
-                    ${icon("playlist", 16)}
+                    ${icon(maPlayer ? "playlist" : "external", 16)}
                   </button>`
                 : nothing}
               ${showQueue

@@ -8,7 +8,13 @@ import {
   DEFAULT_LYRIC_SOURCE,
   isChinese,
 } from "./const.js";
-import { normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
+import {
+  normalizeDockModes,
+  normalizeDockEntities,
+  normalizeDockThemes,
+  loadDockPref,
+  saveDockPref,
+} from "./dock.js";
 
 function fireConfigChanged(node, config) {
   node.dispatchEvent(
@@ -234,15 +240,25 @@ class HaMusicEditor extends LitElement {
   }
 
   _dockModes() {
-    return normalizeDockModes(this._config?.dock);
+    const pref = loadDockPref();
+    return pref ? pref.modes : normalizeDockModes(this._config?.dock);
   }
 
   _dockEntities() {
-    return normalizeDockEntities(this._config?.dock_entities);
+    const pref = loadDockPref();
+    return pref ? pref.entities : normalizeDockEntities(this._config?.dock_entities);
   }
 
   _dockThemes() {
-    return normalizeDockThemes(this._config?.dock_themes);
+    const pref = loadDockPref();
+    return pref ? pref.themes : normalizeDockThemes(this._config?.dock_themes);
+  }
+
+  _syncDockGlobal(patch = {}) {
+    const modes = normalizeDockModes(patch.dock ?? this._dockModes());
+    const entities = normalizeDockEntities(patch.dock_entities ?? this._dockEntities());
+    const themes = normalizeDockThemes(patch.dock_themes ?? this._dockThemes());
+    saveDockPref({ modes, entities, themes });
   }
 
   _setDockTheme(mode, value) {
@@ -250,6 +266,7 @@ class HaMusicEditor extends LitElement {
     if (value) themes[mode] = value;
     else delete themes[mode];
     this._update({ dock_themes: themes, dock_edited: Date.now() });
+    this._syncDockGlobal({ dock_themes: themes });
   }
 
   _mainEntity() {
@@ -272,12 +289,18 @@ class HaMusicEditor extends LitElement {
       dock_entities: entities,
       dock_edited: Date.now(),
     });
+    this._syncDockGlobal({ dock: next.length ? next : "none", dock_entities: entities });
   }
 
   _setDockEntity(mode, value) {
     const entities = { ...this._dockEntities(), [mode]: value || "" };
+    const modes = this._dockModes();
+    if (!entities[mode] && modes.includes(mode) && this._mainEntity()) {
+      entities[mode] = this._mainEntity();
+    }
     if (!entities[mode]) delete entities[mode];
     this._update({ dock_entities: entities, dock_edited: Date.now() });
+    this._syncDockGlobal({ dock_entities: entities });
   }
 
   _entities() {

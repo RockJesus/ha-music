@@ -8,6 +8,7 @@ import { colorTriplet } from "./util.js";
 const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
 const MODES = new Set(["top", "sidebar", "fab"]);
+export const DOCK_PREF_EVENT = "ha-music-dock-pref-changed";
 
 export function normalizeTheme(value) {
   return typeof value === "string" && THEMES[value] ? value : DEFAULT_THEME;
@@ -883,6 +884,31 @@ export function loadDockPref() {
   }
 }
 
+function dockPrefKey(pref) {
+  const modes = normalizeDockModes(pref?.modes ?? pref?.mode);
+  const entities = normalizeDockEntities(pref?.entities);
+  const themes = normalizeDockThemes(pref?.themes);
+  const sortedEntities = {};
+  for (const mode of Object.keys(entities).sort()) sortedEntities[mode] = entities[mode];
+  const sortedThemes = {};
+  for (const mode of Object.keys(themes).sort()) sortedThemes[mode] = themes[mode];
+  return JSON.stringify({
+    modes,
+    entities: sortedEntities,
+    themes: sortedThemes,
+    disabled: pref?.disabled === true,
+  });
+}
+
+function emitDockPref(pref) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(DOCK_PREF_EVENT, { detail: pref }));
+  } catch {
+    /* 旧内核不支持 CustomEvent 时仅依赖 storage 事件跨页面同步 */
+  }
+}
+
 export function saveDockPref(input = {}) {
   try {
     const modes = normalizeDockModes(input.modes ?? input.mode);
@@ -892,30 +918,58 @@ export function saveDockPref(input = {}) {
     const legacyEntity = normalizeEntity(input.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
     const cleanModes = modes.filter((mode) => entities[mode]);
-    if (!cleanModes.length) {
-      const next = JSON.stringify({
-        modes: [],
-        entities,
-        themes,
-        disabled: true,
-        updated,
-      });
-      window.localStorage.setItem(PREF_KEY, next);
-      return;
-    }
-    const next = JSON.stringify({
-      modes: cleanModes,
-      entities,
-      themes,
-      disabled: false,
-      updated,
-    });
-    const current = window.localStorage.getItem(PREF_KEY);
-    if (current === next) return;
-    window.localStorage.setItem(PREF_KEY, next);
+    const next =
+      cleanModes.length > 0
+        ? {
+            modes: cleanModes,
+            entities,
+            themes,
+            disabled: false,
+            updated,
+          }
+        : {
+            modes: [],
+            entities,
+            themes,
+            disabled: true,
+            updated,
+          };
+    const currentRaw = window.localStorage.getItem(PREF_KEY);
+    const current = currentRaw ? JSON.parse(currentRaw) : null;
+    // 内容没变就不要反复写入和广播，否则每次卡片重渲染都会触发全页同步。
+    if (current && dockPrefKey(current) === dockPrefKey(next)) return;
+    window.localStorage.setItem(PREF_KEY, JSON.stringify(next));
+    emitDockPref(next);
   } catch {
     /* localStorage 不可用时只影响跨页面记忆，不影响当前实例 */
   }
+}
+
+// 同一页面里所有 ha-music 卡片都订阅这份全局设置；编辑器写入后立即广播，
+// 其他仪表盘/其他卡片无需刷新页面就能同步三个迷你播放器的开关、实体和主题。
+export function subscribeDockPref(callback) {
+  if (typeof window === "undefined") return () => {};
+  const onCustom = (event) => {
+    try {
+      callback(event.detail || loadDockPref());
+    } catch {
+      /* 单个订阅者异常不影响其他卡片 */
+    }
+  };
+  const onStorage = (event) => {
+    if (event.key !== PREF_KEY) return;
+    try {
+      callback(loadDockPref());
+    } catch {
+      /* 忽略单个订阅者异常 */
+    }
+  };
+  window.addEventListener(DOCK_PREF_EVENT, onCustom);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(DOCK_PREF_EVENT, onCustom);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function clearDockPref() {

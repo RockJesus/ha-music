@@ -38,6 +38,10 @@ const states = Object.fromEntries([
   player("media_player.study", "书房 · Studio", ""),
   player("media_player.bedroom", "卧室 · Bedroom", ""),
   ["number.amp_volume", { entity_id: "number.amp_volume", state: "40", attributes: { min: 0, max: 100 } }],
+  ["media_player.plain", { entity_id: "media_player.plain", state: "playing", attributes: {
+    friendly_name: "普通播放器", media_title: "Plain Track", media_artist: "No MA",
+    supported_features: FEATURES, volume_level: 0.3,
+  } }],
 ]);
 const calls = [];
 const hass = {
@@ -66,6 +70,9 @@ if (!customElements.get("ha-entity-picker")) customElements.define("ha-entity-pi
 const results = [];
 function check(name, ok, detail = "") { results.push({ name, ok: Boolean(ok), detail: String(detail ?? "") }); }
 const wait = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+// 每次回归从干净的全局迷你播放器状态开始，避免浏览器上一次测试的 localStorage 影响断言。
+try { localStorage.removeItem("haMusicMiniPlayer"); } catch {}
 
 const baseConfig = {
   entity: "media_player.living",
@@ -399,6 +406,53 @@ const dockTheme = (label) => dockRow(label)?.querySelector("select") || null;
   check("roundtrip/dock-values", [...er2.querySelectorAll(".dock-row ha-entity-picker")].map((p) => p.value).join("|") === [clone.dock_entities.top, clone.dock_entities.sidebar, clone.dock_entities.fab].join("|"), [...er2.querySelectorAll(".dock-row ha-entity-picker")].map((p) => p.value).join("|"));
 
   check("config/no-undefined", Object.keys(lastConfig || {}).every((k) => lastConfig[k] !== undefined), JSON.stringify(Object.entries(lastConfig || {}).filter(([, v]) => v === undefined)));
+
+  // MA 入口不再依赖当前实体是否带 mass_*：只要配置开启就应该显示。
+  const plainHost = document.createElement("div");
+  plainHost.style.width = "600px";
+  document.body.appendChild(plainHost);
+  const plainCard = document.createElement("ha-music");
+  plainCard.hass = hass;
+  plainCard.setConfig({ entity: "media_player.plain", music_assistant: true, layout: "compact" });
+  plainHost.appendChild(plainCard);
+  await plainCard.updateComplete;
+  await wait(40);
+  const plainMa = plainCard.shadowRoot.querySelector(".hm-ma");
+  check("ma/non-ma-player-visible", Boolean(plainMa), Boolean(plainMa));
+  check("ma/non-ma-player-label", plainMa?.getAttribute("aria-label") === "打开 Music Assistant", plainMa?.getAttribute("aria-label"));
+  plainCard.setConfig({ entity: "media_player.plain", music_assistant: false, layout: "compact" });
+  await plainCard.updateComplete;
+  check("ma/disabled-hidden", !plainCard.shadowRoot.querySelector(".hm-ma"), Boolean(plainCard.shadowRoot.querySelector(".hm-ma")));
+
+  // 多卡片全局迷你播放器：编辑器改动写入同一份全局设置，新卡片直接采用，不等刷新。
+  const globalPref = () => {
+    try { return JSON.parse(localStorage.getItem("haMusicMiniPlayer") || "null"); } catch { return null; }
+  };
+  check("sync/pref-three-modes", Array.isArray(globalPref()?.modes) && globalPref().modes.length === 3, JSON.stringify(globalPref()?.modes));
+  const syncHost = document.createElement("div");
+  document.body.appendChild(syncHost);
+  const syncCard = document.createElement("ha-music");
+  syncCard.hass = hass;
+  syncCard.setConfig({ entity: "media_player.living", dock: "none", layout: "compact" });
+  syncHost.appendChild(syncCard);
+  await syncCard.updateComplete;
+  await wait(60);
+  check("sync/new-card-reads-global", window.__haMusicDocks?.size === 3, window.__haMusicDocks?.size);
+  editor._toggleDock("top", false);
+  await wait(60);
+  check("sync/editor-off-broadcast", !globalPref()?.modes?.includes("top"), JSON.stringify(globalPref()?.modes));
+  check("sync/other-card-top-removed", !window.__haMusicDocks?.has("top"), [...(window.__haMusicDocks || new Map()).keys()].join(","));
+  editor._toggleDock("top", true);
+  await wait(60);
+  check("sync/editor-on-broadcast", globalPref()?.modes?.includes("top"), JSON.stringify(globalPref()?.modes));
+  check("sync/other-card-top-restored", window.__haMusicDocks?.has("top"), [...(window.__haMusicDocks || new Map()).keys()].join(","));
+
+  // 旧卡片 YAML 里可能还留着 dock:none；只改主题不能把全局三个播放器一起关掉。
+  editor._config = { ...editor._config, dock: "none" };
+  editor._setDockTheme("top", "cyber");
+  await wait(50);
+  check("sync/stale-dock-none-keeps-modes", globalPref()?.modes?.length === 3, JSON.stringify(globalPref()?.modes));
+  check("sync/stale-dock-none-theme-written", globalPref()?.themes?.top === "cyber", globalPref()?.themes?.top);
 
   const pass = results.filter((r) => r.ok).length;
   window.__editorAudit = { results, pass, total: results.length, lastConfig, changeCount };

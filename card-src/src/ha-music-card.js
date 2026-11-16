@@ -109,6 +109,7 @@ class HaMusicCard extends LitElement {
     this._toastTimer = null;
     this._menu = null;
     this._seekPreview = null;
+    this._seekPending = null;
     this._volumePreview = null;
     this._showRemaining = false;
     this._drawer = this._emptyDrawer();
@@ -166,6 +167,7 @@ class HaMusicCard extends LitElement {
         at: Date.now(),
       };
     }
+    if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
     const sig = this._computeSig(hass);
     if (sig !== this._sig || previous === undefined) {
       this._sig = sig;
@@ -943,8 +945,27 @@ class HaMusicCard extends LitElement {
   }
 
   _seekTo(seconds) {
-    if (!Number.isFinite(seconds)) return;
-    this._guard(this._call("media_seek", { seek_position: seconds }));
+    if (!Number.isFinite(seconds)) return Promise.resolve(false);
+    const promise = this._call("media_seek", { seek_position: seconds });
+    this._guard(promise);
+    return promise;
+  }
+
+  _settleSeekPending(state, attrs, trackChanged) {
+    const pending = this._seekPending;
+    if (!pending) return false;
+    const position = Number(attrs?.media_position);
+    const stampChanged =
+      String(attrs?.media_position_updated_at || "") !== pending.stamp;
+    const moved = Number.isFinite(position) && Math.abs(position - pending.from) > 1;
+    const reached = Number.isFinite(position) && Math.abs(position - pending.value) <= 2;
+    const expired = Date.now() - pending.at > 8000;
+    if (!state || trackChanged || expired || (reached && (stampChanged || moved))) {
+      this._seekPending = null;
+      this._seekPreview = null;
+      return true;
+    }
+    return false;
   }
 
   _onSeekInput(event) {
@@ -965,8 +986,23 @@ class HaMusicCard extends LitElement {
       return;
     }
     const value = Number(event.target.value);
-    this._seekPreview = null;
-    this._seekTo(value);
+    const state = this._state();
+    const attrs = state?.attributes || {};
+    this._seekPreview = value;
+    this._seekPending = {
+      value,
+      from: Number(attrs.media_position) || 0,
+      stamp: String(attrs.media_position_updated_at || ""),
+      trackKey: this._trackKey(state),
+      at: Date.now(),
+    };
+    const pending = this._seekPending;
+    this._seekTo(value).catch(() => {
+      if (this._seekPending !== pending) return;
+      this._seekPending = null;
+      this._seekPreview = null;
+      this.requestUpdate();
+    });
     this.requestUpdate();
   }
 
@@ -1063,6 +1099,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._menu = null;
     this._seekPreview = null;
+    this._seekPending = null;
     this._resetLyrics();
     this._syncTimer();
     this._sig = this._computeSig(this._hass);

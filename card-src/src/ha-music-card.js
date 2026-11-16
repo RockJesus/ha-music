@@ -126,6 +126,7 @@ class HaMusicCard extends LitElement {
     this._lyricsAbort = null;
     this._lyricsOffset = this._loadLyricsOffset();
     this._lyricsCache = this._loadLyricsCache();
+    this._positionClock = null;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -134,6 +135,27 @@ class HaMusicCard extends LitElement {
     const previous = this._hass;
     this._hass = hass;
     if (!hass) return;
+    const entityId = this._eid();
+    const state = hass.states?.[entityId];
+    const attrs = state?.attributes || {};
+    const base = Number(attrs.media_position) || 0;
+    const stamp = attrs.media_position_updated_at || "";
+    const prior = this._positionClock;
+    if (
+      !prior ||
+      prior.entityId !== entityId ||
+      prior.state !== state?.state ||
+      prior.base !== base ||
+      prior.stamp !== stamp
+    ) {
+      this._positionClock = {
+        entityId,
+        state: state?.state,
+        base,
+        stamp,
+        at: Date.now(),
+      };
+    }
     const sig = this._computeSig(hass);
     if (sig !== this._sig || previous === undefined) {
       this._sig = sig;
@@ -250,6 +272,27 @@ class HaMusicCard extends LitElement {
 
   _state(entityId = this._eid()) {
     return this._hass?.states?.[entityId];
+  }
+
+  _readMedia() {
+    const state = this._state();
+    const media = readMedia(state);
+    const attrs = state?.attributes || {};
+    const updatedAt = attrs.media_position_updated_at;
+    const stampTime = updatedAt ? new Date(updatedAt).getTime() : NaN;
+    const hasValidStamp =
+      Number.isFinite(stampTime) && stampTime <= Date.now() + 3000;
+    if (state?.state === "playing" && !hasValidStamp) {
+      const clock = this._positionClock;
+      if (clock && clock.entityId === this._eid()) {
+        const elapsed = Math.max(0, (Date.now() - clock.at) / 1000);
+        const position = clock.base + elapsed;
+        media.position = media.duration
+          ? clamp(position, 0, media.duration)
+          : Math.max(0, position);
+      }
+    }
+    return media;
   }
 
   _computeSig(hass) {
@@ -382,7 +425,7 @@ class HaMusicCard extends LitElement {
     const cache = new Map();
     try {
       const list = JSON.parse(
-        localStorage.getItem("ha-music-lyrics-cache-v1") || "[]"
+        localStorage.getItem("ha-music-lyrics-cache-v2") || "[]"
       );
       if (!Array.isArray(list)) return cache;
       for (const item of list) {
@@ -406,7 +449,7 @@ class HaMusicCard extends LitElement {
   _saveLyricsCache() {
     try {
       const list = [...this._lyricsCache.entries()].slice(-24);
-      localStorage.setItem("ha-music-lyrics-cache-v1", JSON.stringify(list));
+      localStorage.setItem("ha-music-lyrics-cache-v2", JSON.stringify(list));
     } catch (error) {
       /* 忽略配额或隐私模式错误 */
     }
@@ -486,6 +529,8 @@ class HaMusicCard extends LitElement {
       });
     };
     add(title, artist, media.album || "");
+    add(cleanTitle, artist, "");
+    add(title, cleanArtist, "");
     add(cleanTitle, cleanArtist, "");
     if (primaryArtist && primaryArtist !== cleanArtist) {
       add(cleanTitle, primaryArtist, "");
@@ -586,7 +631,7 @@ class HaMusicCard extends LitElement {
 
   _maybeLoadLyrics() {
     if (!this._lyricsEnabled() || this._thumbMode()) return;
-    const media = readMedia(this._state());
+    const media = this._readMedia();
     if (!media.title) {
       if (this._lyrics.status !== "idle") {
         this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
@@ -680,7 +725,11 @@ class HaMusicCard extends LitElement {
         return query.toString();
       };
 
-      for (const variant of variants.slice(0, 2)) {
+      let syncedPick = null;
+      let syncedParsed = null;
+      let plainPick = null;
+      let plainParsed = null;
+      for (const variant of variants) {
         if (!variant.title || !variant.artist) continue;
         try {
           const exact = await accept(
@@ -690,27 +739,40 @@ class HaMusicCard extends LitElement {
             const parsed = parseLyrics(
               exact.syncedLyrics || exact.plainLyrics || ""
             );
-            const useful =
-              parsed.lines.length >= 3 ||
-              parsed.plain.length >= 3 ||
-              parsed.instrumental;
-            if (useful || !picked) {
-              picked = exact;
-              parsedCandidate = parsed;
+            if (parsed.instrumental || parsed.lines.length >= 3) {
+              syncedPick = exact;
+              syncedParsed = parsed;
+              break;
             }
-            if (useful) break;
+            if (
+              parsed.lines.length &&
+              (!syncedParsed || parsed.lines.length > syncedParsed.lines.length)
+            ) {
+              syncedPick = exact;
+              syncedParsed = parsed;
+            }
+            if (!plainPick && parsed.plain.length >= 3) {
+              plainPick = exact;
+              plainParsed = parsed;
+            }
           }
         } catch (error) {
           if (error?.name === "AbortError") throw error;
         }
       }
 
-      const shortExact =
-        parsedCandidate &&
-        parsedCandidate.lines.length < 3 &&
-        parsedCandidate.plain.length < 3 &&
-        !parsedCandidate.instrumental;
-      if (!picked || shortExact) {
+      if (syncedPick) {
+        picked = syncedPick;
+        parsedCandidate = syncedParsed;
+      } else if (plainPick) {
+        picked = plainPick;
+        parsedCandidate = plainParsed;
+      }
+
+      const needSearch =
+        !parsedCandidate ||
+        (!parsedCandidate.instrumental && parsedCandidate.lines.length < 3);
+      if (needSearch) {
         const variant = variants[1] || variants[0] || {
           title: media.title,
           artist: media.artist,
@@ -1042,7 +1104,7 @@ class HaMusicCard extends LitElement {
     const input = event.target;
     const value = Number(input.value);
     this._seekPreview = value;
-    const duration = readMedia(this._state()).duration;
+    const duration = this._readMedia().duration;
     input.style.setProperty(
       "--pct",
       `${duration ? clamp((value / duration) * 100, 0, 100) : 0}%`
@@ -1069,7 +1131,7 @@ class HaMusicCard extends LitElement {
   _onVolumeCommit(event) {
     const volume = clamp(Number(event.target.value) / 100, 0, 1);
     this._volumePreview = null;
-    const info = this._volumeInfo(readMedia(this._state()));
+    const info = this._volumeInfo(this._readMedia());
     if (info.domain === "media_player") {
       this._guard(
         this._call("volume_set", { volume_level: volume }, "media_player", info.entityId)
@@ -1091,7 +1153,7 @@ class HaMusicCard extends LitElement {
   }
 
   _toggleMute() {
-    const media = readMedia(this._state());
+    const media = this._readMedia();
     const info = this._volumeInfo(media);
     if (info.external) {
       if (info.domain === "media_player") {
@@ -1796,7 +1858,7 @@ class HaMusicCard extends LitElement {
   }
 
   _artUrlFor() {
-    const media = readMedia(this._state());
+    const media = this._readMedia();
     return normalizeArt(this._hass, media.art);
   }
 
@@ -1831,7 +1893,7 @@ class HaMusicCard extends LitElement {
   }
 
   _maybePalette(url) {
-    const media = readMedia(this._state());
+    const media = this._readMedia();
     const key = url || `${media.title}|${media.artist}|${this._eid()}`;
     if (this._paletteKey === key) return;
     this._paletteKey = key;
@@ -1852,7 +1914,7 @@ class HaMusicCard extends LitElement {
     if (!root) return;
     const seek = root.querySelector?.('input.hm-range[data-role="seek"]');
     const volume = root.querySelector?.('input.hm-range[data-role="volume"]');
-    const media = readMedia(this._state());
+    const media = this._readMedia();
     if (seek && this._seekPreview === null) {
       const max = media.duration || 0;
       const value = clamp(media.position, 0, max || media.position);
@@ -2037,7 +2099,7 @@ class HaMusicCard extends LitElement {
       `;
     }
 
-    const media = readMedia(state);
+    const media = this._readMedia();
     const queue = readQueue(state, config.max_queue ?? 40);
     const playing = state.state === "playing" || state.state === "buffering";
     const statusKey = formatEntityState(state.state);

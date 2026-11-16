@@ -105,7 +105,7 @@ function visibleTagRect(tags) {
   return best;
 }
 
-function findTopBarRect() {
+export function findTopBarRect() {
   // HA 新版顶栏是 ha-top-app-bar-fixed 内的 .top-app-bar；
   // 不能用 hui-root 的 .header，那是仪表盘视图标题栏，位置会偏到页面中部。
   const bars = deepMatches((node) => {
@@ -147,7 +147,7 @@ function findTopBarRect() {
   return null;
 }
 
-function findTopBarAddRect(bounds) {
+export function findTopBarAddRect(bounds) {
   if (!bounds) return null;
   const found = deepMatches((node) => {
     if (node.tagName === "BODY" || node.tagName === "HTML") return false;

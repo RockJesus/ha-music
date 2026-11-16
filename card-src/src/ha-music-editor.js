@@ -496,7 +496,7 @@ class HaMusicEditor extends LitElement {
           )}
           ${this._switch(
             this._zh ? "全局歌词悬浮窗（单行 / 长按拖动）" : "Global floating lyric (one line, long-press drag)",
-            config.floating_lyrics === true,
+            config.floating_lyrics !== false,
             (checked) =>
               this._update({
                 floating_lyrics: checked,

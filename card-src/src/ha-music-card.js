@@ -1710,7 +1710,7 @@ class HaMusicCard extends LitElement {
   }
 
   _installLyricDock() {
-    const configOn = this._config?.floating_lyrics === true;
+    const configOn = this._config?.floating_lyrics !== false;
     const editedAt = Number(this._config?.floating_lyrics_edited) || 0;
     const pref = loadLyricDockPref();
     // 与三个迷你播放器一致：只有最近在编辑器里改过开关的卡片能覆盖全局记忆。

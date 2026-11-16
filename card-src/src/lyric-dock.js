@@ -1,6 +1,6 @@
 // 全局歌词悬浮窗：只显示当前播放歌曲的一句歌词。
 // 由卡片安装/更新，跨仪表盘保持；主题跟随卡片当前主题，位置存在 localStorage。
-import { resolveHass, normalizeTheme } from "./dock.js";
+import { resolveHass, normalizeTheme, findTopBarRect, findTopBarAddRect } from "./dock.js";
 import { THEMES, DEFAULT_THEME } from "./const.js";
 import { colorTriplet } from "./util.js";
 import { lyricIndex } from "./lyrics.js";
@@ -205,8 +205,44 @@ const STYLE = `
   @media (max-width: 520px) {
     .lyric {
       max-width: calc(100vw - 24px);
-      padding: 9px 15px 9px 12px;
       font-size: 13px;
+    }
+  }
+  /* 不要胶囊和底板：只保留主题渐变歌词文字。 */
+  .lyric[data-theme] {
+    gap: 0;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    overflow: visible;
+  }
+  .lyric[data-theme]::before,
+  .lyric[data-theme]::after,
+  .lyric[data-theme] .mark {
+    display: none;
+  }
+  .lyric[data-theme][data-dragging="true"] {
+    box-shadow: none;
+  }
+  .lyric[data-theme] .text {
+    color: var(--hm-accent);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-shadow: none;
+    filter: drop-shadow(0 2px 5px rgba(var(--hm-base-rgb), 0.92));
+  }
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .lyric[data-theme] .text {
+      background-image: linear-gradient(100deg, var(--hm-accent), var(--hm-accent-2));
+      background-size: 100% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
     }
   }
 `;
@@ -237,9 +273,8 @@ class HaMusicLyric extends HTMLElement {
     this._onResize = () => this._applyPosition();
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
-      <div class="lyric" role="region" aria-label="当前歌词">
-        <span class="mark" aria-hidden="true"></span>
-        <span class="text">暂无歌词</span>
+      <div class="lyric" data-empty="true" role="region" aria-label="当前歌词">
+        <span class="text"></span>
       </div>
     `;
     this._pill = this.shadowRoot.querySelector(".lyric");
@@ -382,18 +417,31 @@ class HaMusicLyric extends HTMLElement {
     const pos = positions.lyric;
     const vw = window.innerWidth || 1;
     const vh = window.innerHeight || 1;
-    const defaultX = vw / 2 - width / 2;
-    const defaultY = vh - height - 42;
-    const x = clamp(
-      pos && Number.isFinite(pos.x) ? pos.x * vw : defaultX,
-      8,
-      Math.max(8, vw - width - 8)
-    );
-    const y = clamp(
-      pos && Number.isFinite(pos.y) ? pos.y * vh : defaultY,
-      8,
-      Math.max(8, vh - height - 8)
-    );
+    const topbar = findTopBarRect();
+    let defaultX;
+    let defaultY;
+    if (topbar) {
+      const addRect = findTopBarAddRect(topbar);
+      defaultX = addRect
+        ? addRect.left - width - 8
+        : topbar.left + (topbar.width - width) / 2;
+      defaultY = topbar.top + (topbar.height - height) / 2;
+    } else {
+      defaultX = vw - width - 16;
+      defaultY = 16;
+    }
+    let x;
+    let y;
+    if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+      x = clamp(pos.x * vw, 8, Math.max(8, vw - width - 8));
+      y = clamp(pos.y * vh, 8, Math.max(8, vh - height - 8));
+    } else if (topbar) {
+      x = clamp(defaultX, topbar.left + 8, Math.max(topbar.left + 8, topbar.right - width - 8));
+      y = clamp(defaultY, topbar.top + 2, Math.max(topbar.top + 2, topbar.bottom - height - 2));
+    } else {
+      x = clamp(defaultX, 8, Math.max(8, vw - width - 8));
+      y = 16;
+    }
     this._pill.style.left = `${Math.round(x)}px`;
     this._pill.style.top = `${Math.round(y)}px`;
   }

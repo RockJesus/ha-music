@@ -1418,6 +1418,21 @@ export const cardStyles = css`
       display: none;
     }
 
+    /* 280px 这类窄宽完整卡：状态与操作按钮分两行，避免状态文字被挤成单字 */
+    .hm-card[data-layout="full"] .hm-top {
+      flex-wrap: wrap;
+      row-gap: 8px;
+    }
+
+    .hm-card[data-layout="full"] .hm-status {
+      flex: 1 1 100%;
+    }
+
+    .hm-card[data-layout="full"] .hm-top-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+
     .hm-card[data-layout="full"] .hm-main {
       grid-template-columns: 1fr;
       justify-items: center;

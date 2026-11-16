@@ -2446,26 +2446,25 @@ export const cardStyles = css`
   }
 
   @container (max-width: 520px) {
-    /* 手机面板底部控制坞：播控与音量同宽、同一块玻璃底板，避免两行宽度错位 */
+    /* 手机面板底部：无矩形触控框，图标/播放球自带主题立体光效 */
     .hm-card[data-panel="true"] .hm-controls {
       flex-direction: column;
       align-items: stretch;
-      gap: 4px;
+      gap: 10px;
       width: 100%;
       max-width: 360px;
       box-sizing: border-box;
       margin: 0 auto;
-      padding: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 22px;
-      background: rgba(255, 255, 255, 0.035);
-      box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.75);
+      padding: 0 4px;
+      border: none;
+      background: transparent;
+      box-shadow: none;
     }
 
     .hm-card[data-panel="true"] .hm-transport {
       width: 100%;
       justify-content: center;
-      gap: 12px;
+      gap: clamp(5px, 2.8cqi, 11px);
     }
 
     .hm-card[data-panel="true"] .hm-volume {
@@ -2479,43 +2478,152 @@ export const cardStyles = css`
       background: transparent;
     }
 
-    /* 手机面板：去掉单个按钮的圆框/底色，只保留大热区与图标 */
+    /* 次要播控：触控热区完全透明，只让图标悬浮发光 */
     .hm-card[data-panel="true"] .hm-transport .hm-btn,
     .hm-card[data-panel="true"] .hm-transport .hm-btn[data-on="true"] {
-      width: 60px;
-      height: 60px;
+      position: relative;
+      isolation: isolate;
+      width: clamp(42px, 14.5cqi, 58px);
+      height: clamp(42px, 14.5cqi, 58px);
       border: none;
-      border-radius: 0;
+      border-radius: 50%;
       background: transparent;
       box-shadow: none;
+      color: rgba(248, 250, 255, 0.9);
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-btn::before {
+      content: "";
+      position: absolute;
+      inset: 8%;
+      z-index: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.16), transparent 40%),
+        radial-gradient(circle at 50% 52%, rgba(var(--hm-a1-rgb), 0.22), transparent 72%);
+      filter: blur(4px);
+      opacity: 0.6;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn svg {
-      width: 32px;
-      height: 32px;
+      position: relative;
+      z-index: 1;
+      width: clamp(22px, 8.2cqi, 32px);
+      height: clamp(22px, 8.2cqi, 32px);
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55))
+        drop-shadow(0 0 9px rgba(var(--hm-a1-rgb), 0.32));
+      transition: transform 0.18s ease, filter 0.18s ease;
     }
 
+    .hm-card[data-panel="true"] .hm-transport .hm-btn[data-on="true"] {
+      color: var(--hm-a1);
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-btn[data-on="true"]::before {
+      opacity: 1;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-btn[data-on="true"] svg {
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6))
+        drop-shadow(0 0 14px rgba(var(--hm-a1-rgb), 0.9));
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-btn:hover::before {
+      opacity: 0.9;
+      transform: scale(1.08);
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-btn:hover svg {
+      transform: translateY(-1px);
+      filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.6))
+        drop-shadow(0 0 14px rgba(var(--hm-a1-rgb), 0.65));
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* 播放键：主题渐变球体 + 顶部高光 + 底部内阴影 + 呼吸光晕 */
     .hm-card[data-panel="true"] .hm-transport .hm-play {
-      width: 74px;
-      height: 74px;
-      min-width: 74px;
-      min-height: 74px;
+      position: relative;
+      isolation: isolate;
+      width: clamp(52px, 18.5cqi, 72px);
+      height: clamp(52px, 18.5cqi, 72px);
+      min-width: clamp(52px, 18.5cqi, 72px);
+      min-height: clamp(52px, 18.5cqi, 72px);
       border: none;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
+      border-radius: 50%;
       color: #fff;
-      filter: drop-shadow(0 0 10px rgba(var(--hm-a1-rgb), 0.9))
-        drop-shadow(0 0 22px rgba(var(--hm-a2-rgb), 0.55));
+      background:
+        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.58) 0%, rgba(255, 255, 255, 0.12) 27%, transparent 49%),
+        linear-gradient(145deg, rgba(var(--hm-a1-rgb), 1) 0%, rgba(var(--hm-a2-rgb), 1) 100%);
+      box-shadow:
+        0 18px 32px -14px rgba(var(--hm-a1-rgb), 0.95),
+        0 8px 18px -8px rgba(var(--hm-a2-rgb), 0.85),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.28);
+      filter: none;
     }
 
-    .hm-card[data-panel="true"] .hm-transport .hm-play svg {
-      width: 48px;
-      height: 48px;
+    .hm-card[data-panel="true"] .hm-transport .hm-play::before {
+      content: "";
+      position: absolute;
+      left: 14%;
+      right: 14%;
+      top: 8%;
+      height: 38%;
+      z-index: 1;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent);
+      filter: blur(1px);
+      opacity: 0.85;
+      pointer-events: none;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-play::after {
+      content: "";
+      position: absolute;
+      inset: -12px;
+      z-index: -1;
+      border: none;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(var(--hm-a1-rgb), 0.3), transparent 68%);
+      opacity: 0.45;
+      pointer-events: none;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play.is-playing::after {
-      display: none;
+      opacity: 1;
+      animation: hmPulse 3.2s ease-in-out infinite;
+    }
+
+    .hm-card[data-panel="true"] .hm-transport .hm-play svg {
+      position: relative;
+      z-index: 2;
+      width: clamp(30px, 12.3cqi, 48px);
+      height: clamp(30px, 12.3cqi, 48px);
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+    }
+
+    /* 音量条同步主题光效：更厚的轨道 + 立体发光滑块 */
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-webkit-slider-runnable-track {
+      height: 9px;
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.45),
+        0 0 14px rgba(var(--hm-a1-rgb), 0.18);
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-webkit-slider-thumb {
+      width: 22px;
+      height: 22px;
+      margin-top: -6.5px;
+      background: radial-gradient(circle at 34% 28%, #ffffff 0%, #e9f8ff 58%, #cfe8ff 100%);
+      box-shadow:
+        0 0 0 3px rgba(var(--hm-a1-rgb), 0.2),
+        0 0 20px rgba(var(--hm-a1-rgb), 0.9),
+        inset 0 1px 0 #ffffff;
     }
   }
 

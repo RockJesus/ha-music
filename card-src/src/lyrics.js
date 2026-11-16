@@ -103,3 +103,57 @@ export function lyricProgress(lines, position, duration) {
     progress: Math.max(0, Math.min(1, (Math.max(0, Number(position) || 0) - start) / span)),
   };
 }
+
+function compactMatchText(value) {
+  return cleanLyricText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+// 从 LRCLIB 搜索结果里挑最可信的一版：歌名、歌手、时长三项投票，
+// 优先同步歌词，避免同名翻唱/现场版把时间轴带偏。
+export function pickLrclibResult(results, media = {}) {
+  if (!Array.isArray(results) || !results.length) return null;
+  const wantTitle = compactMatchText(media.title);
+  const wantArtist = compactMatchText(media.artist);
+  const wantDuration = Number(media.duration) || 0;
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (const item of results) {
+    if (!item) continue;
+    const lyric = item.syncedLyrics || item.plainLyrics;
+    if (typeof lyric !== "string" || !lyric.trim()) continue;
+    const itemTitle = compactMatchText(item.trackName);
+    const itemArtist = compactMatchText(item.artistName);
+    let score = 0;
+
+    if (wantTitle) {
+      if (itemTitle === wantTitle) score += 120;
+      else if (itemTitle && (itemTitle.includes(wantTitle) || wantTitle.includes(itemTitle))) score += 60;
+      else score -= 35;
+    }
+    if (wantArtist && itemArtist) {
+      if (itemArtist === wantArtist) score += 45;
+      else if (itemArtist.includes(wantArtist) || wantArtist.includes(itemArtist)) score += 32;
+      else score -= 8;
+    }
+    const itemDuration = Number(item.duration) || 0;
+    if (wantDuration && itemDuration) {
+      const diff = Math.abs(itemDuration - wantDuration);
+      if (diff <= 2) score += 80;
+      else if (diff <= 5) score += 35;
+      else if (diff <= 15) score += 10;
+      else score -= Math.min(45, diff);
+    }
+    if (item.syncedLyrics) score += 30;
+    if (score > bestScore) {
+      bestScore = score;
+      best = item;
+    }
+  }
+
+  // 歌名完全对不上时宁可不用，避免把另一首歌的歌词投到当前曲目上。
+  if (best && wantTitle && bestScore < 40) return null;
+  return best;
+}

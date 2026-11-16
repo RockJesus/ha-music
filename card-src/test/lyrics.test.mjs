@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cleanLyricText, lyricIndex, lyricProgress, parseLyrics } from "../src/lyrics.js";
+import { cleanLyricText, lyricIndex, lyricProgress, parseLyrics, pickLrclibResult } from "../src/lyrics.js";
 
 test("parseLyrics 解析 LRC 时间轴并忽略元信息", () => {
   const parsed = parseLyrics(
@@ -48,4 +48,37 @@ test("lyricProgress 计算当前行卡拉OK进度", () => {
   assert.ok(Math.abs(lyricProgress(lines, 15).progress - 0.5) < 0.001);
   assert.ok(Math.abs(lyricProgress(lines, 25, 40).progress - 0.5) < 0.001);
   assert.ok(Math.abs(lyricProgress(lines, 35, 40).progress - 0.5) < 0.001);
+});
+
+test("pickLrclibResult 按歌名/歌手/时长挑同步歌词，拒绝无关曲目", () => {
+  const results = [
+    {
+      trackName: "7 Years (Live)",
+      artistName: "Lukas Graham",
+      duration: 260,
+      syncedLyrics: "[00:10]live",
+      plainLyrics: "live",
+    },
+    {
+      trackName: "7 Years",
+      artistName: "Lukas Graham",
+      duration: 237,
+      syncedLyrics: "[00:12]studio",
+      plainLyrics: "studio",
+    },
+    {
+      trackName: "Sorry",
+      artistName: "Justin Bieber",
+      duration: 237,
+      syncedLyrics: "[00:12]wrong",
+      plainLyrics: "wrong",
+    },
+  ];
+  const best = pickLrclibResult(results, {
+    title: "7 Years",
+    artist: "Lukas Graham",
+    duration: 237,
+  });
+  assert.equal(best.trackName, "7 Years");
+  assert.equal(pickLrclibResult(results, { title: "Blinding Lights", artist: "The Weeknd", duration: 200 }), null);
 });

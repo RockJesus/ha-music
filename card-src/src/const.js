@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.6.6";
+export const CARD_VERSION = "1.6.7";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -34,9 +34,10 @@ export const DEFAULT_COVER = "ambient";
 export const DEFAULT_VISUALIZER = "bars";
 
 export const LYRIC_SOURCES = {
-  auto: { en: "Auto (QQ → NetEase)", zh: "自动（QQ 优先，网易云兜底）" },
+  auto: { en: "Auto (QQ → NetEase → LRCLIB)", zh: "自动（QQ/网易云优先，LRCLIB 兜底）" },
   qq: { en: "QQ Music", zh: "QQ 音乐" },
   wy: { en: "NetEase Cloud Music", zh: "网易云音乐" },
+  lrclib: { en: "LRCLIB (online synced lyrics)", zh: "LRCLIB（在线同步歌词）" },
 };
 
 export const DEFAULT_LYRIC_SOURCE = "auto";

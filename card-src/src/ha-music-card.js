@@ -36,9 +36,10 @@ import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
-import { lyricIndex, lyricProgress, parseLyrics } from "./lyrics.js";
+import { lyricIndex, lyricProgress, parseLyrics, pickLrclibResult } from "./lyrics.js";
 
 const LYRICS_API = "/api/netease_lyrics/lyrics";
+const LRCLIB_API = "https://lrclib.net/api";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -549,8 +550,9 @@ class HaMusicCard extends LitElement {
     const cache = new Map();
     try {
       localStorage.removeItem("ha-music-lyrics-cache-v3");
+      localStorage.removeItem("ha-music-lyrics-cache-v4");
       const list = JSON.parse(
-        localStorage.getItem("ha-music-lyrics-cache-v4") || "[]"
+        localStorage.getItem("ha-music-lyrics-cache-v5") || "[]"
       );
       if (!Array.isArray(list)) return cache;
       for (const item of list) {
@@ -574,7 +576,7 @@ class HaMusicCard extends LitElement {
   _saveLyricsCache() {
     try {
       const list = [...this._lyricsCache.entries()].slice(-24);
-      localStorage.setItem("ha-music-lyrics-cache-v4", JSON.stringify(list));
+      localStorage.setItem("ha-music-lyrics-cache-v5", JSON.stringify(list));
     } catch (error) {
       /* 忽略配额或隐私模式错误 */
     }
@@ -593,7 +595,9 @@ class HaMusicCard extends LitElement {
 
   _lyricsSource() {
     const source = this._config?.lyrics_source;
-    return source === "qq" || source === "wy" ? source : "auto";
+    return source === "qq" || source === "wy" || source === "lrclib"
+      ? source
+      : "auto";
   }
 
   _lyricsQueries(media) {
@@ -651,6 +655,8 @@ class HaMusicCard extends LitElement {
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;
         }
+        // 后端集成缺失时接口是 404；不必对同一查询重复打三次。
+        if (response.status === 404) return null;
         if (!response.ok) {
           lastError = new Error(`lyrics HTTP ${response.status}`);
           if (attempt < 2) {
@@ -682,6 +688,121 @@ class HaMusicCard extends LitElement {
       }
     }
     throw lastError || new Error("歌词接口请求失败");
+  }
+
+  async _lrclibJson(path, params, signal) {
+    const url = new URL(`${LRCLIB_API}/${path}`);
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && String(value).trim()) {
+        url.searchParams.set(key, String(value));
+      }
+    }
+    const local = new AbortController();
+    const onAbort = () => local.abort();
+    if (signal) {
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    const timer = setTimeout(() => local.abort(), 3000);
+    try {
+      const response = await fetch(url.toString(), {
+        signal: local.signal,
+        mode: "cors",
+        headers: { Accept: "application/json" },
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`lrclib HTTP ${response.status}`);
+      return response.json();
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        if (signal?.aborted) throw error;
+        return null; // 单次请求超时：让上层继续尝试下一个查询
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onAbort);
+    }
+  }
+
+  // LRCLIB 是纯在线同步歌词源，不需要 HA 后端集成；后端缺失/归档时作为兜底。
+  async _requestLrclibLyrics(media, query, signal) {
+    const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
+    const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
+    const duration = Math.round(Number(media.duration) || 0);
+    const exact = [];
+    if (duration && rawArtist) {
+      exact.push(
+        media.album
+          ? {
+              track_name: rawTitle,
+              artist_name: rawArtist,
+              album_name: media.album,
+              duration,
+            }
+          : {
+              track_name: query.title || rawTitle,
+              artist_name: rawArtist,
+              duration,
+            }
+      );
+    }
+    const searches = [];
+    if (query.title) {
+      searches.push({
+        track_name: query.title,
+        artist_name: query.artist || rawArtist,
+      });
+    }
+    searches.push({
+      q: [rawTitle, rawArtist].filter(Boolean).join(" "),
+    });
+    let lastError = null;
+    for (const params of searches) {
+      try {
+        const results = await this._lrclibJson("search", params, signal);
+        const match = pickLrclibResult(results, {
+          title: query.title || rawTitle,
+          artist: query.artist || rawArtist,
+          duration: media.duration,
+        });
+        if (!match) continue;
+        const parsed = this._lrclibParsed(match);
+        if (parsed) return { parsed, source: "LRCLIB" };
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        lastError = error;
+      }
+    }
+
+    // 精确接口返回单曲且命中率最高；放在搜索之后，避免 CORS/限流时阻塞首屏。
+    for (const params of exact) {
+      try {
+        const item = await this._lrclibJson("get", params, signal);
+        if (!item) continue;
+        const parsed = this._lrclibParsed(item);
+        if (parsed) return { parsed, source: "LRCLIB" };
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        lastError = error;
+      }
+    }
+    if (lastError) throw lastError;
+    return null;
+  }
+
+  _lrclibParsed(item) {
+    if (!item) return null;
+    if (item.instrumental && !item.syncedLyrics && !item.plainLyrics) {
+      return { lines: [], plain: [], instrumental: true };
+    }
+    const raw = item.syncedLyrics || item.plainLyrics;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+    const parsed = parseLyrics(raw);
+    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
+      return null;
+    }
+    return parsed;
   }
 
   _lyricsKeyFor(media) {
@@ -752,13 +873,33 @@ class HaMusicCard extends LitElement {
   async _fetchLyrics(media, key) {
     const controller = new AbortController();
     this._lyricsAbort = controller;
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     let lastError = null;
     try {
-      for (const query of this._lyricsQueries(media)) {
-        if (controller.signal.aborted || key !== this._lyricsKey) return;
+      const source = this._lyricsSource();
+      if (source !== "lrclib") {
+        for (const query of this._lyricsQueries(media)) {
+          if (controller.signal.aborted || key !== this._lyricsKey) return;
+          try {
+            const result = await this._requestNeteaseLyrics(query, controller.signal);
+            if (controller.signal.aborted || key !== this._lyricsKey) return;
+            if (result) {
+              this._setLyrics(key, result.parsed, result.source);
+              return;
+            }
+          } catch (error) {
+            if (error?.name === "AbortError") throw error;
+            lastError = error;
+          }
+        }
+      }
+
+      // QQ/网易云后端不可用（例如 netease_lyrics 集成缺失）时回退到 LRCLIB。
+      // 只跑一次：LRCLIB 内部已带清洗标题/原始标题/歌手三种检索策略。
+      const lrQuery = this._lyricsQueries(media)[0];
+      if (lrQuery) {
         try {
-          const result = await this._requestNeteaseLyrics(query, controller.signal);
+          const result = await this._requestLrclibLyrics(media, lrQuery, controller.signal);
           if (controller.signal.aborted || key !== this._lyricsKey) return;
           if (result) {
             this._setLyrics(key, result.parsed, result.source);

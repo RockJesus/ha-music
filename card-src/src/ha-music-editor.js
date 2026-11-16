@@ -613,8 +613,8 @@ class HaMusicEditor extends LitElement {
             </select>
             <span class="hint">
               ${this._zh
-                ? "默认自动：先用 QQ 音乐匹配，失败再回退网易云。"
-                : "Auto: try QQ Music first, then fall back to NetEase."}
+                ? "自动：QQ/网易云后端可用时优先，后端缺失或未匹配时自动回退 LRCLIB 在线同步歌词。"
+                : "Auto: prefer the QQ/NetEase backend when available, then fall back to LRCLIB online synced lyrics."}
             </span>
           </label>
           ${this._switch(

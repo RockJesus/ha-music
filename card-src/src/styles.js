@@ -2491,8 +2491,8 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn svg {
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play {
@@ -2510,8 +2510,8 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play svg {
-      width: 42px;
-      height: 42px;
+      width: 48px;
+      height: 48px;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play.is-playing::after {

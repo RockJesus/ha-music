@@ -4,6 +4,8 @@ import {
   LAYOUTS,
   COVER_MODES,
   VISUALIZERS,
+  LYRIC_SOURCES,
+  DEFAULT_LYRIC_SOURCE,
   isChinese,
 } from "./const.js";
 import { normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
@@ -494,6 +496,25 @@ class HaMusicEditor extends LitElement {
             config.show_lyrics !== false,
             (checked) => this._update({ show_lyrics: checked })
           )}
+          <label class="field">
+            <span class="label">${this._zh ? "歌词源" : "Lyrics source"}</span>
+            <select
+              .value=${config.lyrics_source || DEFAULT_LYRIC_SOURCE}
+              @change=${(e) => this._update({ lyrics_source: e.target.value })}
+            >
+              ${Object.keys(LYRIC_SOURCES).map(
+                (key) =>
+                  html`<option value=${key} ?selected=${(config.lyrics_source || DEFAULT_LYRIC_SOURCE) === key}>
+                    ${this._optionLabel(LYRIC_SOURCES[key])}
+                  </option>`
+              )}
+            </select>
+            <span class="hint">
+              ${this._zh
+                ? "默认自动：先用 QQ 音乐匹配，失败再回退网易云。"
+                : "Auto: try QQ Music first, then fall back to NetEase."}
+            </span>
+          </label>
           ${this._switch(
             this._zh ? "全局歌词悬浮窗（单行 / 长按拖动）" : "Global floating lyric (one line, long-press drag)",
             config.floating_lyrics !== false,

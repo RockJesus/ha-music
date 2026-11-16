@@ -490,6 +490,11 @@ class HaMusicCard extends LitElement {
       .trim();
   }
 
+  _lyricsSource() {
+    const source = this._config?.lyrics_source;
+    return source === "qq" || source === "wy" ? source : "auto";
+  }
+
   _lyricsQueries(media) {
     const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
     const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
@@ -529,6 +534,8 @@ class HaMusicCard extends LitElement {
         const url = new URL(LYRICS_API, window.location.origin);
         url.searchParams.set("title", query.title);
         url.searchParams.set("artist", query.artist || "");
+        const lyricSource = this._lyricsSource();
+        if (lyricSource !== "auto") url.searchParams.set("source", lyricSource);
         const response = await fetch(url.toString(), {
           signal,
           headers: {
@@ -580,6 +587,7 @@ class HaMusicCard extends LitElement {
     return [
       this._cleanLyricsQuery(Array.isArray(media.title) ? media.title[0] : media.title),
       this._cleanLyricsQuery(Array.isArray(media.artist) ? media.artist[0] : media.artist),
+      this._lyricsSource(),
     ]
       .join("|")
       .toLowerCase();

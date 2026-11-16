@@ -386,6 +386,17 @@ export const cardStyles = css`
     pointer-events: none;
   }
 
+  .hm-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .hm-info[data-side-lyrics="true"] .hm-meta {
+    min-width: 0;
+  }
+
   .hm-meta {
     display: flex;
     flex-direction: column;
@@ -1830,6 +1841,63 @@ export const cardStyles = css`
     gap: 8px;
     padding: 2px 2px 4px;
     overflow: hidden;
+  }
+
+  .hm-lyrics-inline {
+    flex: 0 1 auto;
+    max-height: clamp(110px, 26vh, 320px);
+    padding: 4px 2px 2px;
+  }
+
+  .hm-lyrics-inline .hm-lyrics-head {
+    padding: 0 4px;
+  }
+
+  .hm-lyrics-inline .hm-lyrics-line {
+    margin-bottom: 2px;
+    padding: 5px 9px;
+    border-radius: 10px;
+    font-size: clamp(13px, 1.35cqi, 18px);
+    line-height: 1.35;
+  }
+
+  .hm-lyrics-inline .hm-lyrics-scroll {
+    padding: 2px 0 10px;
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 14px,
+      #000 calc(100% - 16px),
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 14px,
+      #000 calc(100% - 16px),
+      transparent 100%
+    );
+  }
+
+  .hm-lyrics-inline .hm-lyrics-empty {
+    min-height: 110px;
+  }
+
+  @container (min-width: 1120px) {
+    .hm-card[data-layout="full"] .hm-info[data-side-lyrics="true"] {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+      align-items: center;
+      gap: clamp(18px, 2.4vw, 44px);
+    }
+
+    .hm-card[data-layout="full"] .hm-info[data-side-lyrics="true"] .hm-meta {
+      min-width: 0;
+    }
+
+    .hm-lyrics-inline {
+      max-height: min(50vh, 420px);
+    }
   }
 
   .hm-lyrics-head {

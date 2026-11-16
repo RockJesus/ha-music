@@ -904,6 +904,12 @@ class HaMusicCard extends LitElement {
     }
   }
 
+  _sideLyricsVisible() {
+    if (!this._lyricsEnabled() || this._thumbMode() || this._lyricsOpen) return false;
+    if (this._layoutKey() !== "full") return false;
+    return (this._width || 0) >= 640 && (this._height || 0) >= 480;
+  }
+
   _toggleLyrics() {
     this._lyricsOpen = !this._lyricsOpen;
     this._lyricsScrolled = -2;
@@ -1695,7 +1701,10 @@ class HaMusicCard extends LitElement {
       this._state()?.state === "playing",
     );
     this._maybeLoadLyrics();
-    if (this._lyricsOpen && this._lyricsActive !== this._lyricsScrolled) {
+    if (
+      (this._lyricsOpen || this._sideLyricsVisible()) &&
+      this._lyricsActive !== this._lyricsScrolled
+    ) {
       this._lyricsScrolled = this._lyricsActive;
       if (typeof requestAnimationFrame !== "undefined") {
         requestAnimationFrame(() => {
@@ -2018,7 +2027,7 @@ class HaMusicCard extends LitElement {
 
   /* ---------------- 渲染 ---------------- */
 
-  _renderLyrics(media, position) {
+  _renderLyrics(media, position, inline = false) {
     const t = translator(this._hass?.language);
     const lyrics = this._lyrics;
     const timed = lyrics.lines.length > 0;
@@ -2079,7 +2088,7 @@ class HaMusicCard extends LitElement {
       body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
     }
 
-    return html`<section class="hm-lyrics" data-status=${lyrics.status}>
+    return html`<section class="hm-lyrics ${inline ? "hm-lyrics-inline" : ""}" data-status=${lyrics.status}>
       <div class="hm-lyrics-head">
         <span class="hm-lyrics-title">${t("lyrics")}</span>
         ${lyrics.source
@@ -2104,17 +2113,19 @@ class HaMusicCard extends LitElement {
             }}
           >+</button>
         </div>
-        <button
-          class="hm-lyrics-close"
-          aria-label=${t("close")}
-          title=${t("close")}
-          @click=${(event) => {
-            event.stopPropagation();
-            this._toggleLyrics();
-          }}
-        >
-          ${icon("close", 14)}
-        </button>
+        ${inline
+          ? nothing
+          : html`<button
+              class="hm-lyrics-close"
+              aria-label=${t("close")}
+              title=${t("close")}
+              @click=${(event) => {
+                event.stopPropagation();
+                this._toggleLyrics();
+              }}
+            >
+              ${icon("close", 14)}
+            </button>`}
       </div>
       <div class="hm-lyrics-scroll">${body}</div>
     </section>`;
@@ -2209,6 +2220,8 @@ class HaMusicCard extends LitElement {
         this._lyrics.status === "loading" ||
         this._lyrics.status === "error" ||
         this._lyricsOpen);
+    const sideLyrics =
+      showLyrics && !this._lyricsOpen && this._sideLyricsVisible();
 
     const lyricLine =
       this._lyrics.status === "ready" && this._lyrics.lines.length
@@ -2253,7 +2266,7 @@ class HaMusicCard extends LitElement {
                 ? html`<button
                     class="hm-icon-btn hm-lyrics-btn"
                     data-role="lyrics"
-                    data-active=${this._lyricsOpen ? "true" : "false"}
+                    data-active=${this._lyricsOpen || sideLyrics ? "true" : "false"}
                     aria-label=${t("lyrics")}
                     title=${t("lyrics")}
                     @click=${() => this._toggleLyrics()}
@@ -2353,6 +2366,7 @@ class HaMusicCard extends LitElement {
               <div class="hm-cover-halo"></div>
             </div>
 
+            <div class="hm-info" data-side-lyrics=${sideLyrics ? "true" : "false"}>
             <div class="hm-meta">
               <div class="hm-kicker">
                 ${subtitle || t("noMedia")}
@@ -2425,12 +2439,14 @@ class HaMusicCard extends LitElement {
                       : nothing}
                   </div>`
                 : nothing}
-              ${lyricLine && layout === "full" && !this._thumbMode() && (this._panel || this._height >= 360)
+              ${lyricLine && !sideLyrics && layout === "full" && !this._thumbMode() && (this._panel || this._height >= 360)
                 ? html`<div class="hm-now-lyric">
                     <span class="hm-now-lyric-mark">${icon("lyrics", 12)}</span>
                     <span>${lyricLine}</span>
                   </div>`
                 : nothing}
+            </div>
+            ${sideLyrics ? this._renderLyrics(media, position, true) : nothing}
             </div>
           </section>`}
 

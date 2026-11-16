@@ -494,6 +494,23 @@ class HaMusicEditor extends LitElement {
             config.show_lyrics !== false,
             (checked) => this._update({ show_lyrics: checked })
           )}
+          <label class="field">
+            <span class="label">
+              ${this._zh ? "歌词后端接口（可选）" : "Lyrics backend (optional)"}
+            </span>
+            <input
+              type="text"
+              .value=${config.lyrics_api || ""}
+              placeholder="/api/netease_lyrics/lyrics"
+              @change=${(e) =>
+                this._update({ lyrics_api: e.target.value.trim() || undefined })}
+            />
+            <span class="hint">
+              ${this._zh
+                ? "仅支持同源 /api/ 路径；可接入 knoop7/lyrics-card 等 QQ/网易云歌词后端。留空时使用 LRCLIB。"
+                : "Same-origin /api/ only; supports QQ/NetEase lyric backends. Leave empty to use LRCLIB."}
+            </span>
+          </label>
           ${this._switch(
             this._zh ? "显示分组信息" : "Show group info",
             config.show_group !== false,

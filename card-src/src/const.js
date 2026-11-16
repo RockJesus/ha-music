@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "1.3.11";
+export const CARD_VERSION = "1.4.0";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -158,6 +158,8 @@ const EN = {
   lyricsLoading: "Matching lyrics…",
   lyricsNone: "No lyrics found",
   lyricsError: "Lyrics unavailable",
+  lyricsRetry: "Retry",
+  lyricsOffset: "Lyric timing offset",
   lyricsInstrumental: "Instrumental · no lyrics",
 };
 
@@ -212,6 +214,8 @@ const ZH = {
   lyricsLoading: "正在匹配歌词…",
   lyricsNone: "未找到歌词",
   lyricsError: "歌词暂不可用",
+  lyricsRetry: "重试",
+  lyricsOffset: "歌词时间偏移",
   lyricsInstrumental: "纯音乐 · 无歌词",
 };
 

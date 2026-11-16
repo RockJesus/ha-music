@@ -75,3 +75,31 @@ export function lyricIndex(lines, position) {
   }
   return found;
 }
+
+
+// 清理平台标题里的现场版、括号说明和分隔符，提升跨库匹配率。
+// 例如 "Shape of You (Live) [Remix]" -> "Shape of You"
+export function cleanLyricText(value) {
+  return String(value || "")
+    .replace(/\([^)]*\)|\[[^\]]*\]|（[^）]*）|【[^】]*】/g, " ")
+    .replace(/[\s\-_~～|/]+/g, " ")
+    .trim();
+}
+
+// 当前行在「本行开始 -> 下一行开始」之间的进度，用于歌词卡拉OK填充。
+export function lyricProgress(lines, position, duration) {
+  const index = lyricIndex(lines, position);
+  if (index < 0) return { index: -1, progress: 0 };
+  const start = Number(lines[index].time) || 0;
+  const next = lines[index + 1]?.time;
+  const end = Number.isFinite(next)
+    ? next
+    : Number(duration) > start
+      ? Number(duration)
+      : start + 4;
+  const span = Math.max(0.05, end - start);
+  return {
+    index,
+    progress: Math.max(0, Math.min(1, (Math.max(0, Number(position) || 0) - start) / span)),
+  };
+}

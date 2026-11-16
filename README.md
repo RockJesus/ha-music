@@ -20,6 +20,7 @@
 - **元素不互相遮盖**：封面尺寸随可用高度计算，控制区强制单行、不再让音量换行；紧凑矮卡片自动隐藏频谱和封面光晕，保证标题、进度、控制条各占独立区域。
 - **卡片选择器缩略预览**：兼容旧 `hui-card-preview` 与 HA 2026.6 的 `hui-suggestion-card` / `hui-card[preview]`，在预览容器内使用独立的参考图 UI——圆角方形封面、大标题、频谱、进度条和完整控制条；按预览尺寸分 lg / md / sm 三档。
 - **自动歌词**：优先读取播放器实体自带歌词；没有时按「歌名 + 歌手 + 专辑 + 时长」从 LRCLIB 自动匹配，支持 LRC 时间轴同步高亮与点击歌词跳转。卡片会显示当前一句，点顶栏「歌词」按钮进入滚动歌词面板；纯文本歌词同样支持。歌词查询会向 LRCLIB 发送歌名/歌手/专辑等曲目信息，可在编辑器关闭。
+- **歌词补强**：当前句跟随播放进度做逐行卡拉OK填充；歌词面板内置 ±0.5 秒时间偏移，歌词提前/滞后可即时校准；常用歌词会缓存到浏览器本地，切歌/重载后优先复用；搜索会自动去掉 `(Live)`、`[Remix]`、括号说明和分隔符，并按多组「歌名/歌手」组合重试。可选的 `lyrics_api` 可接入同源 QQ/网易云歌词后端（如 `knoop7/lyrics-card` 的 `/api/netease_lyrics/lyrics`），不可用时自动回退 LRCLIB。
 - **三档自适应布局**：`full` 完整、`compact` 紧凑、`mini` 迷你单行；默认 `adaptive` 按卡片宽度自动切换（< 430px 进入 compact）。
 - **封面驱动配色**：从当前封面提取主色，混入次色与背景氛围光；跨域或取色失败时回退到主题色。
 - **面板单屏铺满**：面板视图按可用高度约束圆形封面，自动压缩主区，频谱、进度和控制条保持在单屏内，不产生纵向溢出；面板中卡片四角保留与普通卡片一致的圆角，不再是无圆角的直角铺满。
@@ -77,7 +78,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.3.11`
+   - URL：`/local/ha-music.js?v=1.4.0`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -100,7 +101,8 @@ entity: media_player.living_room
 | `visualizer` | `bars` \| `wave` \| `orbit` \| `none` | `bars` | 频谱动效 |
 | `volume_entity` | string | — | 用独立实体控制音量（如 `media_player.amplifier`） |
 | `show_volume` | bool | `true` | 显示音量条 |
-| `show_lyrics` | bool | `true` | 自动识别并显示歌词；关闭后不请求 LRCLIB |
+| `show_lyrics` | bool | `true` | 自动识别并显示歌词；关闭后不请求歌词接口 |
+| `lyrics_api` | string | — | 可选歌词后端，仅支持同源 `/api/` 路径；如 `/api/netease_lyrics/lyrics`，失败自动回退 LRCLIB |
 | `show_source` | bool | `true` | 显示音源 chip |
 | `show_queue` | bool | `true` | 显示队列按钮（需播放器提供 `queue` 属性） |
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
@@ -205,6 +207,8 @@ python3 -m http.server 8765
 ```
 
 ## 更新日志
+
+- **1.4.0**：补强歌词体验：逐行卡拉OK进度填充、±0.5 秒歌词时间偏移、本地歌词缓存、多组歌名/歌手搜索重试与标题清洗；新增可选同源歌词后端 `lyrics_api`，可接入 QQ/网易云歌词服务，失败回退 LRCLIB。
 
 - **1.3.11**：支持自动识别歌词（实体歌词优先，缺失时从 LRCLIB 按曲目匹配；LRC 时间轴同步高亮、当前句显示、点击歌词跳转）；面板视图恢复四角圆角，所有卡片尺寸统一圆角裁切。
 

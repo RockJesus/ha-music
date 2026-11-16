@@ -30,7 +30,7 @@ import {
 import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
-import { parseLyrics, lyricIndex } from "./lyrics.js";
+import { cleanLyricText, lyricIndex, lyricProgress, parseLyrics } from "./lyrics.js";
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -124,7 +124,8 @@ class HaMusicCard extends LitElement {
     this._lyricsActive = -1;
     this._lyricsScrolled = -2;
     this._lyricsAbort = null;
-    this._lyricsCache = new Map();
+    this._lyricsOffset = this._loadLyricsOffset();
+    this._lyricsCache = this._loadLyricsCache();
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -345,6 +346,194 @@ class HaMusicCard extends LitElement {
     this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
   }
 
+  _loadLyricsOffset() {
+    try {
+      const raw = localStorage.getItem("ha-music-lyrics-offset");
+      const value = Number(raw);
+      return Number.isFinite(value) ? clamp(value, -5, 5) : 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  _saveLyricsOffset() {
+    try {
+      localStorage.setItem(
+        "ha-music-lyrics-offset",
+        String(Number(this._lyricsOffset.toFixed(1)))
+      );
+    } catch (error) {
+      /* localStorage 不可用时只保留当前会话 */
+    }
+  }
+
+  _bumpLyricsOffset(delta) {
+    this._lyricsOffset = clamp(
+      Math.round((this._lyricsOffset + delta) * 10) / 10,
+      -5,
+      5
+    );
+    this._saveLyricsOffset();
+    this._lyricsScrolled = -2;
+    this.requestUpdate();
+  }
+
+  _loadLyricsCache() {
+    const cache = new Map();
+    try {
+      const list = JSON.parse(
+        localStorage.getItem("ha-music-lyrics-cache-v1") || "[]"
+      );
+      if (!Array.isArray(list)) return cache;
+      for (const item of list) {
+        if (!Array.isArray(item) || item.length !== 2) continue;
+        const [key, value] = item;
+        if (typeof key !== "string" || !value || value.status !== "ready") continue;
+        cache.set(key, {
+          status: "ready",
+          lines: Array.isArray(value.lines) ? value.lines : [],
+          plain: Array.isArray(value.plain) ? value.plain : [],
+          instrumental: Boolean(value.instrumental),
+          source: String(value.source || "LRCLIB"),
+        });
+      }
+    } catch (error) {
+      return cache;
+    }
+    return cache;
+  }
+
+  _saveLyricsCache() {
+    try {
+      const list = [...this._lyricsCache.entries()].slice(-24);
+      localStorage.setItem("ha-music-lyrics-cache-v1", JSON.stringify(list));
+    } catch (error) {
+      /* 忽略配额或隐私模式错误 */
+    }
+  }
+
+  _lyricsPosition(position) {
+    return Math.max(0, (Number(position) || 0) + this._lyricsOffset);
+  }
+
+  _lyricsApiPath() {
+    const configured = this._config?.lyrics_api;
+    if (!configured || typeof configured !== "string") return "";
+    try {
+      const url = new URL(configured, window.location.origin);
+      if (url.origin !== window.location.origin) return "";
+      if (!url.pathname.startsWith("/api/")) return "";
+      return url.pathname + url.search;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  async _fetchConfiguredLyrics(media, signal) {
+    const path = this._lyricsApiPath();
+    const token = this._hass?.auth?.data?.access_token;
+    if (!path || !token || !media.title || !media.artist) return null;
+    const url = new URL(path, window.location.origin);
+    url.searchParams.set("title", media.title);
+    url.searchParams.set("artist", media.artist);
+    const response = await fetch(url.toString(), {
+      signal,
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: "same-origin",
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const raw =
+      data?.lyrics ??
+      data?.syncedLyrics ??
+      data?.synced_lyrics ??
+      data?.plainLyrics ??
+      "";
+    if (!raw || typeof raw !== "string") return null;
+    const parsed = parseLyrics(raw);
+    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
+      return null;
+    }
+    const source =
+      data?.source === "qq"
+        ? "QQ"
+        : data?.source === "netease"
+          ? "网易云"
+          : data?.source || "HA";
+    return { parsed, source };
+  }
+
+  _lyricsSearchVariants(media) {
+    const title = String(media.title || "").trim();
+    const artist = String(media.artist || "").trim();
+    const cleanTitle = cleanLyricText(title) || title;
+    const cleanArtist = cleanLyricText(artist) || artist;
+    const primaryArtist = cleanArtist.split(/[ ,/&、，]+/)[0].trim();
+    const variants = [];
+    const add = (nextTitle, nextArtist, nextAlbum = "") => {
+      if (!nextTitle) return;
+      const key = `${nextTitle}|${nextArtist}|${nextAlbum}`.toLowerCase();
+      if (variants.some((variant) => variant.key === key)) return;
+      variants.push({
+        key,
+        title: nextTitle,
+        artist: nextArtist,
+        album: nextAlbum,
+        duration: media.duration,
+      });
+    };
+    add(title, artist, media.album || "");
+    add(cleanTitle, cleanArtist, "");
+    if (primaryArtist && primaryArtist !== cleanArtist) {
+      add(cleanTitle, primaryArtist, "");
+    }
+    return variants;
+  }
+
+  _pickLyricsCandidate(candidates, media) {
+    const targetTitle = cleanLyricText(media.title);
+    const targetArtist = cleanLyricText(media.artist);
+    const duration = Number(media.duration || 0);
+    return (
+      candidates
+        .slice()
+        .sort((a, b) => {
+          const score = (item) => {
+            const name = cleanLyricText(
+              item.trackName || item.track_name || ""
+            ).toLowerCase();
+            const author = cleanLyricText(
+              item.artistName || item.artist_name || ""
+            ).toLowerCase();
+            const exactTitle =
+              targetTitle && name === targetTitle.toLowerCase()
+                ? 14
+                : targetTitle && name.includes(targetTitle.toLowerCase())
+                  ? 6
+                  : 0;
+            const exactArtist =
+              targetArtist && author === targetArtist.toLowerCase()
+                ? 8
+                : targetArtist && author.includes(targetArtist.toLowerCase())
+                  ? 3
+                  : 0;
+            const diff = duration
+              ? -Math.min(8, Math.abs(Number(item.duration || 0) - duration))
+              : 0;
+            const synced = item.syncedLyrics ? 8 : item.plainLyrics ? 2 : 0;
+            const lineCount = item.syncedLyrics
+              ? Math.min(7, String(item.syncedLyrics).split("\n").length / 5)
+              : 0;
+            return exactTitle + exactArtist + diff + synced + lineCount;
+          };
+          return score(b) - score(a);
+        })[0] || null
+    );
+  }
+
   _embeddedLyrics() {
     const attrs = this._state()?.attributes || {};
     const meta = attrs.media_metadata || {};
@@ -391,6 +580,7 @@ class HaMusicCard extends LitElement {
       this._lyricsCache.delete(this._lyricsCache.keys().next().value);
     }
     this._lyricsCache.set(key, this._lyrics);
+    this._saveLyricsCache();
     this.requestUpdate();
   }
 
@@ -449,11 +639,6 @@ class HaMusicCard extends LitElement {
     const controller = new AbortController();
     this._lyricsAbort = controller;
     const timer = setTimeout(() => controller.abort(), 9000);
-    const params = new URLSearchParams();
-    if (media.title) params.set("track_name", media.title);
-    if (media.artist) params.set("artist_name", media.artist);
-    if (media.album) params.set("album_name", media.album);
-    if (media.duration) params.set("duration", String(Math.round(media.duration)));
 
     const accept = async (url) => {
       const response = await fetch(url, {
@@ -468,43 +653,88 @@ class HaMusicCard extends LitElement {
     };
 
     let picked = null;
+    let parsedCandidate = null;
     try {
-      if (media.title && media.artist) {
+      // 可选：优先走 HA 内的歌词后端（例如 knoop7/lyrics-card 的
+      // /api/netease_lyrics/lyrics），失败或未配置时再回退 LRCLIB。
+      const configured = await this._fetchConfiguredLyrics(
+        media,
+        controller.signal
+      ).catch((error) => {
+        if (error?.name === "AbortError") throw error;
+        return null;
+      });
+      if (controller.signal.aborted || key !== this._lyricsKey) return;
+      if (configured) {
+        this._setLyrics(key, configured.parsed, configured.source);
+        return;
+      }
+
+      const variants = this._lyricsSearchVariants(media);
+      const queryFor = (variant) => {
+        const query = new URLSearchParams();
+        query.set("track_name", variant.title);
+        if (variant.artist) query.set("artist_name", variant.artist);
+        if (variant.album) query.set("album_name", variant.album);
+        if (media.duration) query.set("duration", String(Math.round(media.duration)));
+        return query.toString();
+      };
+
+      for (const variant of variants.slice(0, 2)) {
+        if (!variant.title || !variant.artist) continue;
         try {
-          const exact = await accept(`https://lrclib.net/api/get?${params.toString()}`);
-          if (exact && !Array.isArray(exact)) picked = exact;
+          const exact = await accept(
+            `https://lrclib.net/api/get?${queryFor(variant)}`
+          );
+          if (exact && !Array.isArray(exact)) {
+            const parsed = parseLyrics(
+              exact.syncedLyrics || exact.plainLyrics || ""
+            );
+            const useful =
+              parsed.lines.length >= 3 ||
+              parsed.plain.length >= 3 ||
+              parsed.instrumental;
+            if (useful || !picked) {
+              picked = exact;
+              parsedCandidate = parsed;
+            }
+            if (useful) break;
+          }
         } catch (error) {
-          if (error.name === "AbortError") throw error;
+          if (error?.name === "AbortError") throw error;
         }
       }
-      if (!picked) {
+
+      const shortExact =
+        parsedCandidate &&
+        parsedCandidate.lines.length < 3 &&
+        parsedCandidate.plain.length < 3 &&
+        !parsedCandidate.instrumental;
+      if (!picked || shortExact) {
+        const variant = variants[1] || variants[0] || {
+          title: media.title,
+          artist: media.artist,
+        };
         const query = new URLSearchParams();
-        if (media.title) query.set("track_name", media.title);
-        if (media.artist) query.set("artist_name", media.artist);
-        if (!media.title && media.artist) query.set("q", media.artist);
-        const list = await accept(`https://lrclib.net/api/search?${query.toString()}`);
+        query.set("track_name", variant.title);
+        if (variant.artist) query.set("artist_name", variant.artist);
+        const list = await accept(
+          `https://lrclib.net/api/search?${query.toString()}`
+        );
         const candidates = Array.isArray(list) ? list : list ? [list] : [];
-        const title = String(media.title || "").trim().toLowerCase();
-        const duration = Number(media.duration || 0);
-        picked =
-          candidates
-            .slice()
-            .sort((a, b) => {
-              const score = (item) => {
-                const name = String(item.trackName || item.track_name || "").trim().toLowerCase();
-                const exact = name && name === title ? 12 : name.includes(title) ? 5 : 0;
-                const diff = duration
-                  ? -Math.min(8, Math.abs(Number(item.duration || 0) - duration))
-                  : 0;
-                const synced = item.syncedLyrics ? 8 : item.plainLyrics ? 2 : 0;
-                return exact + diff + synced;
-              };
-              return score(b) - score(a);
-            })[0] || null;
+        const best = this._pickLyricsCandidate(candidates, media);
+        if (best) picked = best;
       }
+
       if (controller.signal.aborted || key !== this._lyricsKey) return;
       if (!picked) {
-        this._lyrics = { status: "none", lines: [], plain: [], instrumental: false, source: "LRCLIB" };
+        this._lyrics = {
+          status: "none",
+          lines: [],
+          plain: [],
+          instrumental: false,
+          source: "LRCLIB",
+        };
         this.requestUpdate();
         return;
       }
@@ -512,21 +742,47 @@ class HaMusicCard extends LitElement {
         this._setLyrics(
           key,
           { lines: [], plain: [], instrumental: true },
-          picked.syncedLyrics || picked.plainLyrics ? "LRCLIB" : "LRCLIB"
+          "LRCLIB"
         );
         return;
       }
-      const parsed = parseLyrics(picked.syncedLyrics || picked.plainLyrics || "");
+      const parsed = parseLyrics(
+        picked.syncedLyrics || picked.plainLyrics || ""
+      );
       if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
-        this._lyrics = { status: "none", lines: [], plain: [], instrumental: false, source: "LRCLIB" };
+        this._lyrics = {
+          status: "none",
+          lines: [],
+          plain: [],
+          instrumental: false,
+          source: "LRCLIB",
+        };
         this.requestUpdate();
         return;
       }
       this._setLyrics(key, parsed, "LRCLIB");
     } catch (error) {
-      if (controller.signal.aborted || error.name === "AbortError") return;
+      if (error?.name === "AbortError") {
+        if (this._lyricsAbort === controller && key === this._lyricsKey) {
+          this._lyrics = {
+            status: "error",
+            lines: [],
+            plain: [],
+            instrumental: false,
+            source: this._lyricsApiPath() ? "歌词接口" : "LRCLIB",
+          };
+          this.requestUpdate();
+        }
+        return;
+      }
       if (key !== this._lyricsKey) return;
-      this._lyrics = { status: "error", lines: [], plain: [], instrumental: false, source: "LRCLIB" };
+      this._lyrics = {
+        status: "error",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: this._lyricsApiPath() ? "歌词接口" : "LRCLIB",
+      };
       this.requestUpdate();
     } finally {
       clearTimeout(timer);
@@ -541,6 +797,15 @@ class HaMusicCard extends LitElement {
       this._lyricsActive = -1;
       this._maybeLoadLyrics();
     }
+    this.requestUpdate();
+  }
+
+  _retryLyrics() {
+    this._lyricsKey = "";
+    this._lyricsAbort?.abort();
+    this._lyricsAbort = null;
+    this._lyricsOpen = true;
+    this._maybeLoadLyrics();
     this.requestUpdate();
   }
 
@@ -1644,11 +1909,15 @@ class HaMusicCard extends LitElement {
     const lyrics = this._lyrics;
     const timed = lyrics.lines.length > 0;
     const plain = lyrics.plain || [];
-    const active = timed
-      ? Math.max(0, lyricIndex(lyrics.lines, position))
-      : -1;
+    const lyricPosition = this._lyricsPosition(position);
+    const progress = timed
+      ? lyricProgress(lyrics.lines, lyricPosition, media.duration)
+      : { index: -1, progress: 0 };
+    const active = timed ? Math.max(0, progress.index) : -1;
+    const lineProgress = active >= 0 ? progress.progress : 0;
     this._lyricsActive = active;
     const canSeek = hasFeature(this._state(), FEATURES.SEEK);
+    const offsetLabel = `${this._lyricsOffset > 0 ? "+" : ""}${this._lyricsOffset.toFixed(1)}s`;
 
     let body = nothing;
     if (lyrics.status === "loading") {
@@ -1658,7 +1927,18 @@ class HaMusicCard extends LitElement {
     } else if (lyrics.status === "none") {
       body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
     } else if (lyrics.status === "error") {
-      body = html`<div class="hm-lyrics-empty">${t("lyricsError")}</div>`;
+      body = html`<div class="hm-lyrics-empty hm-lyrics-error">
+        <span>${t("lyricsError")}</span>
+        <button
+          class="hm-lyrics-retry"
+          @click=${(event) => {
+            event.stopPropagation();
+            this._retryLyrics();
+          }}
+        >
+          ${t("lyricsRetry")}
+        </button>
+      </div>`;
     } else if (lyrics.instrumental) {
       body = html`<div class="hm-lyrics-empty">${t("lyricsInstrumental")}</div>`;
     } else if (timed) {
@@ -1667,11 +1947,14 @@ class HaMusicCard extends LitElement {
           class="hm-lyrics-line"
           data-active=${index === active ? "true" : "false"}
           data-time=${line.time}
+          style=${`--hm-line-progress:${index === active ? Math.round(lineProgress * 100) : 0}%`}
           @click=${() => {
-            if (canSeek) this._seekTo(line.time);
+            if (canSeek) {
+              this._seekTo(Math.max(0, line.time - this._lyricsOffset));
+            }
           }}
         >
-          ${line.text}
+          <span class="hm-lyrics-text">${line.text}</span>
         </button>`
       );
     } else if (plain.length) {
@@ -1688,6 +1971,25 @@ class HaMusicCard extends LitElement {
         ${lyrics.source
           ? html`<span class="hm-lyrics-source">${lyrics.source}</span>`
           : nothing}
+        <div class="hm-lyrics-offset" title=${t("lyricsOffset")}>
+          <button
+            type="button"
+            aria-label="-0.5s"
+            @click=${(event) => {
+              event.stopPropagation();
+              this._bumpLyricsOffset(-0.5);
+            }}
+          >−</button>
+          <span>${offsetLabel}</span>
+          <button
+            type="button"
+            aria-label="+0.5s"
+            @click=${(event) => {
+              event.stopPropagation();
+              this._bumpLyricsOffset(0.5);
+            }}
+          >+</button>
+        </div>
         <button
           class="hm-lyrics-close"
           aria-label=${t("close")}
@@ -1791,12 +2093,13 @@ class HaMusicCard extends LitElement {
       layout !== "mini" &&
       (this._lyrics.status === "ready" ||
         this._lyrics.status === "loading" ||
+        this._lyrics.status === "error" ||
         this._lyricsOpen);
 
     const lyricLine =
       this._lyrics.status === "ready" && this._lyrics.lines.length
         ? this._lyrics.lines[
-            Math.max(0, lyricIndex(this._lyrics.lines, position))
+            Math.max(0, lyricIndex(this._lyrics.lines, this._lyricsPosition(position)))
           ]?.text || ""
         : "";
     const coverUrl = normalizeArt(hass, media.art);

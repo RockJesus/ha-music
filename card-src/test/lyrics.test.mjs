@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { lyricIndex, parseLyrics } from "../src/lyrics.js";
+import { cleanLyricText, lyricIndex, lyricProgress, parseLyrics } from "../src/lyrics.js";
 
 test("parseLyrics 解析 LRC 时间轴并忽略元信息", () => {
   const parsed = parseLyrics(
@@ -32,4 +32,20 @@ test("lyricIndex 返回当前时间对应的歌词行", () => {
   assert.equal(lyricIndex(lines, 19.99), 0);
   assert.equal(lyricIndex(lines, 20.01), 1);
   assert.equal(lyricIndex(lines, 99), 2);
+});
+
+
+test("cleanLyricText 去掉现场版/括号说明和分隔符", () => {
+  assert.equal(cleanLyricText("Shape of You (Live) [Remix]"), "Shape of You");
+  assert.equal(cleanLyricText("A/B - C_D"), "A B C D");
+  assert.equal(cleanLyricText("  "), "");
+});
+
+test("lyricProgress 计算当前行卡拉OK进度", () => {
+  const lines = [{ time: 10 }, { time: 20 }, { time: 30 }];
+  assert.deepEqual(lyricProgress(lines, 5), { index: -1, progress: 0 });
+  assert.equal(lyricProgress(lines, 10).index, 0);
+  assert.ok(Math.abs(lyricProgress(lines, 15).progress - 0.5) < 0.001);
+  assert.ok(Math.abs(lyricProgress(lines, 25, 40).progress - 0.5) < 0.001);
+  assert.ok(Math.abs(lyricProgress(lines, 35, 40).progress - 0.5) < 0.001);
 });

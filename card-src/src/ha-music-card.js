@@ -1965,7 +1965,10 @@ class HaMusicCard extends LitElement {
     const card = this.renderRoot?.querySelector?.(".hm-card");
     if (!card) return;
     const media = this._readMedia();
-    const artSource = media.art || "";
+    const state = this._state();
+    const unavailable =
+      !state || state.state === "unavailable" || state.state === "unknown";
+    const artSource = unavailable ? "" : media.art || "";
     const entityId = this._eid();
     if (artSource !== this._artSource) {
       this._artSource = artSource;
@@ -2588,7 +2591,10 @@ class HaMusicCard extends LitElement {
             Math.max(0, lyricIndex(this._lyrics.lines, this._lyricsPosition(position)))
           ]?.text || ""
         : "";
-    const coverUrl = this._artUrl;
+    const coverUrl =
+      state.state === "unavailable" || state.state === "unknown"
+        ? ""
+        : this._artUrl;
 
     return html`
       <div

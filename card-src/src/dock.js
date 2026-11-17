@@ -1679,12 +1679,16 @@ class HaMusicMini extends HTMLElement {
     const hass = resolveHass() || this._hass;
     if (hass?.states) this._hass = hass;
     const state = this._hass?.states?.[this._entity];
-    if (!state) {
+    const unavailable =
+      !state || state.state === "unavailable" || state.state === "unknown";
+    if (unavailable) {
+      const label = state?.attributes?.friendly_name || this._entity;
       if (this._mini.dataset.playing !== "false") this._mini.dataset.playing = "false";
-      if (this._title.textContent !== this._entity) this._title.textContent = this._entity;
+      if (this._title.textContent !== label) this._title.textContent = label;
       if (this._sub.textContent !== "实体不可用") this._sub.textContent = "实体不可用";
       this._setDisabled(true);
       this._progress.style.width = "0%";
+      // 不可用/实体缺失一律显示主题化默认封面，避免残留上一首封面。
       this._setArt(null);
       syncCoverSpin(this._art, false);
       this._syncFabEq(false, {}, 0);

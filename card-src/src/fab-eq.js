@@ -6,7 +6,7 @@ import { clamp, hashString } from "./util.js";
 
 const SIZE = 104;
 const BARS = 36;
-const HALF = BARS / 2;
+const MAX_BARS = 80;
 const DPR = Math.min(2, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
 const states = new WeakMap();
 const FALLBACK_ACCENT = ["#7b5cff", "#2ee6c5"];
@@ -44,16 +44,18 @@ function paint(canvas, bars, glow) {
   const R = size / 2;
   const maxLen = Math.max(4, R - r0 - 3);
   const accent = state.accent || FALLBACK_ACCENT;
+  const barCount = state.barCount || BARS;
+  const half = barCount / 2;
   ctx.lineCap = "round";
   ctx.shadowBlur = 5 + glow * 7;
 
-  for (let i = 0; i < BARS; i += 1) {
+  for (let i = 0; i < barCount; i += 1) {
     const v = clamp(bars[i] || 0, 0, 1);
-    const angle = (i / BARS) * Math.PI * 2 - Math.PI / 2;
+    const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
     const len = 2.2 + Math.pow(v, 1.05) * maxLen;
     const c = Math.cos(angle);
     const s = Math.sin(angle);
-    const t = Math.abs(i - HALF) / HALF;
+    const t = Math.abs(i - half) / half;
     const color = blend(accent[0], accent[1], t);
     const alpha = 0.5 + v * 0.48;
     ctx.strokeStyle = rgba(color, alpha);
@@ -120,8 +122,10 @@ function frame(canvas, now) {
   const kick = Math.pow(0.5 + 0.5 * Math.sin(angle * 2.15 + state.phase * 1.7), 3);
   const bars = [];
 
-  for (let h = 0; h < HALF; h += 1) {
-    const d = h / (HALF - 1); // 0 = 12 点低频，1 = 6 点高频
+  const barCount = state.barCount || BARS;
+  const half = barCount / 2;
+  for (let h = 0; h < half; h += 1) {
+    const d = h / (half - 1); // 0 = 12 点低频，1 = 6 点高频
     const band = Math.pow(1 - d, 1.05);
     const wobble = Math.sin(t * (4.6 + (state.hash % 9) * 0.25) + h * 1.1 + state.phase);
     const shimmer = Math.sin(t * (11.4 + (state.hash % 5) * 0.4) + h * 2.3);
@@ -133,10 +137,10 @@ function frame(canvas, now) {
       1,
     );
     bars[h] = value;
-    bars[BARS - 1 - h] = value;
+    bars[barCount - 1 - h] = value;
   }
 
-  for (let i = 0; i < BARS; i += 1) {
+  for (let i = 0; i < barCount; i += 1) {
     const prev = state.smooth[i] || 0;
     const target = bars[i] || 0;
     state.smooth[i] = target > prev ? prev + (target - prev) * 0.72 : prev + (target - prev) * 0.24;
@@ -207,7 +211,8 @@ export function syncFabEq(canvas, root, media = {}) {
       phase: 0,
       energy: 0.6,
       accent: FALLBACK_ACCENT,
-      smooth: new Array(BARS).fill(0),
+      smooth: new Array(MAX_BARS).fill(0),
+      barCount: BARS,
       raf: 0,
       clearTimer: 0,
     };
@@ -223,6 +228,12 @@ export function syncFabEq(canvas, root, media = {}) {
   state.size = size;
   state.r0 = Number.isFinite(innerRadius) ? innerRadius : size * 0.322;
   state.lineWidth = Math.max(2, Math.min(5, Number(media.lineWidth) || 3));
+  const requestedBars = Math.round(Number(media.bars) || BARS);
+  const nextBars = Math.max(24, Math.min(MAX_BARS, requestedBars - (requestedBars % 2)));
+  if (state.barCount !== nextBars) {
+    state.barCount = nextBars;
+    state.smooth.fill(0);
+  }
   state.target = media.target || null;
   state.applyShadow = media.applyShadow !== false;
   if (canvas.width !== Math.round(size * DPR)) {

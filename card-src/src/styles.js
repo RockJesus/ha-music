@@ -408,8 +408,9 @@ export const cardStyles = css`
     left: 50%;
     top: 50%;
     z-index: 0;
-    width: calc(100% + 14px);
-    height: calc(100% + 14px);
+    width: calc(var(--hm-cover-size, 168px) + 18px);
+    height: calc(var(--hm-cover-size, 168px) + 18px);
+    aspect-ratio: 1 / 1;
     translate: -50% -50%;
     border-radius: 50%;
     background: conic-gradient(

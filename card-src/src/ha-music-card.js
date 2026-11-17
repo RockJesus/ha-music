@@ -946,6 +946,13 @@ class HaMusicCard extends LitElement {
     const size = Math.min(360, width + 48);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
+    const glow = this.renderRoot?.querySelector?.(".hm-cover-eq-glow");
+    if (glow) {
+      const ring = Math.round(width + 18);
+      if (glow.style.width !== `${ring}px`) glow.style.width = `${ring}px`;
+      if (glow.style.height !== `${ring}px`) glow.style.height = `${ring}px`;
+      glow.style.aspectRatio = "1 / 1";
+    }
     const theme = THEMES[this._themeKey()];
     const customAccent = String(this._config?.accent || "");
     const accent = [
@@ -966,7 +973,8 @@ class HaMusicCard extends LitElement {
       position: this._seekPreview ?? media.position,
       size,
       innerRadius: width / 2 + 3,
-      lineWidth: size >= 220 ? 3 : 2.6,
+      lineWidth: size >= 220 ? 2.2 : 2,
+      bars: width >= 150 ? 64 : 48,
       target: cover,
       applyShadow: false,
       accent,

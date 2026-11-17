@@ -2480,7 +2480,12 @@ export const cardStyles = css`
 
   /* 宽屏整体按比例收一档：标题、歌手、主区间距随封面一起缩小，避免头重脚轻。 */
   @container (min-width: 821px) {
+    /* 左侧预留“封面 + 外圈音柱 + 安全边”，让封面在自己的左侧区域水平/垂直居中，
+       不再贴住卡片边缘或标题。 */
     .hm-card[data-panel="true"] .hm-main {
+      grid-template-columns:
+        minmax(0, calc(var(--hm-panel-cover, 34%) + 136px))
+        minmax(0, 1fr);
       gap: clamp(18px, 2.8vw, 40px);
     }
 

@@ -3,7 +3,7 @@
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
 import { THEMES, DEFAULT_THEME } from "./const.js";
-import { colorTriplet } from "./util.js";
+import { colorTriplet, resolveArtUrl } from "./util.js";
 
 const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
@@ -1065,6 +1065,8 @@ class HaMusicMini extends HTMLElement {
     this._open = false;
     this._folded = false;
     this._entity = "";
+    this._artSource = "";
+    this._artSeq = 0;
     this._hass = null;
     this._poll = null;
     this._press = null;
@@ -1673,22 +1675,34 @@ class HaMusicMini extends HTMLElement {
 
   _setArt(url) {
     if (!this._art) return;
-    if (url) {
-      try {
-        const resolved = new URL(url, window.location.href).href;
-        if (this._art.getAttribute("src") !== resolved) this._art.src = resolved;
-        this._fallback.style.display = "none";
-        this._mini?.style.setProperty("--fab-cover", `url(${JSON.stringify(resolved)})`);
-      } catch {
-        this._art.removeAttribute("src");
-        this._fallback.style.display = "grid";
-        this._mini?.style.removeProperty("--fab-cover");
-      }
-    } else {
-      this._art.removeAttribute("src");
-      this._fallback.style.display = "grid";
-      this._mini?.style.removeProperty("--fab-cover");
+    const source = url || "";
+    const token = ++this._artSeq;
+    this._artSource = source;
+    if (!source) {
+      this._clearArt();
+      return;
     }
+    resolveArtUrl(this._hass, source, this._entity).then((resolved) => {
+      if (token !== this._artSeq || this._artSource !== source) return;
+      if (!resolved) {
+        this._clearArt();
+        return;
+      }
+      try {
+        const normalized = new URL(resolved, window.location.href).href;
+        if (this._art.getAttribute("src") !== normalized) this._art.src = normalized;
+        this._fallback.style.display = "none";
+        this._mini?.style.setProperty("--fab-cover", `url(${JSON.stringify(normalized)})`);
+      } catch {
+        this._clearArt();
+      }
+    });
+  }
+
+  _clearArt() {
+    this._art?.removeAttribute("src");
+    if (this._fallback) this._fallback.style.display = "grid";
+    this._mini?.style.removeProperty("--fab-cover");
   }
 
   _setDisabled(disabled) {

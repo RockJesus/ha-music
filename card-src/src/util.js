@@ -310,6 +310,36 @@ export function normalizeArt(hass, path) {
   return path;
 }
 
+// 把外部 HTTP 封面改走 HA 同源代理，并用带鉴权的 fetch 转成 blob URL。
+// HTTPS 页面直接加载 http://<LAN-IP> 封面会被浏览器按混合内容拦截，
+// 表现就是封面空白、FAB 反复重试/闪烁。代理与 blob 缓存都按原始封面地址去重。
+const artBlobCache = new Map();
+
+export async function resolveArtUrl(hass, path, entityId) {
+  if (!path) return "";
+  const isHttp = /^http:\/\//i.test(path);
+  const httpsPage =
+    typeof window !== "undefined" && window.location?.protocol === "https:";
+  if (!isHttp || !httpsPage || !entityId || !hass?.fetchWithAuth) {
+    return normalizeArt(hass, path);
+  }
+  const proxy = `/api/media_player_proxy/${encodeURIComponent(
+    entityId
+  )}?v=${hashString(path)}`;
+  if (artBlobCache.has(proxy)) return artBlobCache.get(proxy);
+  try {
+    const response = await hass.fetchWithAuth(proxy);
+    if (!response?.ok) throw new Error(`cover proxy ${response?.status}`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    artBlobCache.set(proxy, objectUrl);
+    return objectUrl;
+  } catch {
+    // 代理不可用时宁可不显示，也不要把被拦截的 HTTP 地址塞回 <img>。
+    return "";
+  }
+}
+
 export function pickVolumeState(hass, config) {
   if (config?.volume_entity && hass?.states?.[config.volume_entity]) {
     return hass.states[config.volume_entity];

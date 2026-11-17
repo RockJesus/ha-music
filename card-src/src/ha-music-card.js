@@ -19,6 +19,7 @@ import {
   readQueue,
   hasFeature,
   normalizeArt,
+  resolveArtUrl,
   friendlyName,
   colorTriplet,
   deterministicPalette,
@@ -122,6 +123,9 @@ class HaMusicCard extends LitElement {
     this._showRemaining = false;
     this._drawer = this._emptyDrawer();
     this._artUrl = "";
+    this._artSource = "";
+    this._artApplied = "";
+    this._artSeq = 0;
     this._artSlot = 0;
     this._dockOwner = false;
     this._unsubscribeDockPref = null;
@@ -272,6 +276,7 @@ class HaMusicCard extends LitElement {
       this._palette = null;
       this._paletteKey = "";
       this._artUrl = "";
+      this._artSource = "";
       this._resetLyrics();
     }
     if (this._config.show_lyrics === false) this._lyricsOpen = false;
@@ -1468,6 +1473,7 @@ class HaMusicCard extends LitElement {
     this._palette = null;
     this._paletteKey = "";
     this._artUrl = "";
+    this._artSource = "";
     this._menu = null;
     this._seekPreview = null;
     this._seekPending = null;
@@ -1890,10 +1896,21 @@ class HaMusicCard extends LitElement {
   updated() {
     const card = this.renderRoot?.querySelector?.(".hm-card");
     if (!card) return;
-    const url = this._artUrlFor();
-    if (url !== this._artUrl) {
-      this._artUrl = url;
-      this._crossFadeArt(card, url);
+    const media = this._readMedia();
+    const artSource = media.art || "";
+    const entityId = this._eid();
+    if (artSource !== this._artSource) {
+      this._artSource = artSource;
+      const seq = ++this._artSeq;
+      resolveArtUrl(this._hass, artSource, entityId).then((url) => {
+        if (seq !== this._artSeq || url === this._artUrl) return;
+        this._artUrl = url;
+        this.requestUpdate();
+      });
+    }
+    if (this._artUrl !== this._artApplied) {
+      this._artApplied = this._artUrl;
+      this._crossFadeArt(card, this._artUrl);
     }
     this._syncRangeValues();
     this._syncPanelFlag();
@@ -2481,7 +2498,7 @@ class HaMusicCard extends LitElement {
             Math.max(0, lyricIndex(this._lyrics.lines, this._lyricsPosition(position)))
           ]?.text || ""
         : "";
-    const coverUrl = normalizeArt(hass, media.art);
+    const coverUrl = this._artUrl;
 
     return html`
       <div

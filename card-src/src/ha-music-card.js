@@ -173,7 +173,12 @@ class HaMusicCard extends LitElement {
     this._coverSuppressClick = false;
     this._coverSuppressTimer = null;
     this._spectrumRaf = null;
-    this._spectrumBars = [];
+    this._spectrumCanvas = null;
+    this._spectrumCtx = null;
+    this._spectrumCount = 0;
+    this._spectrumCssW = 0;
+    this._spectrumCssH = 0;
+    this._spectrumDpr = 1;
     this._spectrumLevels = [];
     this._bandLevels = Object.assign([0.18, 0.14, 0.1], { live: false });
     this._spectrumLast = 0;
@@ -3632,39 +3637,9 @@ class HaMusicCard extends LitElement {
         })}
       </div>`;
     }
-    const visWidth =
-      this.renderRoot?.querySelector?.(".hm-vis")?.clientWidth ||
-      this.renderRoot?.querySelector?.(".hm-card")?.clientWidth ||
-      (this._panel ? 1600 : 360);
-    // 宽屏按约 7px 一根生成细柱，手机保持较少数量；上限 300 根兼顾性能与密度。
-    const count = clamp(Math.round(visWidth / 7), 48, 300);
-    const third = count / 3;
-    return html`<div class="hm-bars">
-      ${Array.from({ length: count }, (_, index) => {
-        const h = hashString(`${frame.seed}#${index}`);
-        const base = 0.14 + (h % 100) / 135;
-        const band = index < third ? 0 : index < third * 2 ? 1 : 2;
-        const react = [1, 0.62, 0.34][band];
-        const drive = band === 0 ? frame.low : frame.pulse;
-        const boost = band === 0 ? 1 + 0.12 * drive : 1;
-        const height = clamp(
-          base * (0.55 + react * 0.55 * drive) * boost,
-          0.08,
-          1
-        );
-        const duration = 0.9 + ((h >> 8) % 100) / 90;
-        const delay = -(((h >> 16) % 100) / 45);
-        return html`<span
-          class="hm-bar"
-          style=${styleMap({
-            "--h": height.toFixed(3),
-            "--dur": `${duration.toFixed(2)}s`,
-            "--delay": `${delay.toFixed(2)}s`,
-            "--pos": `${((index / Math.max(1, count - 1)) * 100).toFixed(2)}%`,
-          })}
-        ></span>`;
-      })}
-    </div>`;
+    // 频谱统一画在一张 canvas 上：宽屏约 300 根细柱也不会生成几百个
+    // 独立合成层，避免逐根写 --h 触发整卡样式重算。
+    return html`<canvas class="hm-spectrum" aria-hidden="true"></canvas>`;
   }
 
   _stopSpectrum() {
@@ -4099,19 +4074,98 @@ class HaMusicCard extends LitElement {
     return { bars, punch, low: shape.low };
   }
 
+  _spectrumAccent() {
+    const theme = THEMES[this._themeKey()] || THEMES[DEFAULT_THEME];
+    const custom = String(this._config?.accent || "");
+    return [
+      /^#[0-9a-f]{3,8}$/i.test(custom) ? custom : theme.accent[0],
+      theme.accent[1],
+    ];
+  }
+
+  _syncSpectrumCanvas() {
+    const canvas = this.renderRoot?.querySelector?.(".hm-spectrum");
+    if (!canvas) {
+      this._spectrumCanvas = null;
+      this._spectrumCtx = null;
+      this._spectrumCount = 0;
+      return false;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+    if (!width || !height) return false;
+    const dpr = Math.min(2, Math.max(1, Number(window.devicePixelRatio) || 1));
+    const pixelWidth = Math.round(width * dpr);
+    const pixelHeight = Math.round(height * dpr);
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    this._spectrumCanvas = canvas;
+    this._spectrumCtx = canvas.getContext("2d");
+    this._spectrumCssW = width;
+    this._spectrumCssH = height;
+    this._spectrumDpr = dpr;
+    // 约 7px 一根细柱；用一张 canvas 承载宽屏 300 根，避免 DOM 合成层爆炸。
+    const count = clamp(Math.round(width / 7), 48, 300);
+    if (count !== this._spectrumCount) {
+      this._spectrumCount = count;
+      this._spectrumLevels = new Array(count).fill(0.12);
+    }
+    return true;
+  }
+
+  _drawSpectrum(levels, idle = false) {
+    const ctx = this._spectrumCtx;
+    const width = this._spectrumCssW;
+    const height = this._spectrumCssH;
+    const dpr = this._spectrumDpr;
+    const count = levels?.length || 0;
+    if (!ctx || !width || !height || !count) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+    const cell = width / count;
+    const gap = Math.min(2.4, Math.max(1.2, cell * 0.34));
+    const barWidth = Math.max(1, cell - gap);
+    const radius = Math.min(1.5, barWidth / 2);
+    const accent = this._spectrumAccent();
+    const grad = ctx.createLinearGradient(0, 0, width, 0);
+    grad.addColorStop(0, accent[0]);
+    grad.addColorStop(1, accent[1]);
+    ctx.fillStyle = grad;
+    for (let index = 0; index < count; index += 1) {
+      const level = clamp(Number(levels[index]) || 0, 0.02, 1);
+      const barHeight = Math.max(2, level * height);
+      const x = index * cell + (cell - barWidth) / 2;
+      const y = height - barHeight;
+      ctx.globalAlpha = idle ? 0.5 : 0.58 + level * 0.36;
+      if (typeof ctx.roundRect === "function" && barWidth >= 3) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, barHeight, [radius, radius, 0, 0]);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y, barWidth, barHeight);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   _syncSpectrum() {
-    const bars = Array.from(this.renderRoot?.querySelectorAll?.(".hm-bar") || []);
+    const canvas = this.renderRoot?.querySelector?.(".hm-spectrum");
     if (
-      !bars.length ||
+      !canvas ||
       this._thumbPreview ||
       (this._config?.visualizer || "bars") !== "bars"
     ) {
-      this._spectrumBars = [];
+      this._spectrumCanvas = null;
+      this._spectrumCtx = null;
+      this._spectrumCount = 0;
       this._stopSpectrum();
       this._teardownAudioSpectrum();
       return;
     }
-    this._spectrumBars = bars;
+    if (!this._syncSpectrumCanvas()) return;
     const reduceMotion =
       typeof matchMedia === "function" &&
       matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -4132,14 +4186,20 @@ class HaMusicCard extends LitElement {
 
   _applySpectrumIdle() {
     const frame = visualizerFrame(this._readMedia());
-    const count = this._spectrumBars.length;
+    const count = this._spectrumCount;
+    if (!count) return;
+    if (this._spectrumLevels.length !== count) {
+      this._spectrumLevels = new Array(count).fill(0.12);
+    }
+    const levels = this._spectrumLevels;
     const third = count / 3;
     for (let index = 0; index < count; index += 1) {
       const band = index < third ? 0 : index < third * 2 ? 1 : 2;
       const base = 0.12 + [0.1, 0.06, 0.03][band];
       const level = Math.min(0.24, base + frame.energy * 0.04);
-      this._spectrumBars[index]?.style.setProperty("--h", level.toFixed(3));
+      levels[index] = level;
     }
+    this._drawSpectrum(levels, true);
   }
 
   _maAnalysisAvailable() {
@@ -4298,7 +4358,7 @@ class HaMusicCard extends LitElement {
   }
 
   _spectrumTick(now) {
-    if (!this._spectrumBars.length) {
+    if (!this._spectrumCanvas || !this._spectrumCount) {
       this._stopSpectrum();
       return;
     }
@@ -4307,6 +4367,13 @@ class HaMusicCard extends LitElement {
       this._syncAudioPlayback(false, this._readMedia());
       this._stopSpectrum();
       return;
+    }
+    if (now - (this._spectrumSizeAt || 0) > 500) {
+      this._spectrumSizeAt = now;
+      if (!this._syncSpectrumCanvas()) {
+        this._stopSpectrum();
+        return;
+      }
     }
     const dt = this._spectrumLast
       ? Math.min(0.05, Math.max(0.001, (now - this._spectrumLast) / 1000))
@@ -4317,13 +4384,13 @@ class HaMusicCard extends LitElement {
     const key = this._trackKey(this._state());
     if (key !== this._spectrumKey) {
       this._spectrumKey = key;
-      this._spectrumLevels = this._spectrumBars.map(() => 0.12);
+      this._spectrumLevels = new Array(this._spectrumCount).fill(0.12);
       this._syncSpectrumTrack(media);
     }
     this._ensureMaAnalysis(media, key);
     const time = now / 1000;
     const levels = this._spectrumLevels;
-    const count = this._spectrumBars.length;
+    const count = this._spectrumCount;
     const audioReady = this._audioSpectrumReady();
     const audioRead = audioReady ? this._readAudioLevels(count) : null;
     const audioRaw = audioRead?.levels || null;
@@ -4405,8 +4472,8 @@ class HaMusicCard extends LitElement {
       const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;
       const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
       levels[index] = next;
-      this._spectrumBars[index]?.style.setProperty("--h", next.toFixed(3));
     }
+    this._drawSpectrum(levels);
     this._spectrumRaf = requestAnimationFrame((nextNow) => this._spectrumTick(nextNow));
   }
 

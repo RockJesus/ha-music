@@ -615,48 +615,10 @@ export const cardStyles = css`
     opacity: 0.34;
   }
 
-  .hm-bars {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
+  .hm-spectrum {
+    display: block;
+    width: 100%;
     height: 100%;
-  }
-
-  .hm-bar {
-    flex: 1 1 0;
-    min-width: 1.5px;
-    height: 100%;
-    border-radius: 1.5px 1.5px 1px 1px;
-    /* 每根柱子按横向位置取主题渐变的对应颜色；不支持 color-mix 时回退主色。 */
-    background-color: rgba(var(--hm-a1-rgb), 0.92);
-    background-image: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.16),
-      rgba(255, 255, 255, 0) 56%,
-      rgba(0, 0, 0, 0.24)
-    );
-    opacity: calc(0.55 + var(--h) * 0.45);
-    transform: scaleY(var(--h));
-    transform-origin: bottom center;
-    transition: transform 0.07s linear, opacity 0.07s linear;
-    will-change: transform, opacity;
-    box-shadow: 0 0 8px -2px rgba(var(--hm-a1-rgb), 0.55);
-  }
-
-  @supports (color: color-mix(in srgb, red, blue)) {
-    .hm-bar {
-      background-color: color-mix(
-        in srgb,
-        var(--hm-spec-a1) calc(100% - var(--pos, 0%)),
-        var(--hm-spec-a2)
-      );
-      box-shadow: 0 0 8px -2px
-        color-mix(
-          in srgb,
-          var(--hm-spec-a1) calc(100% - var(--pos, 0%)),
-          var(--hm-spec-a2)
-        );
-    }
   }
 
   .hm-wave-wrap {
@@ -3256,7 +3218,6 @@ export const cardStyles = css`
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hm-bar,
     .hm-wave-wrap svg,
     .hm-orbit-ring,
     .hm-grid,
@@ -3272,8 +3233,7 @@ export const cardStyles = css`
     .hm-cover,
     .hm-play,
     .hm-btn,
-    .hm-icon-btn,
-    .hm-bar {
+    .hm-icon-btn {
       transition: none;
     }
 

@@ -3592,16 +3592,6 @@ class HaMusicCard extends LitElement {
             </div>
           </section>`}
 
-          ${visualizer !== "none" && !this._lyricsOpen
-            ? html`<div
-                class="hm-vis"
-                data-playing=${playing ? "true" : "false"}
-                data-style=${visualizer}
-              >
-                ${this._renderVisualizer(visualizer, media)}
-              </div>`
-            : nothing}
-
           ${duration > 0
             ? html`<section class="hm-progress">
                 <span class="hm-time">${formatTime(position)}</span>
@@ -3728,6 +3718,17 @@ class HaMusicCard extends LitElement {
                 </div>`
               : nothing}
           </section>
+
+          ${visualizer !== "none" && !this._lyricsOpen
+            ? html`<div
+                class="hm-vis"
+                data-playing=${playing ? "true" : "false"}
+                data-style=${visualizer}
+              >
+                ${this._renderVisualizer(visualizer, media)}
+              </div>`
+            : nothing}
+
         </div>
 
         ${this._menu

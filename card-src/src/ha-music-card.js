@@ -3370,7 +3370,7 @@ class HaMusicCard extends LitElement {
 
           ${this._lyricsOpen
             ? this._renderLyrics(media, position)
-            : html`<section class="hm-main">
+            : html`<section class="hm-main" data-side-lyrics=${sideLyrics ? "true" : "false"}>
             <div class="hm-cover-wrap">
               <canvas class="hm-cover-eq" aria-hidden="true"></canvas>
               <button

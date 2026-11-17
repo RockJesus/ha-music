@@ -2097,6 +2097,14 @@ export const cardStyles = css`
   }
 
   @container (min-width: 1120px) {
+    .hm-card[data-layout="full"][data-panel="false"][data-thumb="false"]
+      .hm-main[data-side-lyrics="false"] {
+      width: fit-content;
+      max-width: 100%;
+      margin-inline: auto;
+      grid-template-columns: var(--hm-cover-size) minmax(0, max-content);
+    }
+
     .hm-card[data-layout="full"] .hm-info[data-side-lyrics="true"] {
       display: grid;
       grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);

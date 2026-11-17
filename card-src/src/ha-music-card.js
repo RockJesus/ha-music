@@ -4299,8 +4299,8 @@ class HaMusicCard extends LitElement {
         target = (audioTargets || maTargets)[index];
         const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const drive = this._bandLevels[zone] || 0;
-        // 左/中/右三块分别由低/中/高频段能量推动，同时保留逐柱频谱细节。
-        target = clamp(target * 0.56 + drive * 0.64, 0.03, 1);
+        // 左/中/右三块用低频/中频/高频能量做增益，保留逐柱细节，避免整段被推到天花板。
+        target = clamp(target * (0.58 + drive * 0.48), 0.03, 1);
       } else {
         const band = index < 12 ? 0 : index < 24 ? 1 : 2;
         const seed = hashString(`${frame.seed}#${index}`);
@@ -4330,6 +4330,8 @@ class HaMusicCard extends LitElement {
           1
         );
       }
+      // 顶部留出约 18% 余量，并用 gamma 拉开强弱差，避免整排柱子顶满、只剩细小锯齿。
+      target = clamp(0.055 + Math.pow(clamp(target, 0, 1), 1.6) * 0.76, 0.045, 0.82);
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
       const realTargets = audioTargets || maTargets;
       const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;

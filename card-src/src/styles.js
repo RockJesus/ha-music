@@ -618,26 +618,45 @@ export const cardStyles = css`
   .hm-bars {
     display: flex;
     align-items: flex-end;
-    gap: 3px;
+    gap: 2px;
     height: 100%;
   }
 
   .hm-bar {
     flex: 1 1 0;
-    min-width: 2.5px;
+    min-width: 1.5px;
     height: 100%;
-    border-radius: 2px 2px 1px 1px;
-    background: linear-gradient(
+    border-radius: 1.5px 1.5px 1px 1px;
+    /* 每根柱子按横向位置取主题渐变的对应颜色；不支持 color-mix 时回退主色。 */
+    background-color: rgba(var(--hm-a1-rgb), 0.92);
+    background-image: linear-gradient(
       180deg,
-      rgba(var(--hm-a1-rgb), 0.95),
-      rgba(var(--hm-a2-rgb), 0.45)
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0) 56%,
+      rgba(0, 0, 0, 0.24)
     );
     opacity: calc(0.55 + var(--h) * 0.45);
     transform: scaleY(var(--h));
     transform-origin: bottom center;
     transition: transform 0.07s linear, opacity 0.07s linear;
     will-change: transform, opacity;
-    box-shadow: 0 0 10px -2px rgba(var(--hm-a1-rgb), 0.55);
+    box-shadow: 0 0 8px -2px rgba(var(--hm-a1-rgb), 0.55);
+  }
+
+  @supports (color: color-mix(in srgb, red, blue)) {
+    .hm-bar {
+      background-color: color-mix(
+        in srgb,
+        var(--hm-a1) calc(100% - var(--pos, 0%)),
+        var(--hm-a2)
+      );
+      box-shadow: 0 0 8px -2px
+        color-mix(
+          in srgb,
+          var(--hm-a1) calc(100% - var(--pos, 0%)),
+          var(--hm-a2)
+        );
+    }
   }
 
   .hm-wave-wrap {

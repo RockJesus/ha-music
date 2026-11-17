@@ -3630,12 +3630,18 @@ class HaMusicCard extends LitElement {
         })}
       </div>`;
     }
-    const count = 36;
+    const visWidth =
+      this.renderRoot?.querySelector?.(".hm-vis")?.clientWidth ||
+      this.renderRoot?.querySelector?.(".hm-card")?.clientWidth ||
+      (this._panel ? 1600 : 360);
+    // 宽屏按约 7px 一根生成细柱，手机保持较少数量；上限 300 根兼顾性能与密度。
+    const count = clamp(Math.round(visWidth / 7), 48, 300);
+    const third = count / 3;
     return html`<div class="hm-bars">
       ${Array.from({ length: count }, (_, index) => {
         const h = hashString(`${frame.seed}#${index}`);
         const base = 0.14 + (h % 100) / 135;
-        const band = index < 12 ? 0 : index < 24 ? 1 : 2;
+        const band = index < third ? 0 : index < third * 2 ? 1 : 2;
         const react = [1, 0.62, 0.34][band];
         const drive = band === 0 ? frame.low : frame.pulse;
         const boost = band === 0 ? 1 + 0.12 * drive : 1;
@@ -3652,6 +3658,7 @@ class HaMusicCard extends LitElement {
             "--h": height.toFixed(3),
             "--dur": `${duration.toFixed(2)}s`,
             "--delay": `${delay.toFixed(2)}s`,
+            "--pos": `${((index / Math.max(1, count - 1)) * 100).toFixed(2)}%`,
           })}
         ></span>`;
       })}
@@ -4124,8 +4131,9 @@ class HaMusicCard extends LitElement {
   _applySpectrumIdle() {
     const frame = visualizerFrame(this._readMedia());
     const count = this._spectrumBars.length;
+    const third = count / 3;
     for (let index = 0; index < count; index += 1) {
-      const band = index < 12 ? 0 : index < 24 ? 1 : 2;
+      const band = index < third ? 0 : index < third * 2 ? 1 : 2;
       const base = 0.12 + [0.1, 0.06, 0.03][band];
       const level = Math.min(0.24, base + frame.energy * 0.04);
       this._spectrumBars[index]?.style.setProperty("--h", level.toFixed(3));
@@ -4360,7 +4368,7 @@ class HaMusicCard extends LitElement {
         // 左/中/右三块用低频/中频/高频能量做增益，保留逐柱细节，避免整段被推到天花板。
         target = clamp(target * (0.58 + drive * 0.48), 0.03, 1);
       } else {
-        const band = index < 12 ? 0 : index < 24 ? 1 : 2;
+        const band = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const seed = hashString(`${frame.seed}#${index}`);
         const phase = ((seed % 360) / 360) * Math.PI * 2;
         const x = index / Math.max(1, count - 1);

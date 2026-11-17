@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.0.3`
+   - URL：`/local/ha-music.js?v=2.0.4`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -103,7 +103,7 @@ entity: media_player.living_room
 | `entities` | list | — | 多个播放器，卡片顶部显示切换胶囊 |
 | `name` | string | 实体名称 | 状态栏显示的播放器名称 |
 | `layout` | `adaptive` \| `full` \| `compact` \| `mini` | `adaptive` | 布局；`adaptive` 按宽度自动切换 |
-| `theme` | `aurora` \| `cyber` \| `liquid` \| `velvet` \| `mono` \| `sunset` \| `ocean` | `aurora` | 主卡片主题 |
+| `theme` | `aurora` \| `cyber` \| `liquid` \| `velvet` \| `mono` \| `sunset` \| `ocean` | `cyber` | 主卡片主题 |
 | `accent` | hex color | — | 覆盖主题主色，如 `"#ff5fa2"` |
 | `palette` | bool | `true` | 是否从封面取色（`false` 则固定主题色） |
 | `cover` | `ambient` \| `art` \| `palette` \| `none` | `ambient` | 背景模式 |
@@ -163,7 +163,7 @@ entity: media_player.living_room
 ```yaml
 type: custom:ha-music
 entity: media_player.living_room
-theme: aurora
+theme: cyber
 ```
 
 **液态玻璃 + 封面铺满 + 波形**

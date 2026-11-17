@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.0.3";
+export const CARD_VERSION = "2.0.4";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -29,7 +29,7 @@ export const FEATURES = {
 };
 
 export const DEFAULT_LAYOUT = "adaptive";
-export const DEFAULT_THEME = "aurora";
+export const DEFAULT_THEME = "cyber";
 export const DEFAULT_COVER = "ambient";
 export const DEFAULT_VISUALIZER = "bars";
 

@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from "lit";
 import {
   THEMES,
+  DEFAULT_THEME,
   LAYOUTS,
   COVER_MODES,
   VISUALIZERS,
@@ -456,7 +457,7 @@ class HaMusicEditor extends LitElement {
             <label class="field">
               <span class="label">${this._zh ? "主题" : "Theme"}</span>
               <select
-                .value=${config.theme || "aurora"}
+                .value=${config.theme || DEFAULT_THEME}
                 @change=${(e) => this._update({ theme: e.target.value })}
               >
                 ${Object.keys(THEMES).map(
@@ -699,7 +700,7 @@ class HaMusicEditor extends LitElement {
           ].map(([mode, label]) => {
             const enabled = dockModes.includes(mode);
             const entity = dockEntities[mode] || this._mainEntity();
-            const theme = dockThemes[mode] || this._config.theme || "aurora";
+            const theme = dockThemes[mode] || this._config.theme || DEFAULT_THEME;
             return html`
               <div class="dock-row">
                 <label class="check">

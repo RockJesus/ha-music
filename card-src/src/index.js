@@ -9,6 +9,7 @@ import {
   normalizeDockThemes,
 } from "./dock.js";
 import { installLyricDock, loadLyricDockPref } from "./lyric-dock.js";
+import { DEFAULT_THEME } from "./const.js";
 
 // 同一个 bundle 既可作为 Lovelace 资源，也可作为全局模块加载。
 // 迷你播放器的位置由卡片 `dock` 配置记忆到 localStorage；也可用模块 URL 强制指定：
@@ -47,7 +48,7 @@ function bootGlobalLyricDock() {
     preferredEntity: pref?.entity || "",
     auto: true,
     source: "auto",
-    theme: "aurora",
+    theme: DEFAULT_THEME,
     hass: resolveHass(),
     lines: [],
     trackKey: "",

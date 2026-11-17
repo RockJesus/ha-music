@@ -3101,7 +3101,14 @@ class HaMusicCard extends LitElement {
       : { index: -1, progress: 0 };
     const active = timed ? Math.max(0, progress.index) : -1;
     const lineProgress = active >= 0 ? progress.progress : 0;
+    const activeChanged = active !== this._lyricsActive;
     this._lyricsActive = active;
+    // 不依赖 updated() 的生命周期时机：句子一变化就排一次居中。
+    // 面板未打开或没有歌词容器时，_centerActiveLyric 会自行 no-op。
+    if (activeChanged && active >= 0) {
+      this._lyricsScrolled = active;
+      this._centerActiveLyric();
+    }
     const canSeek = hasFeature(this._state(), FEATURES.SEEK);
     const offsetLabel = `${this._lyricsOffset > 0 ? "+" : ""}${this._lyricsOffset.toFixed(1)}s`;
 

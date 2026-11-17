@@ -4199,7 +4199,34 @@ class HaMusicCard extends LitElement {
         1.6
       );
     }
-    return this._shapeAudioBars(raw);
+    const shaped = this._shapeAudioBars(raw);
+    const centerSample = clamp(Math.round(posIndex), 0, wave.length - 1);
+    const centerPrev = clamp(centerSample - raiseSpan, 0, wave.length - 1);
+    const centerRms = Number(wave[centerSample]) || 0;
+    const centerRise = Math.max(0, centerRms - (Number(wave[centerPrev]) || 0));
+    // 低频看 1.2 秒慢包络 + 拍点，中频看当前 RMS，高频看相邻帧瞬态抬升。
+    const slowSpan = Math.max(4, Math.round((binsPerSecond || 60) * 1.2));
+    const slowStart = Math.max(0, Math.round(posIndex - slowSpan));
+    let slowSum = 0;
+    let slowCount = 0;
+    for (let index = slowStart; index <= centerSample; index += 1) {
+      slowSum += Number(wave[index]) || 0;
+      slowCount += 1;
+    }
+    const slowRms = slowCount ? slowSum / slowCount : 0;
+    const beatPhase =
+      period > 0
+        ? ((((position % period) + period) % period) / period)
+        : 0;
+    const beatPulse = period > 0 ? Math.exp(-beatPhase * 4.6) : 0;
+    const low = clamp(slowRms * 1.3 + beatPulse * 0.3 + 0.02, 0, 1);
+    const mid = clamp(centerRms + beatPulse * 0.05 + 0.01, 0, 1);
+    const high = clamp(
+      centerRise * 4.5 + Math.max(0, centerRms - slowRms) * 1.2 + 0.02,
+      0,
+      1
+    );
+    return { ...shaped, bands: [low, mid, high] };
   }
 
   _spectrumTick(now) {
@@ -4234,23 +4261,25 @@ class HaMusicCard extends LitElement {
     const audioRaw = audioRead?.levels || null;
     const shaped = audioRaw ? this._shapeAudioBars(audioRaw) : null;
     const audioTargets = shaped?.bars || null;
-    // 平滑三段能量，避免频谱跳变时整片音柱闪断。
-    if (audioRead?.bands) {
+    const maShaped = audioTargets ? null : this._maSpectrumShaped(count, media);
+    const maTargets = maShaped?.bars || null;
+    // 平滑三段能量，避免频谱跳变时整片音柱闪断。没有浏览器音频时，
+    // 用 MA 真实音轨 RMS 波形派生的低/中/高频包络继续驱动三频段分区。
+    const liveBands = audioRead?.bands || maShaped?.bands || null;
+    if (liveBands) {
       this._bandLevels.live = true;
       for (let band = 0; band < this._bandLevels.length; band += 1) {
         const current = this._bandLevels[band] || 0;
-        const target = audioRead.bands[band] || 0;
+        const target = liveBands[band] || 0;
         const attack = target > current ? 0.42 : 0.16;
         this._bandLevels[band] = current + (target - current) * attack;
       }
-    } else if (!audioTargets) {
+    } else {
       this._bandLevels.live = false;
       for (let band = 0; band < this._bandLevels.length; band += 1) {
         this._bandLevels[band] = Math.max(0.06, this._bandLevels[band] * 0.9);
       }
     }
-    const maShaped = audioTargets ? null : this._maSpectrumShaped(count, media);
-    const maTargets = maShaped?.bars || null;
     if (audioReady) {
       if (
         !this._audioPeak &&
@@ -4266,14 +4295,12 @@ class HaMusicCard extends LitElement {
     }
     for (let index = 0; index < count; index += 1) {
       let target;
-      if (audioTargets) {
-        target = audioTargets[index];
+      if (audioTargets || maTargets) {
+        target = (audioTargets || maTargets)[index];
         const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const drive = this._bandLevels[zone] || 0;
-        // 保留每根柱的频率细节，同时让左/中/右三块分别被高中低频段推动。
-        target = clamp(target * 0.58 + drive * 0.62, 0.03, 1);
-      } else if (maTargets) {
-        target = maTargets[index];
+        // 左/中/右三块分别由低/中/高频段能量推动，同时保留逐柱频谱细节。
+        target = clamp(target * 0.56 + drive * 0.64, 0.03, 1);
       } else {
         const band = index < 12 ? 0 : index < 24 ? 1 : 2;
         const seed = hashString(`${frame.seed}#${index}`);

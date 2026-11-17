@@ -2524,11 +2524,13 @@ class HaMusicCard extends LitElement {
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
     if (typeof requestAnimationFrame === "undefined") {
       this._fitPanel();
+      this._layoutWideCluster();
       return;
     }
     this._fitPanelRaf = requestAnimationFrame(() => {
       this._fitPanelRaf = null;
       this._fitPanel();
+      this._layoutWideCluster();
     });
   }
 
@@ -2576,6 +2578,57 @@ class HaMusicCard extends LitElement {
       size = Math.max(120, Math.min(mainH - 96, mainW * 0.30, 460));
     }
     this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
+  }
+
+  /**
+   * 宽屏歌词分栏时，封面、环形音柱与歌名/歌手作为一组整体水平居中，
+   * 居中范围是主区左缘到歌词左缘，歌词本身保持不动。
+   * 用 transform 而不是改列宽：歌词列不会被推走，标题过长时也能按可用间隙收敛。
+   */
+  _layoutWideCluster() {
+    const root = this.renderRoot;
+    const cover = root?.querySelector?.(".hm-cover-wrap");
+    const meta = root?.querySelector?.(".hm-meta");
+    const lyrics = root?.querySelector?.(".hm-lyrics-inline");
+    const main = root?.querySelector?.(".hm-main");
+    const info = root?.querySelector?.(".hm-info");
+    if (!cover || !meta) return;
+    cover.style.removeProperty("transform");
+    meta.style.removeProperty("transform");
+    if (!lyrics || !main || !info) return;
+    const cols = getComputedStyle(info).gridTemplateColumns;
+    if (!cols || cols === "none" || cols.trim().split(/\s+/).length < 2) return;
+
+    const ring = root.querySelector(".hm-cover-eq");
+    const mainRect = main.getBoundingClientRect();
+    const lyricsRect = lyrics.getBoundingClientRect();
+    const coverRect = cover.getBoundingClientRect();
+    const ringRect = ring?.getBoundingClientRect?.();
+    const ringLeft =
+      ringRect && ringRect.width > 0 ? ringRect.left : coverRect.left;
+    const metaRect = meta.getBoundingClientRect();
+
+    // 取文字实际右缘，而不是 meta 列的右缘：标题列常有余量，
+    // 按列宽判断会把整组误认为已经居中。
+    let contentRight = metaRect.left;
+    for (const child of meta.children) {
+      const range = document.createRange();
+      range.selectNodeContents(child);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0) contentRight = Math.max(contentRight, rect.right);
+    }
+    if (contentRight <= metaRect.left) contentRight = metaRect.right;
+
+    const regionLeft = mainRect.left;
+    const regionRight = lyricsRect.left - Math.max(16, mainRect.width * 0.012);
+    const clusterCenter = (ringLeft + contentRight) / 2;
+    const regionCenter = (regionLeft + regionRight) / 2;
+    const maxShift = Math.max(0, regionRight - contentRight);
+    const shift = Math.max(0, Math.min(regionCenter - clusterCenter, maxShift));
+    if (shift < 1) return;
+    const tx = `translateX(${shift.toFixed(1)}px)`;
+    cover.style.transform = tx;
+    meta.style.transform = tx;
   }
 
   _isPanelContext() {

@@ -1111,6 +1111,10 @@ class HaMusicMini extends HTMLElement {
     this._artSeq = 0;
     this._iconState = "";
     this._disabledState = null;
+    this._clockKey = "";
+    this._clockAt = 0;
+    this._clockBase = 0;
+    this._clockStamp = "";
     this._hass = null;
     this._poll = null;
     this._press = null;
@@ -1221,7 +1225,7 @@ class HaMusicMini extends HTMLElement {
         this._sync();
       }
       if (!this._boundsNodes) this._watchDockBounds();
-    }, 1000);
+    }, 500);
   }
 
   _watchDockBounds() {
@@ -1666,6 +1670,9 @@ class HaMusicMini extends HTMLElement {
       if (this._mini.dataset.open !== open) this._mini.dataset.open = open;
     }
     if (!this._entity) {
+      this._clockKey = "";
+      this._clockAt = 0;
+      this._clockBase = 0;
       if (this._mini.dataset.playing !== "false") this._mini.dataset.playing = "false";
       if (this._title.textContent !== "选择播放器") this._title.textContent = "选择播放器";
       if (this._sub.textContent !== "在卡片编辑器中选择位置") this._sub.textContent = "在卡片编辑器中选择位置";
@@ -1731,10 +1738,55 @@ class HaMusicMini extends HTMLElement {
     this._setArt(a.entity_picture);
     syncCoverSpin(this._art, playing);
     const duration = Number(a.media_duration || 0);
-    const position = Number(a.media_position || 0);
+    const position = this._displayPosition(playing, a, duration);
     this._syncFabEq(playing, a, position);
     const percent = duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
     this._progress.style.width = `${percent}%`;
+  }
+
+  // 与卡片的 _positionClock 同一口径：media_position 只是采样值，
+  // 播放中必须用 media_position_updated_at 作锚点补上状态上报延迟，
+  // 否则侧边栏 / 顶栏 / 右下角进度条会落后卡片一整段上报周期。
+  _displayPosition(playing, attrs = {}, duration = 0) {
+    const base = Number(attrs.media_position) || 0;
+    const stampText = String(attrs.media_position_updated_at || "");
+    const stamp = stampText ? Date.parse(stampText) : NaN;
+    const trackKey = [
+      this._entity,
+      attrs.media_title || "",
+      attrs.media_artist || "",
+      attrs.media_album_name || "",
+      attrs.media_duration || 0,
+      attrs.media_content_id || "",
+    ].join("|");
+    const now = Date.now();
+    const trackChanged = Boolean(this._clockKey && this._clockKey !== trackKey);
+    if (trackChanged || !this._clockKey) {
+      this._clockKey = trackKey;
+      this._clockAt = now;
+      this._clockBase = trackChanged ? 0 : base;
+      this._clockStamp = stampText;
+    } else if (!Number.isFinite(stamp)) {
+      // 没有采样时刻的播放器，用本地时钟从首次采样继续走。
+      if (Math.abs(base - this._clockBase) > 0.05) {
+        this._clockBase = base;
+        this._clockAt = now;
+      }
+    } else if (stampText !== this._clockStamp) {
+      this._clockBase = base;
+      this._clockAt = Math.min(stamp, now);
+      this._clockStamp = stampText;
+    }
+    let position = base;
+    if (playing) {
+      const anchor = Number.isFinite(stamp)
+        ? Math.min(stamp, now)
+        : this._clockAt || now;
+      const sourceBase = Number.isFinite(stamp) ? base : this._clockBase;
+      position = sourceBase + Math.max(0, (now - anchor) / 1000);
+    }
+    if (duration > 0) position = Math.min(duration, Math.max(0, position));
+    return Math.max(0, position);
   }
 
   _syncFabEq(playing, attrs = {}, position = 0) {

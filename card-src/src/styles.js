@@ -647,14 +647,14 @@ export const cardStyles = css`
     .hm-bar {
       background-color: color-mix(
         in srgb,
-        var(--hm-a1) calc(100% - var(--pos, 0%)),
-        var(--hm-a2)
+        var(--hm-spec-a1) calc(100% - var(--pos, 0%)),
+        var(--hm-spec-a2)
       );
       box-shadow: 0 0 8px -2px
         color-mix(
           in srgb,
-          var(--hm-a1) calc(100% - var(--pos, 0%)),
-          var(--hm-a2)
+          var(--hm-spec-a1) calc(100% - var(--pos, 0%)),
+          var(--hm-spec-a2)
         );
     }
   }

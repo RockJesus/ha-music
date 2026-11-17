@@ -1240,6 +1240,8 @@ class HaMusicCard extends LitElement {
       "--hm-base": theme.base,
       "--hm-a1": a1,
       "--hm-a2": a2,
+      "--hm-spec-a1": a1,
+      "--hm-spec-a2": theme.accent[1],
       "--hm-a1-rgb": rgb1,
       "--hm-a2-rgb": rgb2,
       "--hm-glow-rgb": glowRgb,

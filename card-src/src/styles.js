@@ -772,11 +772,9 @@ export const cardStyles = css`
     margin-top: -5.5px;
     border: none;
     border-radius: 50%;
-    background: #fff;
-    box-shadow:
-      0 0 0 3px rgba(var(--hm-a1-rgb), 0.22),
-      0 0 16px rgba(var(--hm-a1-rgb), 0.85);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    background: transparent;
+    box-shadow: none;
+    transition: none;
   }
 
   .hm-range:hover::-webkit-slider-thumb {
@@ -808,8 +806,8 @@ export const cardStyles = css`
     height: 18px;
     border: none;
     border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 0 12px rgba(var(--hm-a1-rgb), 0.8);
+    background: transparent;
+    box-shadow: none;
   }
 
   .hm-range[data-disabled="true"] {

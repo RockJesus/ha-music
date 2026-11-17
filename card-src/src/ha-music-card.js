@@ -163,6 +163,8 @@ class HaMusicCard extends LitElement {
     this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
     this._lyricsActive = -1;
     this._lyricsScrolled = -2;
+    this._lyricsScrollObserver = null;
+    this._lyricsScrollObserved = null;
     this._lyricsAbort = null;
     this._lyricsOffset = this._loadLyricsOffset();
     this._lyricsCache = this._loadLyricsCache();
@@ -422,6 +424,9 @@ class HaMusicCard extends LitElement {
     this._coverPress = null;
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
+    this._lyricsScrollObserver?.disconnect();
+    this._lyricsScrollObserver = null;
+    this._lyricsScrollObserved = null;
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
     this._fitPanelRaf = null;
     if (this._toastTimer) clearTimeout(this._toastTimer);
@@ -2512,6 +2517,7 @@ class HaMusicCard extends LitElement {
       this._lyricsScrolled = this._lyricsActive;
       this._centerActiveLyric();
     }
+    this._observeLyricsScroll();
     this._syncSpectrum();
     this._syncProgressTicker();
   }
@@ -3010,32 +3016,74 @@ class HaMusicCard extends LitElement {
 
   /* ---------------- 渲染 ---------------- */
 
+  _observeLyricsScroll() {
+    if (typeof ResizeObserver === "undefined") return;
+    const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
+    if (!scroll || scroll === this._lyricsScrollObserved) return;
+    this._lyricsScrollObserver?.disconnect();
+    this._lyricsScrollObserved = scroll;
+    this._lyricsScrollObserver = new ResizeObserver(() => {
+      if (this._lyricsActive >= 0 && scroll.isConnected) {
+        this._centerActiveLyric();
+      }
+    });
+    this._lyricsScrollObserver.observe(scroll);
+  }
+
   _centerActiveLyric() {
     if (typeof requestAnimationFrame === "undefined") return;
-    requestAnimationFrame(() => {
-      const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
-      const line = this.renderRoot?.querySelector?.(
-        '.hm-lyrics-line[data-active="true"]'
-      );
-      if (!scroll || !line) return;
-      // 上下留出半屏滚动空间，当前句才能停在容器垂直中线；
-      // 否则接近结尾的歌词会被 scrollTop 上限压在底部。
-      const pad = Math.max(0, Math.round((scroll.clientHeight - line.offsetHeight) / 2));
-      const padValue = `${pad}px`;
-      if (scroll.style.paddingTop !== padValue) {
-        scroll.style.paddingTop = padValue;
-        scroll.style.paddingBottom = padValue;
-      }
-      const scrollRect = scroll.getBoundingClientRect();
-      const lineRect = line.getBoundingClientRect();
-      const top =
-        scroll.scrollTop +
-        lineRect.top -
-        scrollRect.top -
-        scrollRect.height / 2 +
-        lineRect.height / 2;
-      scroll.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    });
+    const run = (attempt = 0) => {
+      requestAnimationFrame(() => {
+        const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
+        const line = this.renderRoot?.querySelector?.(
+          '.hm-lyrics-line[data-active="true"]'
+        );
+        if (!scroll || !line) return;
+        const viewH = scroll.clientHeight;
+        if (viewH < 24) {
+          if (attempt < 4) run(attempt + 1);
+          return;
+        }
+        // 上下各留半屏滚动空间，首句与末句也有空间停在垂直中线。
+        const pad = Math.max(0, Math.round((viewH - line.offsetHeight) / 2));
+        const padValue = `${pad}px`;
+        if (scroll.style.paddingTop !== padValue) {
+          scroll.style.paddingTop = padValue;
+          scroll.style.paddingBottom = padValue;
+        }
+        // 读一次布局，确保 padding 已生效后再计算位置。
+        void scroll.offsetHeight;
+        const target = () => {
+          const scrollRect = scroll.getBoundingClientRect();
+          const lineRect = line.getBoundingClientRect();
+          const top =
+            scroll.scrollTop +
+            lineRect.top -
+            scrollRect.top -
+            scrollRect.height / 2 +
+            lineRect.height / 2;
+          return Math.max(0, top);
+        };
+        scroll.scrollTo({ top: target(), behavior: "smooth" });
+        // 平滑滚动结束或布局二次变化（面板高度/封面尺寸）后再校正一次，
+        // 保证高亮句最终精确落在滚动区域垂直中线。
+        const settle = () => {
+          const current = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
+          if (current !== scroll) return;
+          const active = this.renderRoot?.querySelector?.(
+            '.hm-lyrics-line[data-active="true"]'
+          );
+          if (active !== line) return;
+          scroll.scrollTop = target();
+        };
+        if ("onscrollend" in scroll) {
+          scroll.addEventListener("scrollend", settle, { once: true });
+        } else {
+          setTimeout(settle, 420);
+        }
+      });
+    };
+    run();
   }
 
   _renderLyrics(media, position, inline = false) {

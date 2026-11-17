@@ -1220,6 +1220,17 @@ export const cardStyles = css`
     scrollbar-width: thin;
   }
 
+  .hm-drawer-note {
+    padding: 7px 8px;
+    margin-bottom: 4px;
+    border: 1px solid rgba(var(--hm-a1-rgb), 0.18);
+    border-radius: 9px;
+    background: rgba(var(--hm-a1-rgb), 0.07);
+    color: rgba(246, 248, 255, 0.56);
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
   .hm-list-item {
     display: flex;
     align-items: center;

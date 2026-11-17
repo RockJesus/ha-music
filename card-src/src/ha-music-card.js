@@ -17,6 +17,8 @@ import {
   formatTime,
   readMedia,
   readQueue,
+  readMassQueueItems,
+  readMaQueueDetails,
   hasFeature,
   normalizeArt,
   resolveArtUrl,
@@ -140,6 +142,7 @@ class HaMusicCard extends LitElement {
     this._volumePreview = null;
     this._showRemaining = false;
     this._drawer = this._emptyDrawer();
+    this._queueLoadToken = 0;
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
@@ -1577,7 +1580,39 @@ class HaMusicCard extends LitElement {
     this._guard(this._call("unjoin"));
   }
 
+  _callMassQueue(service, data) {
+    const hass = this._hass;
+    if (!hass?.callService) return Promise.resolve();
+    try {
+      const result = hass.callService("mass_queue", service, {
+        entity: this._eid(),
+        ...data,
+      });
+      return Promise.resolve(result);
+    } catch (error) {
+      this._notify(error?.message || String(error));
+      return Promise.reject(error);
+    }
+  }
+
   _playQueueItem(item) {
+    const massQueueReady = Boolean(
+      this._hass?.services?.mass_queue?.play_queue_item
+    );
+    if (item?.queueItemId && massQueueReady) {
+      this._guard(
+        this._callMassQueue("play_queue_item", { queue_item_id: item.queueItemId })
+      );
+      this._drawer = {
+        ...this._drawer,
+        items: (this._drawer.items || []).map((entry) => ({
+          ...entry,
+          active: entry.queueItemId === item.queueItemId,
+        })),
+      };
+      this.requestUpdate();
+      return;
+    }
     if (!item?.contentId) {
       this._notify(translator(this._hass?.language)("queueEmpty"));
       return;
@@ -1744,9 +1779,114 @@ class HaMusicCard extends LitElement {
     };
   }
 
+  _scrollQueueToActive() {
+    const root = this.shadowRoot;
+    const body = root?.querySelector(".hm-drawer-body");
+    const active = root?.querySelector('.hm-list-item[data-active="true"]');
+    if (!body || !active) return;
+    const top = active.offsetTop - body.offsetTop;
+    body.scrollTop = Math.max(
+      0,
+      top - body.clientHeight / 2 + active.offsetHeight / 2
+    );
+  }
+
+  _pickQueueResponse(response) {
+    if (!response) return null;
+    if (Array.isArray(response)) return response;
+    const direct = response[this._eid()] ?? response.entity ?? response;
+    if (Array.isArray(direct)) return direct;
+    return direct && typeof direct === "object" ? direct : null;
+  }
+
+  async _serviceResponse(domain, service, data) {
+    const hass = this._hass;
+    if (!hass?.callWS) throw new Error("Service response unavailable");
+    const result = await hass.callWS({
+      type: "call_service",
+      domain,
+      service,
+      service_data: data,
+      return_response: true,
+    });
+    return result?.response ?? null;
+  }
+
+  async _fetchMassQueueItems() {
+    const limit = clamp(Number(this._config?.max_queue) || 60, 20, 500);
+    try {
+      const response = await this._serviceResponse("mass_queue", "get_queue_items", {
+        entity: this._eid(),
+        limit,
+        limit_before: Math.min(15, limit),
+        limit_after: limit,
+      });
+      const items = this._pickQueueResponse(response);
+      return Array.isArray(items) ? items : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _fetchMaQueueDetails() {
+    try {
+      const response = await this._serviceResponse("music_assistant", "get_queue", {
+        entity_id: this._eid(),
+      });
+      return this._pickQueueResponse(response);
+    } catch {
+      return null;
+    }
+  }
+
+  async _loadQueue(token) {
+    const [massItems, details] = await Promise.all([
+      this._fetchMassQueueItems(),
+      this._fetchMaQueueDetails(),
+    ]);
+    if (
+      token !== this._queueLoadToken ||
+      !this._drawer?.open ||
+      this._drawer.mode !== "queue"
+    ) {
+      return;
+    }
+    const t = translator(this._hass?.language);
+    const currentId = details?.current_item?.queue_item_id || "";
+    const contentId = this._state()?.attributes?.media_content_id || "";
+    let items = massItems
+      ? readMassQueueItems(massItems, currentId, contentId)
+      : [];
+    const fullQueue = items.length > 0;
+    if (!items.length && details) {
+      items = readMaQueueDetails(details, contentId);
+    }
+    const total = Number(details?.items);
+    const index = Number(details?.current_index);
+    const title = [t("queue")];
+    if (Number.isFinite(total) && total > 0) {
+      title.push(`${Number.isFinite(index) ? index + 1 : "?"}/${total}`);
+    }
+    this._drawer = {
+      ...this._drawer,
+      items,
+      loading: false,
+      error: "",
+      title: title.join(" · "),
+      note: !fullQueue && items.length ? t("queueLimited") : "",
+      maUrl: this._maUrl(),
+      fullQueue,
+    };
+    this.requestUpdate();
+    this.updateComplete.then(() => this._scrollQueueToActive());
+  }
+
   _openQueue() {
     const t = translator(this._hass?.language);
-    const items = readQueue(this._state(), this._config?.max_queue ?? 40);
+    const state = this._state();
+    const items = readQueue(state, this._config?.max_queue ?? 40);
+    const maPlayer = this._isMaPlayer();
+    const token = ++this._queueLoadToken;
     this._drawer = {
       open: true,
       mode: "queue",
@@ -1754,10 +1894,24 @@ class HaMusicCard extends LitElement {
       cursor: -1,
       items,
       title: t("queue"),
-      loading: false,
+      loading: !items.length && maPlayer,
       error: "",
+      note: "",
+      maUrl: maPlayer ? this._maUrl() : "",
+      fullQueue: items.length > 0,
     };
     this.requestUpdate();
+    if (items.length) this.updateComplete.then(() => this._scrollQueueToActive());
+    if (items.length || !maPlayer) return;
+    this._loadQueue(token).catch((error) => {
+      if (token !== this._queueLoadToken) return;
+      this._drawer = {
+        ...this._drawer,
+        loading: false,
+        error: error?.message || t("queueEmpty"),
+      };
+      this.requestUpdate();
+    });
   }
 
   _openLibrary() {
@@ -1948,6 +2102,7 @@ class HaMusicCard extends LitElement {
     setTimeout(() => {
       if (this._drawer.open) return;
       this._drawer = this._emptyDrawer();
+      this._queueLoadToken += 1;
       this.requestUpdate();
     }, DRAWER_ANIM_MS);
   }
@@ -2663,8 +2818,11 @@ class HaMusicCard extends LitElement {
       soundModes.length > 0 && hasFeature(state, FEATURES.SELECT_SOUND_MODE);
     const groupMembers = media.groupMembers.filter((id) => id && id !== entityId);
     const showGroup = config.show_group !== false && media.groupMembers.length > 1;
+    const massQueueReady = Boolean(hass.services?.mass_queue?.get_queue_items);
     const showQueue =
-      config.show_queue !== false && queue.length > 0;
+      config.show_queue !== false &&
+      (queue.length > 0 ||
+        (maPlayer && (Boolean(state.attributes?.active_queue) || massQueueReady)));
     const showLibrary = config.show_library !== false && canBrowse;
     const visualizer = config.visualizer || "bars";
     const coverMode = config.cover || "ambient";
@@ -3869,6 +4027,7 @@ class HaMusicCard extends LitElement {
     const t = translator(this._hass?.language);
     const isLibrary = drawer.mode === "library";
     const isPlaylists = drawer.mode === "playlists";
+    const isQueue = drawer.mode === "queue";
     return html`
       <div
         class="hm-drawer ${drawer.open ? "open" : ""}"
@@ -3887,7 +4046,7 @@ class HaMusicCard extends LitElement {
               </button>`
             : nothing}
           <div class="hm-drawer-title">${drawer.title || (isLibrary ? t("library") : "")}</div>
-          ${isPlaylists && drawer.maUrl
+          ${(isPlaylists || (isQueue && drawer.maUrl)) && drawer.maUrl
             ? html`<button
                 class="hm-icon-btn hm-ma"
                 aria-label=${t("openAssistant")}
@@ -3907,6 +4066,9 @@ class HaMusicCard extends LitElement {
           </button>
         </div>
         <div class="hm-drawer-body">
+          ${isQueue && drawer.note
+            ? html`<div class="hm-drawer-note">${drawer.note}</div>`
+            : nothing}
           ${drawer.loading
             ? html`<div class="hm-empty"><span class="hm-spinner"></span></div>`
             : drawer.error

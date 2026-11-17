@@ -9,6 +9,8 @@ import {
   normalizeArt,
   readMedia,
   readQueue,
+  readMassQueueItems,
+  readMaQueueDetails,
   visualizerFrame,
   canTapSpectrumAudio,
   normalizeSpectrumPlaylist,
@@ -108,6 +110,75 @@ test("readQueue 归一化队列并遵守上限", () => {
   assert.equal(queue[0].active, true);
   assert.equal(queue[1].title, "B");
   assert.equal(readQueue({ attributes: {} }).length, 0);
+});
+
+test("readMassQueueItems 归一化 MA 完整队列并标记当前曲目", () => {
+  const items = readMassQueueItems(
+    [
+      {
+        queue_item_id: "q1",
+        media_title: "红豆",
+        media_artist: "王菲",
+        media_album_name: "唱游",
+        media_content_id: "library://track/4941",
+        media_image: "https://img.example/a.jpg",
+        media_duration: 256,
+      },
+      {
+        queue_item_id: "q2",
+        media_item: {
+          uri: "library://track/4942",
+          name: "不得不爱",
+          duration: 281,
+          image: "https://img.example/b.jpg",
+          artists: [{ name: "潘玮柏" }, { name: "弦子" }],
+          album: { name: "高手" },
+        },
+      },
+    ],
+    "q1",
+    "library://track/4941"
+  );
+  assert.equal(items.length, 2);
+  assert.equal(items[0].title, "红豆");
+  assert.equal(items[0].artist, "王菲");
+  assert.equal(items[0].queueItemId, "q1");
+  assert.equal(items[0].active, true);
+  assert.equal(items[1].title, "不得不爱");
+  assert.equal(items[1].artist, "潘玮柏, 弦子");
+  assert.equal(items[1].contentId, "library://track/4942");
+  assert.equal(items[1].active, false);
+});
+
+test("readMaQueueDetails 用当前/下一首兜底", () => {
+  const items = readMaQueueDetails(
+    {
+      current_index: 87,
+      current_item: {
+        queue_item_id: "q1",
+        media_item: {
+          uri: "library://track/4941",
+          name: "红豆",
+          duration: 256,
+          artists: [{ name: "王菲" }],
+          album: { name: "唱游" },
+        },
+      },
+      next_item: {
+        queue_item_id: "q2",
+        media_item: {
+          uri: "library://track/4942",
+          name: "不得不爱",
+          duration: 281,
+        },
+      },
+    },
+    "library://track/4941"
+  );
+  assert.equal(items.length, 2);
+  assert.equal(items[0].index, 87);
+  assert.equal(items[0].active, true);
+  assert.equal(items[1].index, 88);
 });
 
 test("normalizeArt 处理相对路径与绝对地址", () => {

@@ -297,10 +297,82 @@ export function readQueue(state, limit = 60) {
     art: item.entity_picture || item.thumbnail || item.artwork || "",
     contentId: item.media_content_id || item.content_id || "",
     contentType: item.media_content_type || item.content_type || "",
+    queueItemId: item.queue_item_id || item.queueItemId || "",
     active: Boolean(
       item.active || item.is_active || item.current || item.playing
     ),
   }));
+}
+
+// Music Assistant 的完整队列由 mass_queue 集成读取；字段比 HA 原生 queue 更扁平。
+// 当前曲目以 queue_item_id / media_content_id 双重匹配，避免同名歌曲误高亮。
+export function readMassQueueItems(items, currentQueueItemId = "", currentContentId = "") {
+  if (!Array.isArray(items)) return [];
+  return items.map((item, index) => {
+    const media = item?.media_item || {};
+    const contentId = media.uri || item?.media_content_id || "";
+    const queueItemId = item?.queue_item_id || item?.queueItemId || "";
+    const active =
+      Boolean(item?.active || item?.is_active || item?.current || item?.playing) ||
+      Boolean(currentQueueItemId && queueItemId === currentQueueItemId) ||
+      Boolean(!currentQueueItemId && currentContentId && contentId === currentContentId);
+    const artists = Array.isArray(media.artists)
+      ? media.artists.map((artist) => artist?.name).filter(Boolean).join(", ")
+      : "";
+    return {
+      index,
+      title:
+        item?.media_title ||
+        item?.title ||
+        media.name ||
+        (queueItemId && item?.name) ||
+        "",
+      artist: item?.media_artist || artists || item?.artist || "",
+      album: item?.media_album_name || media.album?.name || item?.album || "",
+      duration: Number(item?.media_duration ?? item?.duration ?? 0) || 0,
+      art:
+        item?.local_image_encoded ||
+        item?.media_image ||
+        media.image ||
+        item?.entity_picture ||
+        "",
+      contentId,
+      contentType: media.media_type || item?.media_content_type || "music",
+      queueItemId,
+      active,
+    };
+  });
+}
+
+// music_assistant.get_queue 只返回当前/下一首；作为没有 mass_queue 时的兜底，
+// 让用户至少能看到当前队列位置并直接切歌。
+export function readMaQueueDetails(details, currentContentId = "") {
+  if (!details || typeof details !== "object") return [];
+  const currentIndex = Number(details.current_index);
+  const items = [];
+  const push = (entry, offset) => {
+    if (!entry || typeof entry !== "object") return;
+    const media = entry.media_item || {};
+    const artists = Array.isArray(media.artists)
+      ? media.artists.map((artist) => artist?.name).filter(Boolean).join(", ")
+      : "";
+    const contentId = media.uri || entry.media_content_id || "";
+    items.push({
+      index: Number.isFinite(currentIndex) ? currentIndex + offset : offset,
+      title: media.name || entry.media_title || entry.name || "",
+      artist: artists || entry.media_artist || "",
+      album: media.album?.name || entry.media_album_name || "",
+      duration: Number(entry.duration ?? media.duration ?? 0) || 0,
+      art: media.image || entry.media_image || entry.entity_picture || "",
+      contentId,
+      contentType: media.media_type || "music",
+      queueItemId: entry.queue_item_id || "",
+      active: offset === 0 || Boolean(currentContentId && contentId === currentContentId),
+    });
+  };
+  push(details.current_item, 0);
+  push(details.next_item, 1);
+  return items;
 }
 
 export function normalizeArt(hass, path) {

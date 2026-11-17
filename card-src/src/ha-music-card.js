@@ -51,6 +51,14 @@ function isMobileUi() {
   return Boolean(window.matchMedia(MOBILE_MEDIA).matches);
 }
 
+// HA 的 media_position 是采样值，media_position_updated_at 才是采样时刻。
+// 进度必须以采样时刻为锚点，否则状态更新延迟会被当成“歌曲还没播到那里”。
+function positionAnchor(stamp, now = Date.now()) {
+  const parsed = typeof stamp === "number" ? stamp : Date.parse(String(stamp || ""));
+  if (!Number.isFinite(parsed)) return now;
+  return Math.min(parsed, now);
+}
+
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
 
@@ -215,6 +223,11 @@ class HaMusicCard extends LitElement {
     // 新曲目一律从 0 建立本地播放时钟，避免进度条/歌词跳到中段。
     const base = trackChanged ? 0 : Number(attrs.media_position) || 0;
     const stamp = attrs.media_position_updated_at || "";
+    const now = Date.now();
+    const resumed = Boolean(prior && prior.state !== state?.state);
+    // 同一首播放中把采样时刻作为时钟起点，补上 HA 状态上报的延迟；
+    // 换歌、恢复播放或没有时间戳时则从当前时刻开始。
+    const anchor = trackChanged || resumed || !stamp ? now : positionAnchor(stamp, now);
     if (
       !prior ||
       trackChanged ||
@@ -229,7 +242,7 @@ class HaMusicCard extends LitElement {
         trackKey,
         base,
         stamp,
-        at: Date.now(),
+        at: anchor,
       };
     }
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();

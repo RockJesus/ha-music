@@ -2493,7 +2493,18 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn::before {
-      content: none;
+      content: "";
+      position: absolute;
+      inset: 8%;
+      z-index: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.16), transparent 40%),
+        radial-gradient(circle at 50% 52%, rgba(var(--hm-a1-rgb), 0.22), transparent 72%);
+      filter: blur(4px);
+      opacity: 0.6;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn svg {
@@ -2501,8 +2512,8 @@ export const cardStyles = css`
       z-index: 1;
       width: clamp(22px, 8.2cqi, 32px);
       height: clamp(22px, 8.2cqi, 32px);
-      filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55))
-        drop-shadow(0 0 10px rgba(var(--hm-a1-rgb), 0.28));
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55))
+        drop-shadow(0 0 9px rgba(var(--hm-a1-rgb), 0.32));
       transition: transform 0.18s ease, filter 0.18s ease;
     }
 
@@ -2515,8 +2526,8 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn[data-on="true"] svg {
-      filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6))
-        drop-shadow(0 0 4px rgba(var(--hm-a1-rgb), 0.22));
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6))
+        drop-shadow(0 0 14px rgba(var(--hm-a1-rgb), 0.9));
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn:hover::before {
@@ -2526,15 +2537,15 @@ export const cardStyles = css`
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn:hover svg {
       transform: translateY(-1px);
-      filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6))
-        drop-shadow(0 0 10px rgba(var(--hm-a1-rgb), 0.4));
+      filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.6))
+        drop-shadow(0 0 14px rgba(var(--hm-a1-rgb), 0.65));
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-btn:active {
       transform: scale(0.92);
     }
 
-    /* 播放键：后现代“日蚀唱片” —— 平面主题渐变 + 炭黑缺口 + 错位硬阴影 */
+    /* 播放键：主题渐变球体 + 顶部高光 + 底部内阴影 + 呼吸光晕 */
     .hm-card[data-panel="true"] .hm-transport .hm-play {
       position: relative;
       isolation: isolate;
@@ -2545,28 +2556,30 @@ export const cardStyles = css`
       border: none;
       border-radius: 50%;
       color: #fff;
-      background-color: rgba(var(--hm-a1-rgb), 1);
-      background-image:
-        radial-gradient(
-          circle at 84% 16%,
-          #080a0e 0 24%,
-          rgba(255, 255, 255, 0.55) 24% 25.2%,
-          transparent 25.5%
-        ),
-        linear-gradient(
-          142deg,
-          rgba(var(--hm-a1-rgb), 1) 0%,
-          rgba(var(--hm-a2-rgb), 1) 100%
-        );
+      background:
+        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.58) 0%, rgba(255, 255, 255, 0.12) 27%, transparent 49%),
+        linear-gradient(145deg, rgba(var(--hm-a1-rgb), 1) 0%, rgba(var(--hm-a2-rgb), 1) 100%);
       box-shadow:
-        6px 6px 0 rgba(0, 0, 0, 0.52),
-        0 18px 34px -18px rgba(var(--hm-a1-rgb), 0.7),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+        0 18px 32px -14px rgba(var(--hm-a1-rgb), 0.95),
+        0 8px 18px -8px rgba(var(--hm-a2-rgb), 0.85),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.28);
       filter: none;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play::before {
-      content: none;
+      content: "";
+      position: absolute;
+      left: 14%;
+      right: 14%;
+      top: 8%;
+      height: 38%;
+      z-index: 1;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent);
+      filter: blur(1px);
+      opacity: 0.85;
+      pointer-events: none;
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play::after {
@@ -2576,20 +2589,9 @@ export const cardStyles = css`
       z-index: -1;
       border: none;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(var(--hm-a1-rgb), 0.26), transparent 68%);
-      opacity: 0.35;
+      background: radial-gradient(circle, rgba(var(--hm-a1-rgb), 0.3), transparent 68%);
+      opacity: 0.45;
       pointer-events: none;
-    }
-
-    /* 浅色主题：图标转为墨色，保证银白/粉彩盘面上的对比度 */
-    .hm-card[data-panel="true"][data-theme="mono"] .hm-transport .hm-play,
-    .hm-card[data-panel="true"][data-theme="liquid"] .hm-transport .hm-play {
-      color: #090b11;
-    }
-
-    .hm-card[data-panel="true"][data-theme="mono"] .hm-transport .hm-play svg,
-    .hm-card[data-panel="true"][data-theme="liquid"] .hm-transport .hm-play svg {
-      filter: drop-shadow(2px 2px 0 rgba(255, 255, 255, 0.5));
     }
 
     .hm-card[data-panel="true"] .hm-transport .hm-play.is-playing::after {
@@ -2602,45 +2604,25 @@ export const cardStyles = css`
       z-index: 2;
       width: clamp(30px, 12.3cqi, 48px);
       height: clamp(30px, 12.3cqi, 48px);
-      filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.45));
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
     }
 
-    /* 进度条：与音量同一套“推子”语言，细轨 + 竖向滑块 */
-    .hm-card[data-panel="true"] .hm-progress .hm-range::-webkit-slider-runnable-track {
-      height: 6px;
-      border-radius: 2px;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
-    }
-
-    .hm-card[data-panel="true"] .hm-progress .hm-range::-webkit-slider-thumb {
-      width: 9px;
-      height: 20px;
-      margin-top: -7px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, #ffffff 0%, #ffffff 36%, rgba(var(--hm-a1-rgb), 0.95) 100%);
-      box-shadow:
-        2px 2px 0 rgba(0, 0, 0, 0.45),
-        0 0 12px rgba(var(--hm-a1-rgb), 0.55);
-    }
-
-    /* 音量：后现代推子 —— 硬边渐变轨道 + 竖向方形滑块 + 错位硬阴影 */
+    /* 音量条同步主题光效：更厚的轨道 + 立体发光滑块 */
     .hm-card[data-panel="true"] .hm-volume .hm-range::-webkit-slider-runnable-track {
-      height: 8px;
-      border-radius: 2px;
+      height: 9px;
       box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.5),
-        0 0 14px rgba(var(--hm-a1-rgb), 0.16);
+        inset 0 2px 4px rgba(0, 0, 0, 0.45),
+        0 0 14px rgba(var(--hm-a1-rgb), 0.18);
     }
 
     .hm-card[data-panel="true"] .hm-volume .hm-range::-webkit-slider-thumb {
-      width: 11px;
-      height: 26px;
-      margin-top: -9px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, #ffffff 0%, #ffffff 38%, rgba(var(--hm-a1-rgb), 0.95) 100%);
+      width: 22px;
+      height: 22px;
+      margin-top: -6.5px;
+      background: radial-gradient(circle at 34% 28%, #ffffff 0%, #e9f8ff 58%, #cfe8ff 100%);
       box-shadow:
-        3px 3px 0 rgba(0, 0, 0, 0.45),
-        0 0 16px rgba(var(--hm-a1-rgb), 0.75),
+        0 0 0 3px rgba(var(--hm-a1-rgb), 0.2),
+        0 0 20px rgba(var(--hm-a1-rgb), 0.9),
         inset 0 1px 0 #ffffff;
     }
   }

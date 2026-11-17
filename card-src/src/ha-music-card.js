@@ -172,6 +172,8 @@ class HaMusicCard extends LitElement {
     this._coverGestureTimer = null;
     this._coverSuppressClick = false;
     this._coverSuppressTimer = null;
+    this._progressRaf = null;
+    this._progressLastSecond = -1;
     this._spectrumRaf = null;
     this._spectrumCanvas = null;
     this._spectrumCtx = null;
@@ -410,6 +412,7 @@ class HaMusicCard extends LitElement {
       this._onSpectrumGesture = null;
     }
     this._stopTimer();
+    this._stopProgressTicker();
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
     if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
     this._stopSpectrum();
@@ -1501,6 +1504,7 @@ class HaMusicCard extends LitElement {
     const input = event.target;
     const value = Number(input.value);
     this._seekPreview = value;
+    this._stopProgressTicker();
     const duration = this._readMedia().duration;
     input.style.setProperty(
       "--pct",
@@ -1517,6 +1521,7 @@ class HaMusicCard extends LitElement {
     const state = this._state();
     const attrs = state?.attributes || {};
     this._seekPreview = value;
+    this._stopProgressTicker();
     this._seekPending = {
       value,
       from: Number(attrs.media_position) || 0,
@@ -2525,6 +2530,7 @@ class HaMusicCard extends LitElement {
       }
     }
     this._syncSpectrum();
+    this._syncProgressTicker();
   }
 
   _queuePanelFit() {
@@ -2902,6 +2908,66 @@ class HaMusicCard extends LitElement {
       this._palette = palette;
       this.requestUpdate();
     });
+  }
+
+  _stopProgressTicker() {
+    if (this._progressRaf) cancelAnimationFrame(this._progressRaf);
+    this._progressRaf = null;
+    this._progressLastSecond = -1;
+  }
+
+  _syncProgressTicker() {
+    if (this._seekPreview !== null || this._state()?.state !== "playing") {
+      this._stopProgressTicker();
+      return;
+    }
+    const root = this.renderRoot;
+    const seek = root?.querySelector?.('input.hm-range[data-role="seek"]');
+    const media = this._readMedia();
+    if (!seek || !media.duration) {
+      this._stopProgressTicker();
+      return;
+    }
+    if (this._progressRaf) return;
+    this._progressLastSecond = -1;
+    this._progressRaf = requestAnimationFrame(() => this._progressTick());
+  }
+
+  _progressTick() {
+    this._progressRaf = null;
+    if (this._seekPreview !== null || this._state()?.state !== "playing") {
+      this._progressLastSecond = -1;
+      return;
+    }
+    const seek = this.renderRoot?.querySelector?.(
+      'input.hm-range[data-role="seek"]'
+    );
+    if (!seek) {
+      this._progressLastSecond = -1;
+      return;
+    }
+    const media = this._readMedia();
+    const duration = Number(media.duration) || 0;
+    if (!duration) {
+      this._progressLastSecond = -1;
+      return;
+    }
+    const position = clamp(Number(media.position) || 0, 0, duration);
+    const percent = clamp((position / duration) * 100, 0, 100);
+    // 只更新进度条本身，不触发整卡重绘；播放时按帧推进，拖动时由用户接管。
+    seek.value = String(position);
+    seek.style.setProperty("--pct", `${percent}%`);
+    const second = Math.floor(position);
+    if (second !== this._progressLastSecond) {
+      this._progressLastSecond = second;
+      const start = this.renderRoot?.querySelector?.(".hm-time");
+      if (start) start.textContent = formatTime(position);
+      if (this._showRemaining) {
+        const end = this.renderRoot?.querySelector?.(".hm-time.end");
+        if (end) end.textContent = `-${formatTime(Math.max(duration - position, 0))}`;
+      }
+    }
+    this._progressRaf = requestAnimationFrame(() => this._progressTick());
   }
 
   _syncRangeValues() {
@@ -3434,7 +3500,7 @@ class HaMusicCard extends LitElement {
                   type="range"
                   min="0"
                   max=${duration}
-                  step="0.5"
+                  step="0.01"
                   .value=${String(position)}
                   data-disabled=${!canSeek ? "true" : "false"}
                   style=${styleMap({ "--pct": `${percent}%` })}

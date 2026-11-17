@@ -142,6 +142,7 @@ class HaMusicCard extends LitElement {
     this._seekSettleTimer = null;
     this._volumePreview = null;
     this._volumeSettleTimer = null;
+    this._volumeSettleTicks = 0;
     this._showRemaining = false;
     this._drawer = this._emptyDrawer();
     this._queueLoadToken = 0;
@@ -397,8 +398,9 @@ class HaMusicCard extends LitElement {
     this._unsubscribeDockPref = null;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
     this._seekSettleTimer = null;
-    if (this._volumeSettleTimer) clearTimeout(this._volumeSettleTimer);
+    if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTimer = null;
+    this._volumeSettleTicks = 0;
     if (this._onMobileChange) {
       if (this._mobileMq?.removeEventListener) {
         this._mobileMq.removeEventListener("change", this._onMobileChange);
@@ -1579,13 +1581,20 @@ class HaMusicCard extends LitElement {
   _onVolumeCommit(event) {
     const volume = clamp(Number(event.target.value) / 100, 0, 1);
     this._volumePreview = null;
-    if (this._volumeSettleTimer) clearTimeout(this._volumeSettleTimer);
-    // 服务端音量回写可能晚于本轮渲染；超时后强制把滑块同步到实体值。
-    this._volumeSettleTimer = setTimeout(() => {
-      this._volumeSettleTimer = null;
-      this._volumePreview = null;
-      this._syncRangeValues();
-      this.requestUpdate();
+    if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
+    this._volumeSettleTicks = 0;
+    // 设备音量可能被二次收敛（先接受 0.36，几秒后再降到 0.22）。
+    // 提交后持续 9 秒、每 1.5 秒把滑块同步到实体值，直到音量稳定。
+    this._volumeSettleTimer = setInterval(() => {
+      this._volumeSettleTicks += 1;
+      if (this._volumePreview === null) {
+        this._syncRangeValues();
+        this.requestUpdate();
+      }
+      if (this._volumeSettleTicks >= 6) {
+        clearInterval(this._volumeSettleTimer);
+        this._volumeSettleTimer = null;
+      }
     }, 1500);
     this.requestUpdate();
     const info = this._volumeInfo(this._readMedia());

@@ -2510,24 +2510,7 @@ class HaMusicCard extends LitElement {
       this._lyricsActive !== this._lyricsScrolled
     ) {
       this._lyricsScrolled = this._lyricsActive;
-      if (typeof requestAnimationFrame !== "undefined") {
-        requestAnimationFrame(() => {
-          const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
-          const line = this.renderRoot?.querySelector?.(
-            '.hm-lyrics-line[data-active="true"]'
-          );
-          if (!scroll || !line) return;
-          const scrollRect = scroll.getBoundingClientRect();
-          const lineRect = line.getBoundingClientRect();
-          const top =
-            scroll.scrollTop +
-            lineRect.top -
-            scrollRect.top -
-            scrollRect.height / 2 +
-            lineRect.height / 2;
-          scroll.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-        });
-      }
+      this._centerActiveLyric();
     }
     this._syncSpectrum();
     this._syncProgressTicker();
@@ -3026,6 +3009,34 @@ class HaMusicCard extends LitElement {
   }
 
   /* ---------------- 渲染 ---------------- */
+
+  _centerActiveLyric() {
+    if (typeof requestAnimationFrame === "undefined") return;
+    requestAnimationFrame(() => {
+      const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
+      const line = this.renderRoot?.querySelector?.(
+        '.hm-lyrics-line[data-active="true"]'
+      );
+      if (!scroll || !line) return;
+      // 上下留出半屏滚动空间，当前句才能停在容器垂直中线；
+      // 否则接近结尾的歌词会被 scrollTop 上限压在底部。
+      const pad = Math.max(0, Math.round((scroll.clientHeight - line.offsetHeight) / 2));
+      const padValue = `${pad}px`;
+      if (scroll.style.paddingTop !== padValue) {
+        scroll.style.paddingTop = padValue;
+        scroll.style.paddingBottom = padValue;
+      }
+      const scrollRect = scroll.getBoundingClientRect();
+      const lineRect = line.getBoundingClientRect();
+      const top =
+        scroll.scrollTop +
+        lineRect.top -
+        scrollRect.top -
+        scrollRect.height / 2 +
+        lineRect.height / 2;
+      scroll.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    });
+  }
 
   _renderLyrics(media, position, inline = false) {
     const t = translator(this._hass?.language);

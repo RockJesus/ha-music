@@ -46,7 +46,7 @@ function paint(canvas, bars, glow) {
   const accent = state.accent || FALLBACK_ACCENT;
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
-  ctx.lineCap = "round";
+  ctx.lineCap = state.cap || "round";
   ctx.shadowBlur = 5 + glow * 7;
 
   for (let i = 0; i < barCount; i += 1) {
@@ -207,6 +207,7 @@ export function syncFabEq(canvas, root, media = {}) {
       size: SIZE,
       r0: 33.5,
       lineWidth: 3,
+      cap: "round",
       target: null,
       applyShadow: true,
       playing: false,
@@ -237,7 +238,8 @@ export function syncFabEq(canvas, root, media = {}) {
   state.root = root;
   state.size = size;
   state.r0 = Number.isFinite(innerRadius) ? innerRadius : size * 0.322;
-  state.lineWidth = Math.max(2, Math.min(5, Number(media.lineWidth) || 3));
+  state.lineWidth = Math.max(1.6, Math.min(5, Number(media.lineWidth) || 3));
+  state.cap = media.cap === "butt" ? "butt" : "round";
   const requestedBars = Math.round(Number(media.bars) || BARS);
   const nextBars = Math.max(24, Math.min(MAX_BARS, requestedBars - (requestedBars % 2)));
   if (state.barCount !== nextBars) {

@@ -141,6 +141,7 @@ class HaMusicCard extends LitElement {
     this._seekPending = null;
     this._seekSettleTimer = null;
     this._volumePreview = null;
+    this._volumeCommitAt = 0;
     this._volumeSettleTimer = null;
     this._volumeSettleTicks = 0;
     this._showRemaining = false;
@@ -1573,6 +1574,9 @@ class HaMusicCard extends LitElement {
   }
 
   _onVolumeInput(event) {
+    // 移动端松手时 change 之后还会补发一次 input，会把刚清掉的预览值重新写回，
+    // 造成滑块停在拖动值、百分比标签仍是实体旧值。提交后的短暂窗口内忽略补发。
+    if (Date.now() - this._volumeCommitAt < 300) return;
     const value = Number(event.target.value) / 100;
     this._volumePreview = value;
     event.target.style.setProperty("--pct", `${value * 100}%`);
@@ -1580,9 +1584,18 @@ class HaMusicCard extends LitElement {
 
   _onVolumeCommit(event) {
     const volume = clamp(Number(event.target.value) / 100, 0, 1);
+    this._volumeCommitAt = Date.now();
     this._volumePreview = null;
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTicks = 0;
+    // 兜底清除提交后补发的 input 预览，保证标签与实体一致。
+    setTimeout(() => {
+      if (this._volumeCommitAt && this._volumePreview !== null) {
+        this._volumePreview = null;
+        this._syncRangeValues();
+        this.requestUpdate();
+      }
+    }, 320);
     // 设备音量可能被二次收敛（先接受 0.36，几秒后再降到 0.22）。
     // 提交后持续 9 秒、每 1.5 秒把滑块同步到实体值，直到音量稳定。
     this._volumeSettleTimer = setInterval(() => {
@@ -3322,7 +3335,9 @@ class HaMusicCard extends LitElement {
     const duration = media.duration;
     const position = this._seekPreview ?? media.position;
     const percent = duration ? clamp((position / duration) * 100, 0, 100) : 0;
-    const volumePercent = Math.round(volume.level * 100);
+    const volumePercent = Math.round(
+      (this._volumePreview ?? volume.level) * 100
+    );
     const repeat = this._repeatValue();
     const mediaTitle = media.title || (isOff ? "" : "");
     const entities = this._entities();

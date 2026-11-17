@@ -1370,6 +1370,13 @@ class HaMusicMini extends HTMLElement {
 
   _applySavedPosition() {
     if (!this._mini || !this._mini.isConnected || this._dragging) return;
+    const mobile = window.innerWidth <= 700;
+    this._mini.style.removeProperty("display");
+    // 手机没有侧边栏，侧栏模式的悬浮播放器会浮在卡片正中挡住进度条，直接隐藏。
+    if (this._mode === "sidebar" && mobile) {
+      this._mini.style.display = "none";
+      return;
+    }
     if (this._mode === "fab") {
       const mini = this._mini;
       const rect = mini.getBoundingClientRect();
@@ -1377,9 +1384,9 @@ class HaMusicMini extends HTMLElement {
       const height = rect.height || 64;
       const constraints = getFabConstraints();
       const positions = loadDockPositions();
-      const pos = positions.fab;
-      const defaultX = constraints.vw - width - 24;
-      const defaultY = constraints.vh / 2 - height / 2;
+      const pos = mobile ? null : positions.fab;
+      const defaultX = constraints.vw - width - (mobile ? 12 : 24);
+      const defaultY = constraints.vh - height - (mobile ? 14 : 24);
       const target = clampFabPosition(
         pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
         pos && Number.isFinite(pos.y) ? pos.y * window.innerHeight : defaultY,
@@ -1411,11 +1418,13 @@ class HaMusicMini extends HTMLElement {
         const defaultX = addRect
           ? addRect.left - 8 - size
           : bounds.right - size - 80;
-        const x = clampNumber(
-          pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
-          bounds.left + margin,
-          bounds.right - size - margin,
-        );
+        const x = mobile
+          ? bounds.left + margin
+          : clampNumber(
+              pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
+              bounds.left + margin,
+              bounds.right - size - margin,
+            );
         mini.style.left = `${Math.round(x)}px`;
         mini.style.top = `${Math.round(bounds.top + Math.max(2, (bounds.height - size) / 2))}px`;
         mini.style.right = "auto";
@@ -1424,7 +1433,9 @@ class HaMusicMini extends HTMLElement {
       }
       const h = Math.round(Math.min(44, Math.max(38, bounds.height - 8)));
       const maxW = Math.max(150, bounds.width - margin * 2);
-      const w = Math.round(Math.min(300, Math.max(200, bounds.width - 140), maxW));
+      const w = mobile
+        ? Math.max(150, Math.min(374, window.innerWidth - 16))
+        : Math.round(Math.min(300, Math.max(200, bounds.width - 140), maxW));
       mini.style.width = `${w}px`;
       mini.style.height = `${h}px`;
       mini.style.removeProperty("max-height");
@@ -1433,11 +1444,13 @@ class HaMusicMini extends HTMLElement {
       const defaultX = addRect
         ? addRect.left - 8 - w
         : bounds.right - w - 80;
-      const x = clampNumber(
-        pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
-        bounds.left + margin,
-        bounds.right - w - margin,
-      );
+      const x = mobile
+        ? bounds.left + margin
+        : clampNumber(
+            pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
+            bounds.left + margin,
+            bounds.right - w - margin,
+          );
       mini.style.left = `${Math.round(x)}px`;
       mini.style.top = `${Math.round(bounds.top + Math.max(2, (bounds.height - h) / 2))}px`;
       mini.style.right = "auto";

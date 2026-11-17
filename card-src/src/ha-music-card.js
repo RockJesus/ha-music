@@ -3164,7 +3164,7 @@ class HaMusicCard extends LitElement {
                     title=${maPlayer ? t("playlists") : t("openAssistant")}
                     @click=${() => this._openPlaylists()}
                   >
-                    ${icon(maPlayer ? "playlist" : "external", 16)}
+                    ${icon(maPlayer ? "ma" : "external", 16)}
                   </button>`
                 : nothing}
               ${showQueue

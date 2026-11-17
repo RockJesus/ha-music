@@ -2567,8 +2567,9 @@ class HaMusicCard extends LitElement {
       const heightBudget = cardH * (narrow ? 0.3 : 0.45);
       size = Math.max(120, Math.min(mainW * widthRatio, heightBudget));
     } else {
-      // 宽屏：封面以主区可用高度为上限，同时保留 34% 宽度上限。
-      size = Math.max(120, Math.min(mainH, mainW * 0.34));
+      // 宽屏：封面不再吃满主区高度，预留 96px 给封面外圈音柱和底部频谱，
+      // 同时收窄到主区宽度的 30%，避免大封面视觉上压住下面的音柱。
+      size = Math.max(120, Math.min(mainH - 96, mainW * 0.30, 460));
     }
     this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
   }

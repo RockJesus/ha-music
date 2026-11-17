@@ -2478,6 +2478,21 @@ export const cardStyles = css`
     gap: clamp(10px, 1.6cqi, 18px);
   }
 
+  /* 宽屏整体按比例收一档：标题、歌手、主区间距随封面一起缩小，避免头重脚轻。 */
+  @container (min-width: 821px) {
+    .hm-card[data-panel="true"] .hm-main {
+      gap: clamp(18px, 2.8vw, 40px);
+    }
+
+    .hm-card[data-panel="true"] .hm-title {
+      font-size: clamp(26px, 3cqi, 46px);
+    }
+
+    .hm-card[data-panel="true"] .hm-artist {
+      font-size: clamp(13px, 1.3cqi, 18px);
+    }
+  }
+
   @container (max-width: 620px) {
     .hm-card[data-panel="true"] .hm-body {
       padding: 12px 14px;

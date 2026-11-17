@@ -1885,6 +1885,7 @@ class HaMusicCard extends LitElement {
           });
           if (info?.ingress_url) {
             this._maIngressPathValue = String(info.ingress_url);
+            await this._maGrantIngressSession(addon.slug, this._maIngressPathValue);
             return this._maIngressPathValue;
           }
         }
@@ -1897,6 +1898,23 @@ class HaMusicCard extends LitElement {
       return await this._maIngressPromise;
     } finally {
       this._maIngressPromise = null;
+    }
+  }
+
+  async _maGrantIngressSession(slug, path) {
+    if (!slug || !path || !this._hass?.callWS) return;
+    try {
+      const result = await this._hass.callWS({
+        type: "supervisor/ingress/session",
+        slug: String(slug),
+      });
+      const token = result?.session || result?.ingress_session || "";
+      if (!token || typeof document === "undefined") return;
+      const cookiePath = path.endsWith("/") ? path : `${path}/`;
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `ingress_session=${token}; Path=${cookiePath}; SameSite=Strict${secure}`;
+    } catch {
+      // 没有 ingress 权限时继续尝试；失败后由 _fetchMaApiQueue 回退。
     }
   }
 

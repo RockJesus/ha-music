@@ -37,11 +37,12 @@ function paint(canvas, bars, glow) {
   const state = states.get(canvas);
   if (!state?.ctx) return;
   const { ctx } = state;
+  const size = state.size || SIZE;
+  const r0 = state.r0 || 33.5;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.clearRect(0, 0, SIZE, SIZE);
-  const R = SIZE / 2;
-  const r0 = 33.5;
-  const maxLen = R - r0 - 3;
+  ctx.clearRect(0, 0, size, size);
+  const R = size / 2;
+  const maxLen = Math.max(4, R - r0 - 3);
   const accent = state.accent || FALLBACK_ACCENT;
   ctx.lineCap = "round";
   ctx.shadowBlur = 5 + glow * 7;
@@ -57,7 +58,7 @@ function paint(canvas, bars, glow) {
     const alpha = 0.5 + v * 0.48;
     ctx.strokeStyle = rgba(color, alpha);
     ctx.shadowColor = rgba(color, 0.12 + glow * 0.26);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = state.lineWidth || 3;
     ctx.beginPath();
     ctx.moveTo(R + c * r0, R + s * r0);
     ctx.lineTo(R + c * (r0 + len), R + s * (r0 + len));
@@ -80,16 +81,17 @@ function paint(canvas, bars, glow) {
 function clear(canvas) {
   const state = states.get(canvas);
   if (!state?.ctx) return;
+  const size = state.size || SIZE;
   state.ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  state.ctx.clearRect(0, 0, SIZE, SIZE);
+  state.ctx.clearRect(0, 0, size, size);
 }
 
-function setBeat(root, scale, glow, accent) {
+function setBeat(root, scale, glow, accent, target, applyShadow = true) {
   if (!root?.style) return;
   root.style.setProperty("--fab-beat", scale.toFixed(4));
   root.style.setProperty("--fab-beat-glow", glow.toFixed(3));
-  const disc = root.querySelector?.(".fab-disc");
-  if (disc) {
+  const disc = target || root.querySelector?.(".fab-disc");
+  if (disc && applyShadow) {
     const colors = accent || FALLBACK_ACCENT;
     const [r, g, b] = parseHex(colors[0]);
     const [r2, g2, b2] = parseHex(colors[1]);
@@ -143,7 +145,14 @@ function frame(canvas, now) {
   const glow = Math.min(1, low * 1.05 + kick * 0.4);
   paint(canvas, state.smooth, glow);
   const scale = 1 + Math.min(0.085, low * 0.05 + kick * 0.05);
-  setBeat(state.root, scale, 0.16 + Math.min(0.46, low * 0.5 + kick * 0.26), state.accent);
+  setBeat(
+    state.root,
+    scale,
+    0.16 + Math.min(0.46, low * 0.5 + kick * 0.26),
+    state.accent,
+    state.target,
+    state.applyShadow,
+  );
   state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
 }
 
@@ -154,7 +163,7 @@ function stop(canvas, { clearNow = false } = {}) {
     cancelAnimationFrame(state.raf);
     state.raf = 0;
   }
-  setBeat(state.root, 1, 0);
+  setBeat(state.root, 1, 0, state.accent, state.target, state.applyShadow);
   state.smooth.fill(0);
   if (clearNow) {
     clear(canvas);
@@ -183,6 +192,11 @@ export function syncFabEq(canvas, root, media = {}) {
     state = {
       ctx,
       root,
+      size: SIZE,
+      r0: 33.5,
+      lineWidth: 3,
+      target: null,
+      applyShadow: true,
       playing: false,
       visible: true,
       position: 0,
@@ -202,8 +216,19 @@ export function syncFabEq(canvas, root, media = {}) {
   const accent = Array.isArray(media.accent) && media.accent.length >= 2
     ? [media.accent[0], media.accent[1]]
     : FALLBACK_ACCENT;
+  const size = Math.max(72, Math.min(360, Math.round(Number(media.size) || SIZE)));
+  const innerRadius = Number(media.innerRadius);
   state.accent = accent;
   state.root = root;
+  state.size = size;
+  state.r0 = Number.isFinite(innerRadius) ? innerRadius : size * 0.322;
+  state.lineWidth = Math.max(2, Math.min(5, Number(media.lineWidth) || 3));
+  state.target = media.target || null;
+  state.applyShadow = media.applyShadow !== false;
+  if (canvas.width !== Math.round(size * DPR)) {
+    canvas.width = Math.round(size * DPR);
+    canvas.height = Math.round(size * DPR);
+  }
 
   if (state.clearTimer) {
     window.clearTimeout(state.clearTimer);
@@ -237,7 +262,7 @@ export function syncFabEq(canvas, root, media = {}) {
     return;
   }
   if (!state.raf) {
-    setBeat(state.root, 1, 0);
+    setBeat(state.root, 1, 0, state.accent, state.target, state.applyShadow);
     state.since = performance.now();
     state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
   }

@@ -284,6 +284,7 @@ export const cardStyles = css`
 
   .hm-cover {
     position: relative;
+    z-index: 2;
     display: block;
     width: var(--hm-cover-size, 168px);
     height: var(--hm-cover-size, 168px);
@@ -398,6 +399,52 @@ export const cardStyles = css`
     );
     filter: blur(14px);
     pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 主封面环形音频律动：与右下角悬浮唱片同源，围绕封面外圈展开 */
+  .hm-cover-eq-glow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 0;
+    width: calc(100% + 14px);
+    height: calc(100% + 14px);
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 30deg,
+      rgba(var(--hm-a1-rgb), 0.85),
+      rgba(var(--hm-a2-rgb), 0.9),
+      rgba(var(--hm-a1-rgb), 0.55),
+      rgba(var(--hm-a1-rgb), 0.85)
+    );
+    filter: blur(10px);
+    opacity: 0;
+    animation: hmSpin 16s linear infinite;
+    pointer-events: none;
+    transition: opacity 0.45s ease;
+  }
+
+  .hm-cover-wrap[data-eq="true"] .hm-cover-eq-glow {
+    opacity: 0.5;
+  }
+
+  .hm-cover-eq {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    width: calc(var(--hm-cover-size, 168px) + 48px);
+    height: calc(var(--hm-cover-size, 168px) + 48px);
+    translate: -50% -50%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+  }
+
+  .hm-cover-wrap[data-eq="true"] .hm-cover-eq {
+    opacity: 1;
   }
 
   .hm-cover[data-playing="true"]::before {
@@ -1522,6 +1569,7 @@ export const cardStyles = css`
   /* ---------- 封面容器与多设备切换 ---------- */
   .hm-cover-wrap {
     position: relative;
+    isolation: isolate;
     min-width: 0;
     height: var(--hm-cover-size, 168px);
     min-height: 0;
@@ -3152,6 +3200,7 @@ export const cardStyles = css`
     .hm-orbit-ring,
     .hm-grid,
     .hm-cover::before,
+    .hm-cover-eq-glow,
     .hm-play.is-playing::after,
     .hm-entity-eq i,
     .hm-entity-chip[data-playing="true"]::after,

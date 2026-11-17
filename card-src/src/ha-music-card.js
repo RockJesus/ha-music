@@ -37,6 +37,7 @@ import { paletteFor } from "./palette.js";
 import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
+import { syncFabEq } from "./fab-eq.js";
 import { lyricIndex, lyricProgress, parseLyrics, pickLrclibResult } from "./lyrics.js";
 
 const LYRICS_API = "/api/netease_lyrics/lyrics";
@@ -927,6 +928,49 @@ class HaMusicCard extends LitElement {
     this._lyricsCache.set(key, this._lyrics);
     this._saveLyricsCache();
     this.requestUpdate();
+  }
+
+  _syncCoverEq() {
+    const canvas = this.renderRoot?.querySelector?.(".hm-cover-eq");
+    const cover = this.renderRoot?.querySelector?.(".hm-cover");
+    if (!canvas || !cover) return;
+    const state = this._state();
+    const media = this._readMedia();
+    const width = Math.max(
+      72,
+      Math.round(cover.getBoundingClientRect().width || this._coverPx(this._layoutKey())),
+    );
+    const size = Math.min(360, width + 48);
+    if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
+    if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
+    const theme = THEMES[this._themeKey()];
+    const customAccent = String(this._config?.accent || "");
+    const accent = [
+      /^#[0-9a-f]{3,8}$/i.test(customAccent) ? customAccent : theme.accent[0],
+      theme.accent[1],
+    ];
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const first = (value) => (Array.isArray(value) ? value[0] || "" : value || "");
+    const active = state?.state === "playing" && !reduceMotion;
+    const wrap = cover.parentElement;
+    if (wrap) wrap.dataset.eq = active ? "true" : "false";
+    syncFabEq(canvas, wrap, {
+      playing: active,
+      visible: true,
+      position: this._seekPreview ?? media.position,
+      size,
+      innerRadius: width / 2 + 3,
+      lineWidth: size >= 220 ? 3 : 2.6,
+      target: cover,
+      applyShadow: false,
+      accent,
+      title: first(media.title),
+      artist: first(media.artist),
+      album: first(media.album),
+    });
   }
 
   _maybeLoadLyrics() {
@@ -2037,6 +2081,7 @@ class HaMusicCard extends LitElement {
       this.renderRoot?.querySelector?.(".hm-cover img"),
       this._state()?.state === "playing",
     );
+    this._syncCoverEq();
     this._maybeLoadLyrics();
     if (
       (this._lyricsOpen || this._sideLyricsVisible()) &&
@@ -2787,6 +2832,8 @@ class HaMusicCard extends LitElement {
             ? this._renderLyrics(media, position)
             : html`<section class="hm-main">
             <div class="hm-cover-wrap">
+              <span class="hm-cover-eq-glow" aria-hidden="true"></span>
+              <canvas class="hm-cover-eq" aria-hidden="true"></canvas>
               <button
                 class="hm-cover"
                 data-playing=${playing ? "true" : "false"}

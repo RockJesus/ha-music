@@ -385,47 +385,8 @@ export const cardStyles = css`
     pointer-events: none;
   }
 
-  .hm-cover-halo {
-    position: absolute;
-    left: 50%;
-    bottom: -30px;
-    width: 76%;
-    height: 56px;
-    translate: -50% 0;
-    background: radial-gradient(
-      50% 100% at 50% 0%,
-      rgba(var(--hm-a1-rgb), 0.42),
-      transparent 72%
-    );
-    filter: blur(14px);
-    pointer-events: none;
-    z-index: 0;
-  }
 
   /* 主封面环形音频律动：与右下角悬浮唱片同源，围绕封面外圈展开 */
-  .hm-cover-eq-glow {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    z-index: 0;
-    width: calc(var(--hm-cover-size, 168px) + 18px);
-    height: calc(var(--hm-cover-size, 168px) + 18px);
-    aspect-ratio: 1 / 1;
-    translate: -50% -50%;
-    border-radius: 50%;
-    background: conic-gradient(
-      from 30deg,
-      rgba(var(--hm-a1-rgb), 0.85),
-      rgba(var(--hm-a2-rgb), 0.9),
-      rgba(var(--hm-a1-rgb), 0.55),
-      rgba(var(--hm-a1-rgb), 0.85)
-    );
-    filter: blur(10px);
-    opacity: 0;
-    animation: hmSpin 16s linear infinite;
-    pointer-events: none;
-    transition: opacity 0.45s ease;
-  }
 
   .hm-cover-wrap[data-eq="true"] .hm-cover-eq-glow {
     opacity: 0.5;
@@ -448,27 +409,6 @@ export const cardStyles = css`
     opacity: 1;
   }
 
-  .hm-cover[data-playing="true"]::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: 50%;
-    padding: 1px;
-    background: conic-gradient(
-      from 0deg,
-      rgba(var(--hm-a1-rgb), 0),
-      rgba(var(--hm-a1-rgb), 0.9),
-      rgba(var(--hm-a2-rgb), 0.9),
-      rgba(var(--hm-a1-rgb), 0)
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    animation: hmSpin 8s linear infinite;
-    pointer-events: none;
-  }
 
   .hm-cover[data-gesture="next"] {
     animation: hmCoverNext 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);

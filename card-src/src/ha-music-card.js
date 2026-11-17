@@ -947,13 +947,6 @@ class HaMusicCard extends LitElement {
     const size = Math.min(1200, width + band);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
-    const glow = this.renderRoot?.querySelector?.(".hm-cover-eq-glow");
-    if (glow) {
-      const ring = Math.round(width + band);
-      if (glow.style.width !== `${ring}px`) glow.style.width = `${ring}px`;
-      if (glow.style.height !== `${ring}px`) glow.style.height = `${ring}px`;
-      glow.style.aspectRatio = "1 / 1";
-    }
     const theme = THEMES[this._themeKey()];
     const customAccent = String(this._config?.accent || "");
     const accent = [
@@ -3246,7 +3239,6 @@ class HaMusicCard extends LitElement {
             ? this._renderLyrics(media, position)
             : html`<section class="hm-main">
             <div class="hm-cover-wrap">
-              <span class="hm-cover-eq-glow" aria-hidden="true"></span>
               <canvas class="hm-cover-eq" aria-hidden="true"></canvas>
               <button
                 class="hm-cover"
@@ -3270,7 +3262,6 @@ class HaMusicCard extends LitElement {
                     />`
                   : html`<span class="hm-cover-ph">${icon("music", 40)}</span>`}
               </button>
-              <div class="hm-cover-halo"></div>
             </div>
 
             <div class="hm-info" data-side-lyrics=${sideLyrics ? "true" : "false"}>

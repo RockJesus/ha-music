@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.8.0`
+   - URL：`/local/ha-music.js?v=1.8.1`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -113,6 +113,8 @@ entity: media_player.living_room
 | `show_lyrics` | bool | `true` | 自动识别并显示歌词；关闭后不请求歌词接口 |
 | `floating_lyrics` | bool | `true` | 全局歌词悬浮窗：默认开启并停在顶栏，只显示当前一句；透明背景、无胶囊，文字主题渐变；长按拖动并跨页面记住位置 |
 | `floating_lyrics_auto` | bool | `true` | 全局歌词自动跟随正在播放的播放器；即使当前页面没有卡片也会自动匹配歌词 |
+| `mobile_hide_dock` | bool | `true` | 手机端自动隐藏悬浮播放器；仅粗指针窄屏/横屏矮屏生效，桌面和平板不受影响 |
+| `mobile_hide_lyrics` | bool | `true` | 手机端自动隐藏全局歌词悬浮窗；仅粗指针窄屏/横屏矮屏生效，桌面和平板不受影响 |
 | `show_source` | bool | `true` | 显示音源 chip |
 | `show_queue` | bool | `true` | 显示队列按钮（需播放器提供 `queue` 属性） |
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |

@@ -632,6 +632,21 @@ class HaMusicEditor extends LitElement {
             (checked) => this._update({ floating_lyrics_auto: checked })
           )}
           ${this._switch(
+            this._zh ? "移动端自动隐藏悬浮播放器" : "Hide floating player on mobile",
+            config.mobile_hide_dock !== false,
+            (checked) => this._update({ mobile_hide_dock: checked })
+          )}
+          ${this._switch(
+            this._zh ? "移动端自动隐藏悬浮歌词" : "Hide floating lyrics on mobile",
+            config.mobile_hide_lyrics !== false,
+            (checked) => this._update({ mobile_hide_lyrics: checked })
+          )}
+          <span class="hint">
+            ${this._zh
+              ? "仅手机（粗指针窄屏 / 横屏矮屏）生效；桌面和平板不受影响。"
+              : "Phone only (coarse pointer narrow screen / short landscape); desktop and tablet are unaffected."}
+          </span>
+          ${this._switch(
             this._zh ? "显示分组信息" : "Show group info",
             config.show_group !== false,
             (checked) => this._update({ show_group: checked })

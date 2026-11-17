@@ -41,6 +41,15 @@ import { lyricIndex, lyricProgress, parseLyrics, pickLrclibResult } from "./lyri
 
 const LYRICS_API = "/api/netease_lyrics/lyrics";
 const LRCLIB_API = "https://lrclib.net/api";
+const MOBILE_MEDIA =
+  "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)";
+
+function isMobileUi() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return Boolean(window.matchMedia(MOBILE_MEDIA).matches);
+}
 
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
@@ -301,6 +310,19 @@ class HaMusicCard extends LitElement {
       }
     };
     window.addEventListener("keydown", this._onKeyDown);
+    // 手机/平板判定随时可能随旋转或窗口变化；变化时重新挂载全局悬浮层，
+    // 只影响粗指针窄屏，桌面与平板仍保持原 UI。
+    this._mobileMq =
+      typeof window.matchMedia === "function" ? window.matchMedia(MOBILE_MEDIA) : null;
+    this._onMobileChange = () => {
+      this._installDock();
+      this._installLyricDock();
+    };
+    if (this._mobileMq?.addEventListener) {
+      this._mobileMq.addEventListener("change", this._onMobileChange);
+    } else {
+      this._mobileMq?.addListener?.(this._onMobileChange);
+    }
     this._onSpectrumGesture = () => {
       if (this._spectrumPlaying() && (this._config?.visualizer || "bars") === "bars") {
         this._primeAudioSpectrum();
@@ -342,6 +364,15 @@ class HaMusicCard extends LitElement {
     super.disconnectedCallback();
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
+    if (this._onMobileChange) {
+      if (this._mobileMq?.removeEventListener) {
+        this._mobileMq.removeEventListener("change", this._onMobileChange);
+      } else {
+        this._mobileMq?.removeListener?.(this._onMobileChange);
+      }
+      this._onMobileChange = null;
+      this._mobileMq = null;
+    }
     if (this._onKeyDown) {
       window.removeEventListener("keydown", this._onKeyDown);
       this._onKeyDown = null;
@@ -2148,8 +2179,17 @@ class HaMusicCard extends LitElement {
     return Boolean(this.closest?.("hui-card-preview, hui-card-options"));
   }
 
+  _isMobileUi() {
+    return this._mobileMq ? Boolean(this._mobileMq.matches) : isMobileUi();
+  }
+
   _installDock() {
     if (this._isPreviewContext()) return;
+    if (this._isMobileUi() && this._config?.mobile_hide_dock !== false) {
+      uninstallDock();
+      this._dockOwner = false;
+      return;
+    }
     const configDock = this._config?.dock;
     const configEntities = normalizeDockEntities(this._config?.dock_entities);
     const configThemes = normalizeDockThemes(this._config?.dock_themes);
@@ -2198,6 +2238,12 @@ class HaMusicCard extends LitElement {
   }
 
   _installLyricDock() {
+    if (this._isPreviewContext()) return;
+    if (this._isMobileUi() && this._config?.mobile_hide_lyrics !== false) {
+      uninstallLyricDock();
+      this._lyricDockOwner = false;
+      return;
+    }
     const configOn = this._config?.floating_lyrics !== false;
     const editedAt = Number(this._config?.floating_lyrics_edited) || 0;
     const pref = loadLyricDockPref();

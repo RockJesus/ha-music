@@ -241,7 +241,9 @@ export function friendlyName(hass, entityId, fallback = "") {
 export function readMedia(state) {
   const attrs = state?.attributes ?? {};
   const meta = attrs.media_metadata ?? {};
-  const duration = Number(attrs.media_duration ?? meta.duration ?? 0);
+  // Music Assistant 切歌时先更新 media_metadata，扁平的 media_title/artist
+  // 会晚一拍；优先读元数据，避免卡片继续显示上一首。
+  const duration = Number(meta.duration ?? attrs.media_duration ?? 0);
   let position = Number(attrs.media_position ?? 0);
   const updatedAt = attrs.media_position_updated_at;
   if (state?.state === "playing" && updatedAt) {
@@ -254,16 +256,16 @@ export function readMedia(state) {
     position = 0;
   }
   return {
-    title: attrs.media_title || meta.title || "",
+    title: meta.title || attrs.media_title || "",
     artist:
-      attrs.media_artist ||
       meta.artist ||
-      attrs.media_album_artist ||
+      attrs.media_artist ||
       meta.album_artist ||
+      attrs.media_album_artist ||
       "",
-    album: attrs.media_album_name || meta.album_name || "",
-    series: attrs.media_series_title || meta.series_title || "",
-    track: attrs.media_track ?? meta.track_number ?? "",
+    album: meta.album_name || attrs.media_album_name || "",
+    series: meta.series_title || attrs.media_series_title || "",
+    track: meta.track_number ?? attrs.media_track ?? "",
     duration: Number.isFinite(duration) ? duration : 0,
     position: Number.isFinite(position) ? position : 0,
     art:

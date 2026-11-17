@@ -260,6 +260,8 @@ class HaMusicCard extends LitElement {
       };
     }
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
+    // 切歌立即重绘：不依赖扁平属性与签名比对的先后，避免标题/封面慢一拍。
+    if (trackChanged) this.requestUpdate();
     const sig = this._computeSig(hass);
     if (sig !== this._sig || previous === undefined) {
       this._sig = sig;
@@ -460,12 +462,13 @@ class HaMusicCard extends LitElement {
 
   _trackKey(state) {
     const attrs = state?.attributes || {};
+    const meta = attrs.media_metadata || {};
     return [
       this._eid(),
-      attrs.media_title || "",
-      attrs.media_artist || "",
-      attrs.media_album_name || "",
-      attrs.media_duration || 0,
+      meta.title || attrs.media_title || "",
+      meta.artist || attrs.media_artist || "",
+      meta.album_name || attrs.media_album_name || "",
+      meta.duration ?? attrs.media_duration ?? 0,
       attrs.media_content_id || "",
     ]
       .map((value) => String(value))
@@ -2819,12 +2822,13 @@ class HaMusicCard extends LitElement {
 
   _trackKeyFor(entity, state) {
     const attrs = state?.attributes || {};
+    const meta = attrs.media_metadata || {};
     return [
       entity,
-      attrs.media_title || "",
-      attrs.media_artist || "",
-      attrs.media_album_name || "",
-      attrs.media_duration || 0,
+      meta.title || attrs.media_title || "",
+      meta.artist || attrs.media_artist || "",
+      meta.album_name || attrs.media_album_name || "",
+      meta.duration ?? attrs.media_duration ?? 0,
       attrs.media_content_id || "",
     ]
       .map((value) => String(value))

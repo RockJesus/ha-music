@@ -2585,6 +2585,73 @@ export const cardStyles = css`
     }
   }
 
+  /* 宽屏音量与手机端保持一致：整行铺开、无胶囊底色，细轨道 + 主题光效滑块。 */
+  @container (min-width: 821px) {
+    .hm-card[data-panel="true"] .hm-controls {
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume {
+      flex: 1 1 100%;
+      width: 100%;
+      max-width: 100%;
+      min-height: 36px;
+      margin: 0;
+      padding: 0 2px 0 0;
+      border: none;
+      background: transparent;
+      box-sizing: border-box;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-range {
+      height: 36px;
+      min-width: 64px;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-webkit-slider-runnable-track {
+      height: 9px;
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.45),
+        0 0 14px rgba(var(--hm-a1-rgb), 0.18);
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-moz-range-track,
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-moz-range-progress {
+      height: 9px;
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.45),
+        0 0 14px rgba(var(--hm-a1-rgb), 0.18);
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-webkit-slider-thumb {
+      width: 22px;
+      height: 22px;
+      margin-top: -6.5px;
+      background: radial-gradient(circle at 34% 28%, #ffffff 0%, #e9f8ff 58%, #cfe8ff 100%);
+      box-shadow:
+        0 0 0 3px rgba(var(--hm-a1-rgb), 0.2),
+        0 0 20px rgba(var(--hm-a1-rgb), 0.9),
+        inset 0 1px 0 #ffffff;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-range::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      background: radial-gradient(circle at 34% 28%, #ffffff 0%, #e9f8ff 58%, #cfe8ff 100%);
+      box-shadow:
+        0 0 0 3px rgba(var(--hm-a1-rgb), 0.2),
+        0 0 20px rgba(var(--hm-a1-rgb), 0.9),
+        inset 0 1px 0 #ffffff;
+    }
+  }
+
   @container (max-width: 520px) {
     /* 手机面板底部：无矩形触控框，图标/播放球自带主题立体光效 */
     .hm-card[data-panel="true"] .hm-controls {

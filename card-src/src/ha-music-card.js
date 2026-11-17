@@ -2744,9 +2744,15 @@ class HaMusicCard extends LitElement {
                   ${entities.map((id) => {
                     const item = hass.states?.[id];
                     const art = normalizeArt(hass, item?.attributes?.entity_picture);
+                    const itemPlaying =
+                      item?.state === "playing" || item?.state === "buffering";
                     return html`<button
                       class="hm-entity-chip"
                       data-active=${id === entityId ? "true" : "false"}
+                      data-playing=${itemPlaying ? "true" : "false"}
+                      aria-label=${itemPlaying
+                        ? `${friendlyName(hass, id, id)} ${t("playing")}`
+                        : friendlyName(hass, id, id)}
                       @click=${() => this._switchEntity(id, true)}
                     >
                       <span
@@ -2754,6 +2760,11 @@ class HaMusicCard extends LitElement {
                         style=${art ? `background-image:url("${art}")` : ""}
                       ></span>
                       <span class="hm-entity-name">${friendlyName(hass, id, id)}</span>
+                      ${itemPlaying
+                        ? html`<span class="hm-entity-eq" aria-hidden="true">
+                            <i></i><i></i><i></i>
+                          </span>`
+                        : nothing}
                     </button>`;
                   })}
                 </div>`

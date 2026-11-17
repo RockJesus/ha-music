@@ -1580,6 +1580,73 @@ export const cardStyles = css`
     box-shadow: 0 0 16px -6px rgba(var(--hm-a1-rgb), 0.9);
   }
 
+  .hm-entity-chip[data-playing="true"] {
+    position: relative;
+    color: rgba(246, 248, 255, 0.92);
+    border-color: rgba(var(--hm-a1-rgb), 0.22);
+    background:
+      linear-gradient(105deg, rgba(var(--hm-a1-rgb), 0.1), rgba(255, 255, 255, 0.05));
+  }
+
+  .hm-entity-chip[data-playing="true"]::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    border: 1px solid rgba(var(--hm-a1-rgb), 0.4);
+    opacity: 0;
+    animation: hm-entity-glow 2.4s ease-in-out infinite;
+  }
+
+  .hm-entity-chip[data-playing="true"][data-active="true"] {
+    border-color: rgba(var(--hm-a1-rgb), 0.5);
+    background: rgba(var(--hm-a1-rgb), 0.17);
+    box-shadow:
+      0 0 0 1px rgba(var(--hm-a1-rgb), 0.08),
+      0 0 20px -6px rgba(var(--hm-a1-rgb), 0.95);
+  }
+
+  .hm-entity-eq {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+    width: 10px;
+    height: 12px;
+    margin-left: 1px;
+    opacity: 0.92;
+  }
+
+  .hm-entity-eq i {
+    width: 2px;
+    height: 9px;
+    border-radius: 1px;
+    transform-origin: 50% 100%;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.95),
+      rgba(var(--hm-a1-rgb), 0.9)
+    );
+    animation: hm-entity-eq 0.9s ease-in-out infinite;
+  }
+
+  .hm-entity-eq i:nth-child(1) {
+    animation-delay: -0.55s;
+    animation-duration: 1.05s;
+  }
+
+  .hm-entity-eq i:nth-child(2) {
+    animation-delay: -0.2s;
+    animation-duration: 0.78s;
+  }
+
+  .hm-entity-eq i:nth-child(3) {
+    animation-delay: -0.7s;
+    animation-duration: 0.96s;
+  }
+
   .hm-entity-dot {
     flex: 0 0 auto;
     width: 18px;
@@ -1747,6 +1814,28 @@ export const cardStyles = css`
     100% {
       transform: scale(1.28);
       opacity: 0;
+    }
+  }
+
+  @keyframes hm-entity-eq {
+    0%,
+    100% {
+      transform: scaleY(0.3);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes hm-entity-glow {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.72;
     }
   }
 
@@ -3064,6 +3153,8 @@ export const cardStyles = css`
     .hm-grid,
     .hm-cover::before,
     .hm-play.is-playing::after,
+    .hm-entity-eq i,
+    .hm-entity-chip[data-playing="true"]::after,
     .hm-dot {
       animation: none !important;
     }

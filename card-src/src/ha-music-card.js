@@ -3035,9 +3035,13 @@ class HaMusicCard extends LitElement {
     }
     if (volume && this._volumePreview === null) {
       const info = this._volumeInfo(media);
-      volume.value = String(Math.round(info.level * 100));
+      const pct = Math.round(info.level * 100);
+      volume.value = String(pct);
       volume.style.setProperty("--pct", `${info.level * 100}%`);
       volume.setAttribute("data-disabled", String(!info.supported));
+      // 百分比标签直接回写：不依赖下一轮 Lit 重绘，避免移动端拖完后标签停在旧值。
+      const pctEl = root.querySelector?.(".hm-vol-pct");
+      if (pctEl) pctEl.textContent = `${pct}%`;
     }
   }
 

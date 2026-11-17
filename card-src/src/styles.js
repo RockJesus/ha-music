@@ -332,14 +332,42 @@ export const cardStyles = css`
     inset: 0;
     display: grid;
     place-items: center;
-    color: rgba(255, 255, 255, 0.72);
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.78);
+    background:
+      radial-gradient(circle at 50% 42%, rgba(var(--hm-a1-rgb), 0.5) 0 8%, rgba(var(--hm-a2-rgb), 0.18) 24%, transparent 52%),
+      conic-gradient(from 215deg at 50% 50%, rgba(var(--hm-a2-rgb), 0.34), rgba(7, 11, 21, 0.72) 31%, rgba(var(--hm-a1-rgb), 0.28) 62%, rgba(7, 11, 21, 0.8));
+  }
+
+  .hm-cover .hm-cover-ph::before,
+  .hm-cover .hm-cover-ph::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .hm-cover .hm-cover-ph::before {
+    inset: 13%;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    box-shadow:
+      0 0 0 10px rgba(255, 255, 255, 0.025),
+      inset 0 0 26px rgba(var(--hm-a1-rgb), 0.22);
+  }
+
+  .hm-cover .hm-cover-ph::after {
+    inset: 32%;
+    border: 1px solid rgba(var(--hm-a2-rgb), 0.38);
+    background: rgba(6, 10, 19, 0.18);
   }
 
   .hm-cover .hm-cover-ph svg {
+    position: relative;
+    z-index: 1;
     width: 34%;
     height: 34%;
-    opacity: 0.9;
-    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.4));
+    opacity: 0.92;
+    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.42));
   }
 
   .hm-cover::after {

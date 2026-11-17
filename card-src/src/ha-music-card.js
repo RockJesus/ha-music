@@ -125,6 +125,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
+    this._artFailedSource = "";
     this._artSeq = 0;
     this._artSlot = 0;
     this._dockOwner = false;
@@ -278,6 +279,7 @@ class HaMusicCard extends LitElement {
       this._paletteKey = "";
       this._artUrl = "";
       this._artSource = "";
+      this._artFailedSource = "";
       this._resetLyrics();
     }
     if (this._config.show_lyrics === false) this._lyricsOpen = false;
@@ -1539,6 +1541,7 @@ class HaMusicCard extends LitElement {
     this._paletteKey = "";
     this._artUrl = "";
     this._artSource = "";
+    this._artFailedSource = "";
     this._menu = null;
     this._seekPreview = null;
     this._seekPending = null;
@@ -1966,6 +1969,7 @@ class HaMusicCard extends LitElement {
     const entityId = this._eid();
     if (artSource !== this._artSource) {
       this._artSource = artSource;
+      this._artFailedSource = "";
       const seq = ++this._artSeq;
       resolveArtUrl(this._hass, artSource, entityId).then((url) => {
         if (seq !== this._artSeq || url === this._artUrl) return;
@@ -2259,6 +2263,22 @@ class HaMusicCard extends LitElement {
     return normalizeArt(this._hass, media.art);
   }
 
+  _onArtError() {
+    if (!this._artSource) return;
+    this._artFailedSource = this._artSource;
+    this._artUrl = "";
+    this._artApplied = "";
+    const card = this.renderRoot?.querySelector?.(".hm-card");
+    const layers = card?.querySelectorAll?.(".hm-bg-art") || [];
+    layers.forEach((layer) => {
+      layer.classList.remove("on");
+      layer.style.backgroundImage = "";
+    });
+    this._artSlot = 0;
+    this._maybePalette("");
+    this.requestUpdate();
+  }
+
   _crossFadeArt(card, url) {
     const layers = card.querySelectorAll(".hm-bg-art");
     if (!layers.length) return;
@@ -2284,7 +2304,7 @@ class HaMusicCard extends LitElement {
       this._maybePalette(url);
     };
     image.onerror = () => {
-      this._maybePalette("");
+      this._onArtError();
     };
     image.src = url;
   }
@@ -2705,7 +2725,12 @@ class HaMusicCard extends LitElement {
                 @click=${() => this._onCoverClick()}
               >
                 ${coverUrl
-                  ? html`<img src=${coverUrl} alt=${mediaTitle || ""} draggable="false" />`
+                  ? html`<img
+                      src=${coverUrl}
+                      alt=${mediaTitle || ""}
+                      draggable="false"
+                      @error=${() => this._onArtError()}
+                    />`
                   : html`<span class="hm-cover-ph">${icon("music", 40)}</span>`}
               </button>
               <div class="hm-cover-halo"></div>

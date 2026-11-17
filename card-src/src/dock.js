@@ -26,6 +26,7 @@ export function normalizeDockThemes(value) {
 function applyMiniTheme(node, themeKey) {
   if (!node) return;
   const key = normalizeTheme(themeKey);
+  if (node.dataset.theme === key && node.dataset.hmThemeReady === "1") return;
   const theme = THEMES[key];
   node.dataset.theme = key;
   node.style.setProperty("--hm-accent", theme.accent[0]);
@@ -34,6 +35,7 @@ function applyMiniTheme(node, themeKey) {
   node.style.setProperty("--hm-accent-2-rgb", colorTriplet(theme.accent[1], "123,92,255"));
   node.style.setProperty("--hm-base-rgb", colorTriplet(theme.base, "5,10,18"));
   node.style.setProperty("--hm-glow", String(theme.glow ?? 1));
+  node.dataset.hmThemeReady = "1";
 }
 
 function loadDockPositions() {
@@ -450,6 +452,7 @@ const STYLE = `
     width: min(300px, calc(100vw - 32px));
   }
   .art {
+    position: relative;
     width: 36px;
     height: 36px;
     flex: 0 0 auto;
@@ -474,7 +477,45 @@ const STYLE = `
     user-select: none;
   }
   .art img[src] { display: block; }
-  .art .fallback { display: grid; place-items: center; }
+  .art .fallback {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(var(--hm-accent-rgb), 0.58) 0 7%, rgba(var(--hm-accent-rgb), 0.18) 21%, transparent 46%),
+      conic-gradient(from 215deg at 50% 50%, rgba(var(--hm-accent-2-rgb), 0.48), rgba(7, 11, 21, 0.94) 29%, rgba(var(--hm-accent-rgb), 0.36) 62%, rgba(7, 11, 21, 0.96));
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .art .fallback::before,
+  .art .fallback::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .art .fallback::before {
+    inset: 13%;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow:
+      0 0 0 7px rgba(255, 255, 255, 0.025),
+      inset 0 0 18px rgba(var(--hm-accent-rgb), 0.24);
+  }
+  .art .fallback::after {
+    inset: 31%;
+    border: 1px solid rgba(var(--hm-accent-2-rgb), 0.42);
+    background: rgba(5, 9, 18, 0.2);
+  }
+  .art .fallback svg {
+    position: relative;
+    z-index: 1;
+    width: 34%;
+    height: 34%;
+    opacity: 0.92;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.48));
+  }
   .meta {
     min-width: 0;
     flex: 1 1 auto;
@@ -1066,7 +1107,10 @@ class HaMusicMini extends HTMLElement {
     this._folded = false;
     this._entity = "";
     this._artSource = "";
+    this._artAppliedSource = null;
     this._artSeq = 0;
+    this._iconState = "";
+    this._disabledState = null;
     this._hass = null;
     this._poll = null;
     this._press = null;
@@ -1102,6 +1146,7 @@ class HaMusicMini extends HTMLElement {
     const entity = normalizeEntity(config.entity);
     const theme = normalizeTheme(config.theme);
     const changedMode = mode !== this._mode;
+    const identityChanged = changedMode || entity !== this._entity || theme !== this._theme;
     this._mode = mode;
     this._theme = theme;
     if (changedMode) {
@@ -1110,10 +1155,19 @@ class HaMusicMini extends HTMLElement {
     }
     this._entity = entity;
     if (config.hass?.states) this._hass = config.hass;
+    if (identityChanged) {
+      // 实体/主题变化才允许重新解析封面和重建控件状态；轮询同步不能把封面
+      // 每秒重新走一遍，也不能把播放图标重建一次，否则悬浮播放器会闪。
+      this._artAppliedSource = null;
+      this._iconState = "";
+      this._disabledState = null;
+    }
     if (!this.shadowRoot.childElementCount || changedMode) this._render();
     this._sync();
-    this._applySavedPosition();
-    this._watchDockBounds();
+    if (identityChanged) {
+      this._applySavedPosition();
+      this._watchDockBounds();
+    }
   }
 
   connectedCallback() {
@@ -1231,7 +1285,8 @@ class HaMusicMini extends HTMLElement {
     this._quick = null;
     this._art.addEventListener("error", () => {
       this._art.removeAttribute("src");
-      this._fallback.style.display = "grid";
+      if (this._fallback) this._fallback.style.display = "grid";
+      this._mini?.style.removeProperty("--fab-cover");
     });
   }
 
@@ -1282,7 +1337,8 @@ class HaMusicMini extends HTMLElement {
     this._eq = this.shadowRoot.querySelector(".fab-eq");
     this._art.addEventListener("error", () => {
       this._art.removeAttribute("src");
-      this._fallback.style.display = "grid";
+      if (this._fallback) this._fallback.style.display = "grid";
+      this._mini?.style.removeProperty("--fab-cover");
     });
   }
 
@@ -1602,13 +1658,17 @@ class HaMusicMini extends HTMLElement {
   _sync() {
     if (!this._mini) return;
     applyMiniTheme(this._mini, this._theme);
-    this._mini.dataset.mode = this._mode;
-    this._mini.dataset.folded = this._mode !== "fab" && this._folded ? "true" : "false";
-    if (this._mode === "fab") this._mini.dataset.open = this._open ? "true" : "false";
-    this._mini.dataset.playing = "false";
+    if (this._mini.dataset.mode !== this._mode) this._mini.dataset.mode = this._mode;
+    const folded = this._mode !== "fab" && this._folded ? "true" : "false";
+    if (this._mini.dataset.folded !== folded) this._mini.dataset.folded = folded;
+    if (this._mode === "fab") {
+      const open = this._open ? "true" : "false";
+      if (this._mini.dataset.open !== open) this._mini.dataset.open = open;
+    }
     if (!this._entity) {
-      this._title.textContent = "选择播放器";
-      this._sub.textContent = "在卡片编辑器中选择位置";
+      if (this._mini.dataset.playing !== "false") this._mini.dataset.playing = "false";
+      if (this._title.textContent !== "选择播放器") this._title.textContent = "选择播放器";
+      if (this._sub.textContent !== "在卡片编辑器中选择位置") this._sub.textContent = "在卡片编辑器中选择位置";
       this._setDisabled(true);
       this._progress.style.width = "0%";
       this._setArt(null);
@@ -1620,8 +1680,9 @@ class HaMusicMini extends HTMLElement {
     if (hass?.states) this._hass = hass;
     const state = this._hass?.states?.[this._entity];
     if (!state) {
-      this._title.textContent = this._entity;
-      this._sub.textContent = "实体不可用";
+      if (this._mini.dataset.playing !== "false") this._mini.dataset.playing = "false";
+      if (this._title.textContent !== this._entity) this._title.textContent = this._entity;
+      if (this._sub.textContent !== "实体不可用") this._sub.textContent = "实体不可用";
       this._setDisabled(true);
       this._progress.style.width = "0%";
       this._setArt(null);
@@ -1631,26 +1692,38 @@ class HaMusicMini extends HTMLElement {
     }
     const a = state.attributes || {};
     const title = a.media_title || a.friendly_name || this._entity;
-    this._title.textContent = title;
+    if (this._title.textContent !== title) this._title.textContent = title;
     let artist = a.media_artist || a.media_album_name || "";
     if (artist === title) artist = "";
     const label = this._stateLabel(state.state);
-    this._sub.textContent = artist ? `${artist} · ${label}` : label;
+    const subtitle = artist ? `${artist} · ${label}` : label;
+    if (this._sub.textContent !== subtitle) this._sub.textContent = subtitle;
     this._setDisabled(false);
     const playing = state.state === "playing";
-    this._mini.dataset.playing = playing ? "true" : "false";
-    const icon = playing ? PAUSE_ICON : PLAY_ICON;
-    this._toggle.innerHTML = icon;
-    this._toggle.setAttribute("aria-label", playing ? "暂停" : "播放");
-    if (this._quick) {
-      this._quick.innerHTML = icon;
-      this._quick.setAttribute("aria-label", playing ? "暂停" : "播放");
+    const playingValue = playing ? "true" : "false";
+    // 只在播放状态真正变化时翻转 data-playing。每秒先写 false 再写 true
+    // 会让 FAB 的播放态样式和唱片脉冲反复重启，看起来就是闪烁。
+    if (this._mini.dataset.playing !== playingValue) {
+      this._mini.dataset.playing = playingValue;
+    }
+    const iconState = playing ? "pause" : "play";
+    if (this._iconState !== iconState) {
+      this._iconState = iconState;
+      const icon = playing ? PAUSE_ICON : PLAY_ICON;
+      this._toggle.innerHTML = icon;
+      this._toggle.setAttribute("aria-label", playing ? "暂停" : "播放");
+      if (this._quick) {
+        this._quick.innerHTML = icon;
+        this._quick.setAttribute("aria-label", playing ? "暂停" : "播放");
+      }
     }
     if (this._disc) {
-      this._disc.setAttribute("aria-label", this._open ? "收起播放器" : "展开播放器");
-      this._disc.setAttribute("aria-expanded", this._open ? "true" : "false");
+      const expanded = this._open ? "true" : "false";
+      if (this._disc.getAttribute("aria-expanded") !== expanded) {
+        this._disc.setAttribute("aria-label", this._open ? "收起播放器" : "展开播放器");
+        this._disc.setAttribute("aria-expanded", expanded);
+      }
     }
-    if (this._collapse) this._collapse.innerHTML = DOWN_ICON;
     this._setArt(a.entity_picture);
     syncCoverSpin(this._art, playing);
     const duration = Number(a.media_duration || 0);
@@ -1676,6 +1749,10 @@ class HaMusicMini extends HTMLElement {
   _setArt(url) {
     if (!this._art) return;
     const source = url || "";
+    // 同一实体、同一封面地址在 1 秒轮询里只解析一次。重复走代理/重设
+    // <img src> 会让唱片封面在 FAB 和顶部/侧边栏迷你播放器里闪一下。
+    if (this._artAppliedSource === source) return;
+    this._artAppliedSource = source;
     const token = ++this._artSeq;
     this._artSource = source;
     if (!source) {
@@ -1691,7 +1768,7 @@ class HaMusicMini extends HTMLElement {
       try {
         const normalized = new URL(resolved, window.location.href).href;
         if (this._art.getAttribute("src") !== normalized) this._art.src = normalized;
-        this._fallback.style.display = "none";
+        if (this._fallback) this._fallback.style.display = "none";
         this._mini?.style.setProperty("--fab-cover", `url(${JSON.stringify(normalized)})`);
       } catch {
         this._clearArt();
@@ -1706,6 +1783,8 @@ class HaMusicMini extends HTMLElement {
   }
 
   _setDisabled(disabled) {
+    if (this._disabledState === disabled) return;
+    this._disabledState = disabled;
     for (const button of [this._prev, this._toggle, this._next, this._quick]) {
       if (button) button.disabled = disabled;
     }

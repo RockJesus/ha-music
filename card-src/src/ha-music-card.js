@@ -175,6 +175,7 @@ class HaMusicCard extends LitElement {
     this._spectrumRaf = null;
     this._spectrumBars = [];
     this._spectrumLevels = [];
+    this._bandLevels = Object.assign([0.18, 0.14, 0.1], { live: false });
     this._spectrumLast = 0;
     this._spectrumKey = "";
     this._spectrumAudioUrl = "";
@@ -976,6 +977,7 @@ class HaMusicCard extends LitElement {
       title: first(media.title),
       artist: first(media.artist),
       album: first(media.album),
+      bands: this._bandLevels,
     });
   }
 
@@ -3610,6 +3612,8 @@ class HaMusicCard extends LitElement {
   }
 
   _resetAudioShape() {
+    this._bandLevels = Object.assign([0.18, 0.14, 0.1], { live: false });
+    this._bandPeaks = [0, 0, 0];
     this._audioShape = {
       bars: [],
       mean: [],
@@ -3943,8 +3947,28 @@ class HaMusicCard extends LitElement {
       levels[index] = clamp((avg / 255) * weight, 0, 1.6);
       if (max > peak) peak = max;
     }
+    // 高中低三段能量独立归一化：低频管左侧/环顶部，中频管中部，高频管右侧/环底部。
+    const nyq = ctx.sampleRate / 2;
+    const ranges = [
+      [40, 250],
+      [250, 1600],
+      [1600, Math.min(8000, nyq)],
+    ];
+    const weights = [1.05, 1.28, 1.6];
+    const bands = ranges.map(([startHz, endHz], bandIndex) => {
+      const start = clamp(Math.floor(startHz / binHz), 0, bins.length - 1);
+      const end = clamp(Math.ceil(endHz / binHz), start, bins.length - 1);
+      let sum = 0;
+      let n = 0;
+      for (let bin = start; bin <= end; bin += 1) {
+        sum += bins[bin] || 0;
+        n += 1;
+      }
+      const avg = n ? sum / n / 255 : 0;
+      return clamp(avg * weights[bandIndex] * 1.75, 0, 1);
+    });
     this._audioPeak = peak;
-    return levels;
+    return { levels, bands };
   }
 
   _shapeAudioBars(raw) {
@@ -4206,9 +4230,25 @@ class HaMusicCard extends LitElement {
     const levels = this._spectrumLevels;
     const count = this._spectrumBars.length;
     const audioReady = this._audioSpectrumReady();
-    const audioRaw = audioReady ? this._readAudioLevels(count) : null;
+    const audioRead = audioReady ? this._readAudioLevels(count) : null;
+    const audioRaw = audioRead?.levels || null;
     const shaped = audioRaw ? this._shapeAudioBars(audioRaw) : null;
     const audioTargets = shaped?.bars || null;
+    // 平滑三段能量，避免频谱跳变时整片音柱闪断。
+    if (audioRead?.bands) {
+      this._bandLevels.live = true;
+      for (let band = 0; band < this._bandLevels.length; band += 1) {
+        const current = this._bandLevels[band] || 0;
+        const target = audioRead.bands[band] || 0;
+        const attack = target > current ? 0.42 : 0.16;
+        this._bandLevels[band] = current + (target - current) * attack;
+      }
+    } else if (!audioTargets) {
+      this._bandLevels.live = false;
+      for (let band = 0; band < this._bandLevels.length; band += 1) {
+        this._bandLevels[band] = Math.max(0.06, this._bandLevels[band] * 0.9);
+      }
+    }
     const maShaped = audioTargets ? null : this._maSpectrumShaped(count, media);
     const maTargets = maShaped?.bars || null;
     if (audioReady) {
@@ -4228,6 +4268,10 @@ class HaMusicCard extends LitElement {
       let target;
       if (audioTargets) {
         target = audioTargets[index];
+        const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
+        const drive = this._bandLevels[zone] || 0;
+        // 保留每根柱的频率细节，同时让左/中/右三块分别被高中低频段推动。
+        target = clamp(target * 0.58 + drive * 0.62, 0.03, 1);
       } else if (maTargets) {
         target = maTargets[index];
       } else {

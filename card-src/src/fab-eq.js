@@ -126,16 +126,24 @@ function frame(canvas, now) {
   const half = barCount / 2;
   for (let h = 0; h < half; h += 1) {
     const d = h / (half - 1); // 0 = 12 点低频，1 = 6 点高频
-    const band = Math.pow(1 - d, 1.05);
     const wobble = Math.sin(t * (4.6 + (state.hash % 9) * 0.25) + h * 1.1 + state.phase);
     const shimmer = Math.sin(t * (11.4 + (state.hash % 5) * 0.4) + h * 2.3);
-    const base = (0.16 + 0.68 * band) * (0.62 + 0.38 * (0.5 + 0.5 * wobble));
     const transient = 0.18 * kick * Math.pow(1 - d, 2.2);
-    const value = clamp(
-      base * (0.55 + 0.45 * (0.5 + 0.5 * shimmer)) + transient + 0.04 * state.energy,
-      0,
-      1,
-    );
+    let base;
+    if (state.bands?.length && state.bands.live) {
+      // 环顶部低频、两侧中频、底部高频；同一频段共用能量包络，柱体保留细碎纹理。
+      const bandIndex = d < 0.28 ? 0 : d < 0.55 ? 1 : 2;
+      const drive = clamp(state.bands[bandIndex] || 0, 0, 1);
+      base =
+        (0.1 + 0.86 * drive) *
+        (0.58 + 0.42 * (0.5 + 0.5 * wobble)) *
+        (0.62 + 0.38 * (0.5 + 0.5 * shimmer));
+    } else {
+      const band = Math.pow(1 - d, 1.05);
+      base = (0.16 + 0.68 * band) * (0.62 + 0.38 * (0.5 + 0.5 * wobble));
+      base *= 0.55 + 0.45 * (0.5 + 0.5 * shimmer);
+    }
+    const value = clamp(base + transient + 0.04 * state.energy, 0, 1);
     bars[h] = value;
     bars[barCount - 1 - h] = value;
   }
@@ -210,6 +218,7 @@ export function syncFabEq(canvas, root, media = {}) {
       period: 2,
       phase: 0,
       energy: 0.6,
+      bands: null,
       accent: FALLBACK_ACCENT,
       smooth: new Array(MAX_BARS).fill(0),
       barCount: BARS,
@@ -236,6 +245,7 @@ export function syncFabEq(canvas, root, media = {}) {
     state.smooth.fill(0);
   }
   state.target = media.target || null;
+  state.bands = Array.isArray(media.bands) && media.bands.length ? media.bands : null;
   state.applyShadow = media.applyShadow !== false;
   if (canvas.width !== Math.round(size * DPR)) {
     canvas.width = Math.round(size * DPR);

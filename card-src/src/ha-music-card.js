@@ -139,7 +139,9 @@ class HaMusicCard extends LitElement {
     this._menu = null;
     this._seekPreview = null;
     this._seekPending = null;
+    this._seekSettleTimer = null;
     this._volumePreview = null;
+    this._volumeSettleTimer = null;
     this._showRemaining = false;
     this._drawer = this._emptyDrawer();
     this._queueLoadToken = 0;
@@ -393,6 +395,10 @@ class HaMusicCard extends LitElement {
     super.disconnectedCallback();
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
+    if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
+    this._seekSettleTimer = null;
+    if (this._volumeSettleTimer) clearTimeout(this._volumeSettleTimer);
+    this._volumeSettleTimer = null;
     if (this._onMobileChange) {
       if (this._mobileMq?.removeEventListener) {
         this._mobileMq.removeEventListener("change", this._onMobileChange);
@@ -1500,8 +1506,14 @@ class HaMusicCard extends LitElement {
     const reached = Number.isFinite(position) && Math.abs(position - pending.value) <= 2;
     const expired = Date.now() - pending.at > 8000;
     if (!state || trackChanged || expired || (reached && (stampChanged || moved))) {
+      if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
+      this._seekSettleTimer = null;
       this._seekPending = null;
       this._seekPreview = null;
+      // 直接回写 DOM 并恢复 ticker：不依赖 Lit 是否会在本轮再重绘，
+      // 避免拖动后“预览值卡住、进度条不再前进”。
+      this._syncRangeValues();
+      this._syncProgressTicker();
       return true;
     }
     return false;
@@ -1538,11 +1550,22 @@ class HaMusicCard extends LitElement {
       at: Date.now(),
     };
     const pending = this._seekPending;
-    this._seekTo(value).catch(() => {
-      if (this._seekPending !== pending) return;
+    if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
+    const release = () => {
+      if (this._seekPreview !== value) return;
+      this._seekSettleTimer = null;
       this._seekPending = null;
       this._seekPreview = null;
+      this._syncRangeValues();
+      this._syncProgressTicker();
       this.requestUpdate();
+    };
+    // 播放器 seek 可能晚于服务返回数秒；超时兜底保证 UI 不会永久停在拖动值。
+    this._seekSettleTimer = setTimeout(release, 4000);
+    this._seekTo(value).catch(() => {
+      if (this._seekPending !== pending) return;
+      if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
+      release();
     });
     this.requestUpdate();
   }
@@ -1556,6 +1579,15 @@ class HaMusicCard extends LitElement {
   _onVolumeCommit(event) {
     const volume = clamp(Number(event.target.value) / 100, 0, 1);
     this._volumePreview = null;
+    if (this._volumeSettleTimer) clearTimeout(this._volumeSettleTimer);
+    // 服务端音量回写可能晚于本轮渲染；超时后强制把滑块同步到实体值。
+    this._volumeSettleTimer = setTimeout(() => {
+      this._volumeSettleTimer = null;
+      this._volumePreview = null;
+      this._syncRangeValues();
+      this.requestUpdate();
+    }, 1500);
+    this.requestUpdate();
     const info = this._volumeInfo(this._readMedia());
     if (info.domain === "media_player") {
       this._guard(

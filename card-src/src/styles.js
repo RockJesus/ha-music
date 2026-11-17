@@ -2486,6 +2486,9 @@ export const cardStyles = css`
       grid-template-columns:
         minmax(0, calc(var(--hm-panel-cover, 34%) + 136px))
         minmax(0, 1fr);
+      /* 锁死单行高度，歌词再长也不能把封面容器撑出主区域。 */
+      grid-template-rows: minmax(0, 1fr);
+      overflow: hidden;
       gap: clamp(18px, 2.8vw, 40px);
     }
 

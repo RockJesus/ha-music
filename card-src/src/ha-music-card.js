@@ -1595,7 +1595,23 @@ class HaMusicCard extends LitElement {
     }
   }
 
-  _playQueueItem(item) {
+  async _playQueueItem(item) {
+    const queueId =
+      this._queueQueueId || this._state()?.attributes?.active_queue || "";
+    if (item?.queueItemId && queueId) {
+      const played = await this._playMaApiItem(queueId, item.queueItemId);
+      if (played) {
+        this._drawer = {
+          ...this._drawer,
+          items: (this._drawer?.items || []).map((entry) => ({
+            ...entry,
+            active: entry.queueItemId === item.queueItemId,
+          })),
+        };
+        this.requestUpdate();
+        return;
+      }
+    }
     const massQueueReady = Boolean(
       this._hass?.services?.mass_queue?.play_queue_item
     );
@@ -1839,7 +1855,207 @@ class HaMusicCard extends LitElement {
     }
   }
 
+  // Music Assistant 的完整队列不在 HA 的 get_queue 响应里，但可以经
+  // Supervisor Ingress 直接连 MA 的 websocket。这样无需安装 mass_queue，
+  // 也能拿到完整队列并精确切歌；失败时再回退到 HA 服务。
+  async _maIngressPath() {
+    if (this._maIngressPathValue) return this._maIngressPathValue;
+    if (this._maIngressPromise) return this._maIngressPromise;
+    this._maIngressPromise = (async () => {
+      const hass = this._hass;
+      if (!hass?.callWS) return "";
+      try {
+        const list = await hass.callWS({
+          type: "supervisor/api",
+          endpoint: "/addons",
+          method: "get",
+        });
+        const addons = Array.isArray(list?.addons) ? list.addons : [];
+        const candidates = addons.filter(
+          (addon) =>
+            addon &&
+            addon.state === "started" &&
+            /music\s*assistant/i.test(`${addon.name || ""} ${addon.slug || ""}`)
+        );
+        for (const addon of candidates) {
+          const info = await hass.callWS({
+            type: "supervisor/api",
+            endpoint: `/addons/${encodeURIComponent(addon.slug)}/info`,
+            method: "get",
+          });
+          if (info?.ingress_url) {
+            this._maIngressPathValue = String(info.ingress_url);
+            return this._maIngressPathValue;
+          }
+        }
+      } catch {
+        // 非管理员、未安装加载项或旧版 HA 都可能没有 supervisor/api。
+      }
+      return "";
+    })();
+    try {
+      return await this._maIngressPromise;
+    } finally {
+      this._maIngressPromise = null;
+    }
+  }
+
+  _maOpenSocket(path) {
+    return new Promise((resolve, reject) => {
+      let socket;
+      try {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const base = path.startsWith("/") ? path : `/${path}`;
+        const url = `${protocol}//${window.location.host}${base}${
+          base.endsWith("/") ? "" : "/"
+        }ws`;
+        socket = new WebSocket(url);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      const timer = setTimeout(() => {
+        try {
+          socket.close();
+        } catch {
+          // ignore
+        }
+        reject(new Error("Music Assistant websocket timeout"));
+      }, 10000);
+      socket.addEventListener("open", () => {
+        clearTimeout(timer);
+        resolve(socket);
+      });
+      socket.addEventListener("error", () => {
+        clearTimeout(timer);
+        reject(new Error("Music Assistant websocket failed"));
+      });
+      socket.addEventListener("close", () => {
+        clearTimeout(timer);
+      });
+    });
+  }
+
+  _maSend(socket, command, args = {}, timeout = 15000) {
+    return new Promise((resolve, reject) => {
+      const messageId = `hm${(this._maMsgSeq = (this._maMsgSeq || 0) + 1)}`;
+      let settled = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        socket.removeEventListener("message", onMessage);
+        socket.removeEventListener("close", onClose);
+      };
+      const fail = (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const timer = setTimeout(() => fail(new Error("Music Assistant API timeout")), timeout);
+      const onMessage = (event) => {
+        let message;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (!message || message.message_id !== messageId) return;
+        if (message.error || message.error_code) {
+          fail(
+            new Error(
+              message.details ||
+                message.error?.message ||
+                `Music Assistant error ${message.error_code || ""}`
+            )
+          );
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(message.result);
+      };
+      const onClose = () => fail(new Error("Music Assistant websocket closed"));
+      socket.addEventListener("message", onMessage);
+      socket.addEventListener("close", onClose);
+      try {
+        socket.send(JSON.stringify({ message_id: messageId, command, args }));
+      } catch (error) {
+        fail(error);
+      }
+    });
+  }
+
+  async _fetchMaApiQueue(queueId) {
+    if (!queueId) return null;
+    const path = await this._maIngressPath();
+    if (!path) return null;
+    let socket;
+    try {
+      socket = await this._maOpenSocket(path);
+      const queue = await this._maSend(socket, "player_queues/get", {
+        queue_id: queueId,
+      });
+      const total = Number(queue?.items) || 0;
+      const activeItemId = queue?.current_item?.queue_item_id || "";
+      const currentIndex = Number(queue?.current_index);
+      const items = [];
+      const pageSize = 500;
+      let offset = 0;
+      while (offset < (total || 5000)) {
+        const page = await this._maSend(socket, "player_queues/items", {
+          queue_id: queueId,
+          limit: pageSize,
+          offset,
+        });
+        if (!Array.isArray(page) || !page.length) break;
+        items.push(...page);
+        offset += page.length;
+        if (page.length < pageSize) break;
+      }
+      if (!items.length) return null;
+      return {
+        items,
+        total: total || items.length,
+        activeItemId,
+        currentIndex,
+      };
+    } catch {
+      return null;
+    } finally {
+      try {
+        socket?.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async _playMaApiItem(queueId, queueItemId) {
+    if (!queueId || !queueItemId) return false;
+    const path = await this._maIngressPath();
+    if (!path) return false;
+    let socket;
+    try {
+      socket = await this._maOpenSocket(path);
+      await this._maSend(socket, "player_queues/play_index", {
+        queue_id: queueId,
+        index: queueItemId,
+      });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      try {
+        socket?.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   async _loadQueue(token) {
+    const attrs = this._state()?.attributes || {};
+    const queueId = attrs.active_queue || "";
     const [massItems, details] = await Promise.all([
       this._fetchMassQueueItems(),
       this._fetchMaQueueDetails(),
@@ -1852,17 +2068,28 @@ class HaMusicCard extends LitElement {
       return;
     }
     const t = translator(this._hass?.language);
-    const currentId = details?.current_item?.queue_item_id || "";
-    const contentId = this._state()?.attributes?.media_content_id || "";
-    let items = massItems
-      ? readMassQueueItems(massItems, currentId, contentId)
-      : [];
+    const direct = await this._fetchMaApiQueue(queueId || details?.queue_id || "");
+    if (
+      token !== this._queueLoadToken ||
+      !this._drawer?.open ||
+      this._drawer.mode !== "queue"
+    ) {
+      return;
+    }
+    this._queueQueueId = queueId || details?.queue_id || "";
+    const currentId = direct?.activeItemId || details?.current_item?.queue_item_id || "";
+    const contentId = attrs.media_content_id || "";
+    let items = direct
+      ? readMassQueueItems(direct.items, currentId, contentId)
+      : massItems
+        ? readMassQueueItems(massItems, currentId, contentId)
+        : [];
     const fullQueue = items.length > 0;
     if (!items.length && details) {
       items = readMaQueueDetails(details, contentId);
     }
-    const total = Number(details?.items);
-    const index = Number(details?.current_index);
+    const total = Number(direct?.total ?? details?.items);
+    const index = Number(direct?.currentIndex ?? details?.current_index);
     const title = [t("queue")];
     if (Number.isFinite(total) && total > 0) {
       title.push(`${Number.isFinite(index) ? index + 1 : "?"}/${total}`);
@@ -1887,6 +2114,7 @@ class HaMusicCard extends LitElement {
     const items = readQueue(state, this._config?.max_queue ?? 40);
     const maPlayer = this._isMaPlayer();
     const token = ++this._queueLoadToken;
+    this._queueQueueId = maPlayer ? state?.attributes?.active_queue || "" : "";
     this._drawer = {
       open: true,
       mode: "queue",

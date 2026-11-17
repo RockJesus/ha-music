@@ -34,7 +34,7 @@
 - **频谱动效**：`bars` 柱状、`wave` 波形、`orbit` 光环；`bars` 优先使用 MA 能量波形，未接桥接服务时按「歌名+歌手+专辑」和 `media_position` 做逐帧律动。
 - **完整播放控制**：播放/暂停、上一首/下一首、进度拖动、音量拖动与静音、随机、循环（关/列表/单曲）、电源开关。
 - **音源与声音模式**：读取 `source_list` / `sound_mode_list`，点击 chip 直接切换。
-- **播放队列**：读取播放器 `queue` 属性，抽屉内点击任意曲目跳播。
+- **当前播放列表**：原生播放器读取 `queue` 属性；Music Assistant 播放器经 HA Supervisor Ingress 直连 MA API 读取完整队列，抽屉内点击任意曲目精确切歌，无需安装 Mass Queue。非管理员、外部 MA 服务器或读取失败时，自动回退到当前/下一首，并保留「在 Music Assistant 查看全部」入口。
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`；首次加载或有播放器刚开始播放时，会自动跟到正在播放的那台，多台同时播放则优先最近更新的一台。手动点选播放器后不会被立刻抢回，避免影响操作。
 - **触屏优先**：`pointer: coarse` 下按钮/滑杆/列表自动放大到 40–48px，抽屉滚动不穿透页面，点按有按压反馈；窄屏自动把音量条换到下一行，避免大按钮把卡片撑破。
@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=1.8.5`
+   - URL：`/local/ha-music.js?v=1.8.6`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -116,13 +116,13 @@ entity: media_player.living_room
 | `mobile_hide_dock` | bool | `true` | 手机端自动隐藏悬浮播放器；仅粗指针窄屏/横屏矮屏生效，桌面和平板不受影响 |
 | `mobile_hide_lyrics` | bool | `true` | 手机端自动隐藏全局歌词悬浮窗；仅粗指针窄屏/横屏矮屏生效，桌面和平板不受影响 |
 | `show_source` | bool | `true` | 显示音源 chip |
-| `show_queue` | bool | `true` | 显示当前播放列表按钮；MA 播放器自动读取队列，完整队列需安装 Mass Queue 集成 |
+| `show_queue` | bool | `true` | 显示当前播放列表按钮；MA 播放器自动读取完整队列（需 Music Assistant 加载项）；读取失败时回退当前/下一首 |
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |
 | `dock` | `none` \| 位置数组 | `none` | 全局迷你播放器位置，可同时启用多个：`top` / `sidebar` / `fab`；直接控制播放暂停、上一首、下一首，不跳转页面 |
 | `dock_entities` | object | — | 每个位置各自的播放器实体，如 `{ top: "media_player.a", sidebar: "media_player.b", fab: "media_player.c" }`；未填时回退主卡片实体 |
 | `dock_themes` | object | — | 每个位置各自的播放器主题，如 `{ top: "cyber", sidebar: "liquid", fab: "velvet" }`；未填时跟随主卡片 `theme` |
-| `max_queue` | number | `60` | 队列最多展示条数 |
+| `max_queue` | number | `60` | 原生播放器/MA 兜底队列最多展示条数；MA 完整队列显示全部 |
 | `music_assistant` | `true` \| `false` \| string | 自动 | 歌单入口：不填时检测到 MA 服务/播放器即显示；`false` 隐藏；字符串同时作为抽屉内「打开 MA」按钮的面板地址（留空自动读 HA 面板路径） |
 
 ### MA 真实能量波形
@@ -195,7 +195,7 @@ show_volume: false
 - 顶栏歌单按钮列出 MA 播放列表（走 `media_player/browse_media` 的 `Playlists` 目录），点击后调用 `music_assistant.play_media`（`media_type: playlist`、`enqueue: play`）直接开播。
 - 没有 MA 服务时自动回退 `media_player.play_media`，因此普通播放器的歌单也能用。
 - 抽屉右上角的跳转图标打开 MA 面板：默认自动读取 HA 面板路径（加载项 ingress 的前缀因实例而异，如 `/b93b5321_music_assistant`），也可用 `music_assistant` 指定相对路径或 `https://` 地址。
-- 队列与媒体库浏览仍走实体暴露的 `queue` 与 `browse_media`，无需额外配置。
+- 完整队列优先经 HA Supervisor Ingress 直连 MA 的 `player_queues/items`，支持 3000+ 首并在抽屉内精确切歌；没有 MA 加载项、当前用户不是管理员或 Ingress 不可用时，回退到 `music_assistant.get_queue` 的当前/下一首与 `mass_queue`（若已安装）。
 
 ## 交互说明
 
@@ -211,7 +211,7 @@ show_volume: false
 ## 兼容性
 
 - Home Assistant 2023.8 及以上；不需要任何前端集成或后端组件。
-- 队列依赖播放器暴露 `queue` 属性（Music Assistant、Sonos 等支持）。
+- 原生队列依赖播放器暴露 `queue` 属性（Sonos 等支持）；Music Assistant 完整队列依赖 MA 加载项的 Ingress，无需 mass_queue。
 - 媒体库依赖播放器支持 `BROWSE_MEDIA`，部分集成可能只返回扁平列表。
 - 音量默认作用于当前播放器，可用 `volume_entity` 指向功放/音箱实体。
 

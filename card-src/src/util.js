@@ -306,6 +306,22 @@ export function readQueue(state, limit = 60) {
 
 // Music Assistant 的完整队列由 mass_queue 集成读取；字段比 HA 原生 queue 更扁平。
 // 当前曲目以 queue_item_id / media_content_id 双重匹配，避免同名歌曲误高亮。
+function queueImage(media = {}, item = {}) {
+  const pick = (value) => {
+    if (typeof value === "string") return value;
+    if (value && typeof value === "object") return value.url || value.path || "";
+    return "";
+  };
+  const direct = pick(media.image) || pick(item.media_image) || pick(item.entity_picture);
+  if (direct) return direct;
+  const images = media.metadata?.images;
+  if (Array.isArray(images)) {
+    const found = images.find((image) => image && image.remotely_accessible !== false) || images[0];
+    return pick(found);
+  }
+  return "";
+}
+
 export function readMassQueueItems(items, currentQueueItemId = "", currentContentId = "") {
   if (!Array.isArray(items)) return [];
   return items.map((item, index) => {
@@ -332,10 +348,7 @@ export function readMassQueueItems(items, currentQueueItemId = "", currentConten
       duration: Number(item?.media_duration ?? item?.duration ?? 0) || 0,
       art:
         item?.local_image_encoded ||
-        item?.media_image ||
-        media.image ||
-        item?.entity_picture ||
-        "",
+        queueImage(media, item),
       contentId,
       contentType: media.media_type || item?.media_content_type || "music",
       queueItemId,

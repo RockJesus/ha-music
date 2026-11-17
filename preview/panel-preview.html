@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HA Music · Panel</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; width:390px; height:844px; background:#05060a; overflow:hidden; }
+  hui-panel-view, #stage, .cell, ha-music { display:block; width:390px; height:844px; margin:0; padding:0; }
+</style>
+<script type="module" src="../ha-music.js"></script>
+</head>
+<body>
+<hui-panel-view><div id="stage"></div></hui-panel-view>
+<script type="module">
+  const params = new URLSearchParams(location.search);
+  const THEME = params.get("theme") || "aurora";
+  const STATE = params.get("state") || "playing";
+  const ART = { aurora:"art/cover-aurora-720.jpg", cyber:"art/cover-cyber-720.jpg", liquid:"art/cover-liquid-720.jpg" };
+  const FEATURES = 1+2+4+8+16+32+128+256+512+2048+16384+32768+65536+131072+262144+524288;
+  const QUEUE = [["Neon River","AURORA LAB",257,ART.aurora,true],["Velvet Static","AURORA LAB",198,ART.aurora,false],["Glass Bloom","LILA K.",231,ART.liquid,false],["Chrome Horizon","NEON DISTRICT",274,ART.cyber,false]].map(([title,artist,duration,art,active])=>({title,artist,duration,entity_picture:art,active,media_content_id:"media-source://preview/"+encodeURIComponent(title),media_content_type:"music"}));
+  const player = (id,name,title,artist,art,state,pos,dur,volume)=>({entity_id:id,state,attributes:{friendly_name:name,media_title:title,media_artist:artist,media_album_name:"Midnight Signals",entity_picture:art,media_duration:dur,media_position:pos,media_position_updated_at:new Date(Date.now()-2000).toISOString(),volume_level:volume,is_volume_muted:false,shuffle:true,repeat:"all",mass_player_type:"player",source:"Spotify",source_list:["Spotify","本地媒体"],sound_mode:"Music",sound_mode_list:["Music"],supported_features:FEATURES,group_members:[id],app_name:"Spotify",media_track:3,queue:QUEUE}});
+  const states = {
+    "media_player.living": player("media_player.living","客厅 · Living Room","Neon River","AURORA LAB",ART.aurora,STATE,83,257,0.42),
+    "media_player.study": player("media_player.study","书房 · Studio","Chrome Horizon","NEON DISTRICT",ART.cyber,"paused",42,274,0.66),
+  };
+  const hass = {
+    language:"zh-Hans", states,
+    services:{ music_assistant:{ play_media:{} } },
+    panels:{ b93b5321_music_assistant:{ url_path:"b93b5321_music_assistant", title:"Music Assistant", component_name:"app" } },
+    hassUrl:(p)=>p,
+    callService:()=>Promise.resolve({}),
+    connection:{ sendMessagePromise: async(m)=>({title:"媒体库",children:[]}) }
+  };
+  const cell = document.createElement("div"); cell.className="cell";
+  const card = document.createElement("ha-music");
+  card.hass = hass;
+  card.setConfig({ entity:"media_player.living", theme:THEME, layout:"full", cover:"ambient", visualizer:"bars" });
+  cell.appendChild(card); document.getElementById("stage").appendChild(cell);
+  window.__preview={hass,states,card};
+</script>
+</body>
+</html>

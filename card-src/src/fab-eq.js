@@ -6,7 +6,7 @@ import { clamp, hashString } from "./util.js";
 
 const SIZE = 104;
 const BARS = 36;
-const MAX_BARS = 128;
+const MAX_BARS = 192;
 const DPR = Math.min(2, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
 const states = new WeakMap();
 const FALLBACK_ACCENT = ["#7b5cff", "#2ee6c5"];

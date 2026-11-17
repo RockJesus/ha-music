@@ -2477,7 +2477,7 @@ export const cardStyles = css`
   /* ---------- 面板视图：自动铺满可用区域 ---------- */
   :host([data-panel="true"]) {
     --hm-panel-height: 100%;
-    --hm-panel-cover: calc(100dvh - 440px);
+    --hm-panel-cover: min(600px, calc(100dvh - 440px));
     height: var(--hm-panel-height, 100%);
     min-height: 0;
     max-height: var(--hm-panel-height, 100%);

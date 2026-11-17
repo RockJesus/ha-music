@@ -6,7 +6,7 @@ import { clamp, hashString } from "./util.js";
 
 const SIZE = 104;
 const BARS = 36;
-const MAX_BARS = 80;
+const MAX_BARS = 128;
 const DPR = Math.min(2, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1);
 const states = new WeakMap();
 const FALLBACK_ACCENT = ["#7b5cff", "#2ee6c5"];
@@ -221,7 +221,8 @@ export function syncFabEq(canvas, root, media = {}) {
   const accent = Array.isArray(media.accent) && media.accent.length >= 2
     ? [media.accent[0], media.accent[1]]
     : FALLBACK_ACCENT;
-  const size = Math.max(72, Math.min(360, Math.round(Number(media.size) || SIZE)));
+  const maxSize = Math.max(104, Number(media.maxSize) || 360);
+  const size = Math.max(72, Math.min(maxSize, Math.round(Number(media.size) || SIZE)));
   const innerRadius = Number(media.innerRadius);
   state.accent = accent;
   state.root = root;

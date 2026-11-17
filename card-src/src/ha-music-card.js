@@ -943,7 +943,7 @@ class HaMusicCard extends LitElement {
       72,
       Math.round(cover.getBoundingClientRect().width || this._coverPx(this._layoutKey())),
     );
-    const size = Math.min(360, width + 48);
+    const size = Math.min(1200, width + 48);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
     const glow = this.renderRoot?.querySelector?.(".hm-cover-eq-glow");
@@ -973,8 +973,9 @@ class HaMusicCard extends LitElement {
       position: this._seekPreview ?? media.position,
       size,
       innerRadius: width / 2 + 3,
-      lineWidth: size >= 220 ? 2.2 : 2,
-      bars: width >= 150 ? 64 : 48,
+      lineWidth: Math.max(2.2, Math.min(5, width / 110)),
+      bars: width >= 600 ? 112 : width >= 300 ? 88 : width >= 150 ? 64 : 48,
+      maxSize: 1200,
       target: cover,
       applyShadow: false,
       accent,

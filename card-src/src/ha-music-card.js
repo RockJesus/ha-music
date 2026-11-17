@@ -144,6 +144,7 @@ class HaMusicCard extends LitElement {
     this._lyricsAbort = null;
     this._lyricsOffset = this._loadLyricsOffset();
     this._lyricsCache = this._loadLyricsCache();
+    this._lyricsBackendMissingAt = 0;
     this._coverPress = null;
     this._coverGesture = "";
     this._coverGestureTimer = null;
@@ -661,7 +662,10 @@ class HaMusicCard extends LitElement {
           continue;
         }
         // 后端集成缺失时接口是 404；不必对同一查询重复打三次。
-        if (response.status === 404) return null;
+        if (response.status === 404) {
+          this._lyricsBackendMissingAt = Date.now();
+          return null;
+        }
         if (!response.ok) {
           lastError = new Error(`lyrics HTTP ${response.status}`);
           if (attempt < 2) {
@@ -734,33 +738,35 @@ class HaMusicCard extends LitElement {
   async _requestLrclibLyrics(media, query, signal) {
     const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
     const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
+    const cleanTitle = this._cleanLyricsQuery(rawTitle) || rawTitle;
+    const cleanArtist = this._cleanLyricsQuery(rawArtist) || rawArtist;
     const duration = Math.round(Number(media.duration) || 0);
     const exact = [];
-    if (duration && rawArtist) {
-      exact.push(
-        media.album
-          ? {
-              track_name: rawTitle,
-              artist_name: rawArtist,
-              album_name: media.album,
-              duration,
-            }
-          : {
-              track_name: query.title || rawTitle,
-              artist_name: rawArtist,
-              duration,
-            }
-      );
+    if (duration && cleanArtist) {
+      exact.push({
+        track_name: cleanTitle,
+        artist_name: cleanArtist,
+        ...(media.album ? { album_name: media.album } : {}),
+        duration,
+      });
+      if (rawArtist !== cleanArtist) {
+        exact.push({
+          track_name: rawTitle,
+          artist_name: rawArtist,
+          ...(media.album ? { album_name: media.album } : {}),
+          duration,
+        });
+      }
     }
     const searches = [];
     if (query.title) {
       searches.push({
         track_name: query.title,
-        artist_name: query.artist || rawArtist,
+        artist_name: query.artist || cleanArtist,
       });
     }
     searches.push({
-      q: [rawTitle, rawArtist].filter(Boolean).join(" "),
+      q: [rawTitle, cleanArtist || rawArtist].filter(Boolean).join(" "),
     });
     let lastError = null;
     for (const params of searches) {
@@ -794,6 +800,46 @@ class HaMusicCard extends LitElement {
     }
     if (lastError) throw lastError;
     return null;
+  }
+
+  async _requestLyricsOvh(media, query, signal) {
+    const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
+    const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
+    const artist = this._cleanLyricsQuery(query?.artist || rawArtist) || rawArtist;
+    const title = this._cleanLyricsQuery(query?.title || rawTitle) || rawTitle;
+    if (!artist || !title) return null;
+    const local = new AbortController();
+    const onAbort = () => local.abort();
+    if (signal) {
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    const timer = setTimeout(() => local.abort(), 4500);
+    try {
+      const response = await fetch(
+        `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`,
+        {
+          signal: local.signal,
+          mode: "cors",
+          headers: { Accept: "application/json" },
+        }
+      );
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`lyrics.ovh HTTP ${response.status}`);
+      const data = await response.json();
+      const parsed = parseLyrics(data?.lyrics || "");
+      if (!parsed.lines.length && !parsed.plain.length) return null;
+      return { parsed, source: "Lyrics.ovh" };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        if (signal?.aborted) throw error;
+        return null;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onAbort);
+    }
   }
 
   _lrclibParsed(item) {
@@ -882,7 +928,10 @@ class HaMusicCard extends LitElement {
     let lastError = null;
     try {
       const source = this._lyricsSource();
-      if (source !== "lrclib") {
+      const backendMissing =
+        this._lyricsBackendMissingAt &&
+        Date.now() - this._lyricsBackendMissingAt < 10 * 60 * 1000;
+      if (source !== "lrclib" && !backendMissing) {
         for (const query of this._lyricsQueries(media)) {
           if (controller.signal.aborted || key !== this._lyricsKey) return;
           try {
@@ -892,6 +941,7 @@ class HaMusicCard extends LitElement {
               this._setLyrics(key, result.parsed, result.source);
               return;
             }
+            if (this._lyricsBackendMissingAt) break;
           } catch (error) {
             if (error?.name === "AbortError") throw error;
             lastError = error;
@@ -905,6 +955,21 @@ class HaMusicCard extends LitElement {
       if (lrQuery) {
         try {
           const result = await this._requestLrclibLyrics(media, lrQuery, controller.signal);
+          if (controller.signal.aborted || key !== this._lyricsKey) return;
+          if (result) {
+            this._setLyrics(key, result.parsed, result.source);
+            return;
+          }
+        } catch (error) {
+          if (error?.name === "AbortError") throw error;
+          lastError = error;
+        }
+      }
+
+      // LRCLIB 没有收录时，再用 Lyrics.ovh 的纯文本歌词兜底；自动模式才启用。
+      if (source === "auto" || source === "") {
+        try {
+          const result = await this._requestLyricsOvh(media, lrQuery, controller.signal);
           if (controller.signal.aborted || key !== this._lyricsKey) return;
           if (result) {
             this._setLyrics(key, result.parsed, result.source);
@@ -2156,10 +2221,15 @@ class HaMusicCard extends LitElement {
     installLyricDock({
       enabled: true,
       entity: fallback,
+      preferredEntity: fallback,
+      auto: this._config?.floating_lyrics_auto !== false,
+      source: this._lyricsSource(),
       theme: this._themeKey(),
       hass: this._hass,
       lines,
+      plain: this._lyrics.plain,
       trackKey,
+      status: this._lyrics.status,
       offset: this._lyricsOffset,
     });
     saveLyricDockPref({

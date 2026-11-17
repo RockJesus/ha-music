@@ -613,8 +613,8 @@ class HaMusicEditor extends LitElement {
             </select>
             <span class="hint">
               ${this._zh
-                ? "自动：QQ/网易云后端可用时优先，后端缺失或未匹配时自动回退 LRCLIB 在线同步歌词。"
-                : "Auto: prefer the QQ/NetEase backend when available, then fall back to LRCLIB online synced lyrics."}
+                ? "自动：QQ/网易云后端可用时优先，后端缺失或未匹配时自动回退 LRCLIB 同步歌词，最后用 Lyrics.ovh 纯文本兜底。"
+                : "Auto: prefer the QQ/NetEase backend when available, then LRCLIB synced lyrics, then Lyrics.ovh plain-text fallback."}
             </span>
           </label>
           ${this._switch(
@@ -625,6 +625,11 @@ class HaMusicEditor extends LitElement {
                 floating_lyrics: checked,
                 floating_lyrics_edited: Date.now(),
               })
+          )}
+          ${this._switch(
+            this._zh ? "歌词自动跟随正在播放的播放器" : "Auto-follow the playing player",
+            config.floating_lyrics_auto !== false,
+            (checked) => this._update({ floating_lyrics_auto: checked })
           )}
           ${this._switch(
             this._zh ? "显示分组信息" : "Show group info",

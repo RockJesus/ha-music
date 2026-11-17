@@ -8,6 +8,7 @@ import {
   normalizeDockModes,
   normalizeDockThemes,
 } from "./dock.js";
+import { installLyricDock, loadLyricDockPref } from "./lyric-dock.js";
 
 // 同一个 bundle 既可作为 Lovelace 资源，也可作为全局模块加载。
 // 迷你播放器的位置由卡片 `dock` 配置记忆到 localStorage；也可用模块 URL 强制指定：
@@ -34,3 +35,30 @@ const configs = modes
   .map((mode) => ({ mode, entity: entities[mode], theme: themes[mode] }))
   .filter((item) => item.entity);
 if (configs.length) installDocks(configs.map((item) => ({ ...item, hass: resolveHass() })));
+
+// 即使当前页面没有 ha-music 卡片，全局歌词悬浮窗也自动识别正在播放的播放器。
+// 卡片加载后会复用同一个悬浮窗，并把卡片自己的歌词/主题同步过来。
+function bootGlobalLyricDock() {
+  const pref = loadLyricDockPref();
+  if (pref?.enabled === false) return;
+  installLyricDock({
+    enabled: true,
+    entity: pref?.entity || "",
+    preferredEntity: pref?.entity || "",
+    auto: true,
+    source: "auto",
+    theme: "aurora",
+    hass: resolveHass(),
+    lines: [],
+    trackKey: "",
+    status: "idle",
+  });
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootGlobalLyricDock, { once: true });
+  } else {
+    window.setTimeout(bootGlobalLyricDock, 0);
+  }
+}

@@ -4,6 +4,11 @@ import { resolveHass, normalizeTheme, findTopBarRect, findTopBarAddRect } from "
 import { THEMES, DEFAULT_THEME } from "./const.js";
 import { colorTriplet } from "./util.js";
 import { lyricIndex } from "./lyrics.js";
+import {
+  fetchGlobalLyrics,
+  globalTrackKey,
+  pickGlobalLyricsEntity,
+} from "./lyrics-service.js";
 
 const PREF_KEY = "haMusicLyricDock";
 const POS_KEY = "haMusicLyricDockPos";
@@ -252,9 +257,16 @@ class HaMusicLyric extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._theme = DEFAULT_THEME;
     this._entity = "";
+    this._preferred = "";
+    this._auto = true;
+    this._source = "auto";
+    this._status = "idle";
     this._hass = null;
     this._lines = [];
+    this._plain = [];
     this._linesKey = "";
+    this._requestKey = "";
+    this._requestController = null;
     this._offset = 0;
     this._clock = null;
     this._poll = null;
@@ -291,10 +303,24 @@ class HaMusicLyric extends HTMLElement {
       this.remove();
       return;
     }
-    if (Array.isArray(config.lines)) this._lines = config.lines;
-    if (config.trackKey !== undefined) this._linesKey = String(config.trackKey || "");
+    if (config.auto !== undefined) this._auto = config.auto !== false;
+    if (config.source) this._source = String(config.source);
+    if (config.entity) {
+      this._preferred = config.entity;
+      if (!this._entity || !this._auto) this._entity = config.entity;
+    }
+    // 卡片提供的歌词只在实体对得上时采用；自动跟随切到别的播放器后，
+    // 旧卡片的歌词不能覆盖当前播放器。
+    if (
+      Array.isArray(config.lines) &&
+      (!this._auto || !config.entity || config.entity === this._entity)
+    ) {
+      this._setLines(config.lines, config.trackKey, config.status, config.plain);
+    }
+    if (config.status && (!config.entity || config.entity === this._entity)) {
+      this._status = config.status;
+    }
     if (config.offset !== undefined) this._offset = Number(config.offset) || 0;
-    if (config.entity) this._entity = config.entity;
     if (config.hass?.states) this._hass = config.hass;
     const theme = normalizeTheme(config.theme);
     if (theme !== this._theme) {
@@ -304,6 +330,13 @@ class HaMusicLyric extends HTMLElement {
     this._applyTheme();
     this._sync();
     if (!this._dragging) this._applyPosition();
+  }
+
+  _setLines(lines, key, status, plain) {
+    if (Array.isArray(lines)) this._lines = lines;
+    if (Array.isArray(plain)) this._plain = plain;
+    if (key !== undefined) this._linesKey = String(key || "");
+    if (status) this._status = status;
   }
 
   connectedCallback() {
@@ -338,24 +371,15 @@ class HaMusicLyric extends HTMLElement {
     this._pill.dataset.theme = key;
   }
 
-  _trackKey(state) {
-    const attrs = state?.attributes || {};
-    return [
-      this._entity,
-      attrs.media_title || "",
-      attrs.media_artist || "",
-      attrs.media_album_name || "",
-      attrs.media_duration || 0,
-      attrs.media_content_id || "",
-    ]
-      .map((value) => String(value))
-      .join("|");
-  }
-
   _sync() {
     if (!this._pill) return;
     const hass = resolveHass() || this._hass;
     if (hass?.states) this._hass = hass;
+    const preferred = this._preferred || this._entity;
+    if (this._auto) {
+      const active = pickGlobalLyricsEntity(hass, preferred);
+      if (active && active !== this._entity) this._selectEntity(active);
+    }
     if (!this._entity) {
       this._setText("");
       return;
@@ -366,7 +390,13 @@ class HaMusicLyric extends HTMLElement {
       return;
     }
     const attrs = state.attributes || {};
-    const key = this._trackKey(state);
+    const key = globalTrackKey(this._entity, state);
+    if (
+      key !== this._linesKey &&
+      (this._status !== "loading" || key !== this._requestKey)
+    ) {
+      this._ensureLyrics(state, key);
+    }
     const stamp = attrs.media_position_updated_at || "";
     const base = Number(attrs.media_position) || 0;
     const now = Date.now();
@@ -385,13 +415,77 @@ class HaMusicLyric extends HTMLElement {
     position += this._offset;
 
     let line = "";
-    if (this._linesKey && key !== this._linesKey) {
-      line = "";
-    } else if (this._lines.length) {
-      const index = lyricIndex(this._lines, position);
-      line = this._lines[Math.max(0, index)]?.text || "";
+    if (this._linesKey && key === this._linesKey) {
+      if (this._lines.length) {
+        const index = lyricIndex(this._lines, position);
+        line = this._lines[Math.max(0, index)]?.text || "";
+      } else if (this._plain.length) {
+        // 纯文本歌词没有时间轴，至少显示首句，避免全局歌词窗空白。
+        line = this._plain[0] || "";
+      }
     }
     this._setText(line);
+  }
+
+  _selectEntity(entityId) {
+    if (!entityId || entityId === this._entity) return;
+    this._abortRequest();
+    this._entity = entityId;
+    this._lines = [];
+    this._plain = [];
+    this._linesKey = "";
+    this._requestKey = "";
+    this._status = "idle";
+    this._clock = null;
+  }
+
+  _abortRequest() {
+    if (this._requestController) this._requestController.abort();
+    this._requestController = null;
+  }
+
+  _ensureLyrics(state, key) {
+    if (!state || this._requestKey === key && this._status === "loading") return;
+    this._abortRequest();
+    this._requestKey = key;
+    this._status = "loading";
+    this._lines = [];
+    this._plain = [];
+    this._linesKey = "";
+    const entityId = this._entity;
+    const controller = new AbortController();
+    this._requestController = controller;
+    fetchGlobalLyrics(state, {
+      hass: this._hass,
+      source: this._source,
+      signal: controller.signal,
+    })
+      .then((result) => {
+        if (controller.signal.aborted || this._entity !== entityId || this._requestKey !== key) {
+          return;
+        }
+        // 卡片已经为同一首曲目提供了歌词时，不用全局兜底结果覆盖它。
+        if (this._linesKey === key && (this._lines.length || this._plain.length)) return;
+        this._lines = Array.isArray(result.lines) ? result.lines : [];
+        this._plain = Array.isArray(result.plain) ? result.plain : [];
+        this._linesKey = key;
+        this._status = result.status || "none";
+        this._source = result.source || this._source;
+        this._sync();
+      })
+      .catch(() => {
+        if (controller.signal.aborted || this._entity !== entityId || this._requestKey !== key) {
+          return;
+        }
+        this._lines = [];
+        this._plain = [];
+        this._linesKey = key;
+        this._status = "error";
+        this._sync();
+      })
+      .finally(() => {
+        if (this._requestController === controller) this._requestController = null;
+      });
   }
 
   _setText(text) {

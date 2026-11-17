@@ -19,6 +19,14 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+// 与卡片歌词共用同一套播放时钟锚点。HA 的 media_position 可能落后于
+// media_position_updated_at，直接把它当作当前时刻会让悬浮歌词晚几秒。
+function positionAnchor(stamp, now = Date.now()) {
+  const parsed = typeof stamp === "number" ? stamp : Date.parse(String(stamp || ""));
+  if (!Number.isFinite(parsed)) return now;
+  return Math.min(parsed, now);
+}
+
 function loadPositions() {
   try {
     const raw = window.localStorage.getItem(POS_KEY);
@@ -400,13 +408,14 @@ class HaMusicLyric extends HTMLElement {
     const stamp = attrs.media_position_updated_at || "";
     const base = Number(attrs.media_position) || 0;
     const now = Date.now();
+    const anchor = stamp ? positionAnchor(stamp, now) : now;
     if (
       !this._clock ||
       this._clock.key !== key ||
       this._clock.state !== state.state ||
       this._clock.stamp !== stamp
     ) {
-      this._clock = { key, state: state.state, stamp, base, at: now };
+      this._clock = { key, state: state.state, stamp, base, at: anchor };
     }
     let position = this._clock.base;
     if (state.state === "playing") position += Math.max(0, now - this._clock.at) / 1000;

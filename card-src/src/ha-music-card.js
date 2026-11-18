@@ -3362,14 +3362,25 @@ class HaMusicCard extends LitElement {
         max_rows: 24,
       };
     }
-    const shape = this._shape();
-    const minRows = shape === "mini" || shape === "banner" ? 1 : shape === "compact" ? 2 : 4;
+    // 按内容算行数（mushroom 的做法）：rows = 内容高度需要的栅格行，min_rows 与之一致。
+    // 用户仍可往上拖高，但默认高度不会小于内容，避免裁切。
+    const w = this._width || 0;
+    const h = this._height || 0;
+    let rows;
+    if (h) {
+      // 行高 56px、行间距 8px：rows 行可容纳 rows*56 + (rows-1)*8
+      rows = Math.ceil((h + 8) / 64);
+    } else {
+      // 未测到尺寸时按宽度估：>=760 的自然内容约 390px，<760 约 330px
+      rows = w >= 760 ? 7 : 6;
+    }
+    rows = Math.min(24, Math.max(4, rows));
     return {
       columns: 12,
-      rows: "auto",
+      rows,
       min_columns: 4,
       max_columns: 24,
-      min_rows: minRows,
+      min_rows: rows,
       max_rows: 24,
     };
   }

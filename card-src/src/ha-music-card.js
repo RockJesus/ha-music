@@ -264,8 +264,9 @@ class HaMusicCard extends LitElement {
       };
     }
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
-    // 切歌立即重绘：不依赖扁平属性与签名比对的先后，避免标题/封面慢一拍。
+    // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
+    this._syncArt(readMedia(state), entityId);
     const sig = this._computeSig(hass);
     if (sig !== this._sig || previous === undefined) {
       this._sig = sig;
@@ -2543,21 +2544,8 @@ class HaMusicCard extends LitElement {
     const card = this.renderRoot?.querySelector?.(".hm-card");
     if (!card) return;
     const media = this._readMedia();
-    const state = this._state();
-    const unavailable =
-      !state || state.state === "unavailable" || state.state === "unknown";
-    const artSource = unavailable ? "" : media.art || "";
     const entityId = this._eid();
-    if (artSource !== this._artSource) {
-      this._artSource = artSource;
-      this._artFailedSource = "";
-      const seq = ++this._artSeq;
-      resolveArtUrl(this._hass, artSource, entityId).then((url) => {
-        if (seq !== this._artSeq || url === this._artUrl) return;
-        this._artUrl = url;
-        this.requestUpdate();
-      });
-    }
+    this._syncArt(media, entityId);
     if (this._artUrl !== this._artApplied) {
       this._artApplied = this._artUrl;
       this._crossFadeArt(card, this._artUrl);
@@ -2895,6 +2883,29 @@ class HaMusicCard extends LitElement {
       .join("|");
   }
 
+  _syncArt(media, entityId) {
+    const state = this._state();
+    const unavailable =
+      !state || state.state === "unavailable" || state.state === "unknown";
+    const artSource = unavailable ? "" : media?.art || "";
+    if (artSource === this._artSource) return;
+    this._artSource = artSource;
+    this._artFailedSource = "";
+    const seq = ++this._artSeq;
+    if (!artSource) {
+      this._artUrl = "";
+      this._artApplied = "";
+      this.requestUpdate();
+      return;
+    }
+    resolveArtUrl(this._hass, artSource, entityId).then((url) => {
+      if (seq !== this._artSeq) return;
+      if (url === this._artUrl) return;
+      this._artUrl = url;
+      this.requestUpdate();
+    });
+  }
+
   _artUrlFor() {
     const media = this._readMedia();
     return normalizeArt(this._hass, media.art);
@@ -3022,9 +3033,13 @@ class HaMusicCard extends LitElement {
       this._progressLastSecond = second;
       const start = this.renderRoot?.querySelector?.(".hm-time");
       if (start) start.textContent = formatTime(position);
-      if (this._showRemaining) {
-        const end = this.renderRoot?.querySelector?.(".hm-time.end");
-        if (end) end.textContent = `-${formatTime(Math.max(duration - position, 0))}`;
+      // 切歌后模板可能还保留上一首的结束时间；这里每帧用当前时长校正，
+      // 不只更新当前时间，避免总时长标签停在旧值直到整卡重绘。
+      const end = this.renderRoot?.querySelector?.(".hm-time.end");
+      if (end) {
+        end.textContent = this._showRemaining
+          ? `-${formatTime(Math.max(duration - position, 0))}`
+          : formatTime(duration);
       }
     }
     this._progressRaf = requestAnimationFrame(() => this._progressTick());

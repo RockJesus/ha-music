@@ -4559,6 +4559,23 @@ class HaMusicCard extends LitElement {
       this._spectrumGrad = grad;
       this._spectrumGradKey = gradKey;
     }
+    const depth = height >= 28 && width >= 360;
+    // 后层：略短、下沉、压暗的副柱，和倾斜的频谱平面一起构成纵深。
+    if (depth) {
+      ctx.save();
+      ctx.fillStyle = accent[1];
+      ctx.globalAlpha = idle ? 0.12 : 0.22;
+      for (let index = 0; index < count; index += 1) {
+        const level = clamp(Number(levels[index]) || 0, 0.02, 1);
+        const barHeight = Math.max(2, level * height);
+        const x = index * cell + (cell - barWidth) / 2;
+        const rearH = Math.max(2, barHeight * 0.74);
+        const rearX = x + barWidth * 0.16;
+        const rearW = Math.max(1, barWidth * 0.68);
+        ctx.fillRect(rearX, height - rearH + 2, rearW, rearH);
+      }
+      ctx.restore();
+    }
     ctx.fillStyle = this._spectrumGrad;
     if (mobile) ctx.globalAlpha = idle ? 0.5 : 0.84;
     for (let index = 0; index < count; index += 1) {
@@ -4574,6 +4591,25 @@ class HaMusicCard extends LitElement {
       } else {
         ctx.fillRect(x, y, barWidth, barHeight);
       }
+      // 柱顶高光：让细柱有受光面，不再是一块纯色矩形。
+      if (depth && !idle) {
+        ctx.globalAlpha = 0.55 + level * 0.35;
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillRect(x, y, barWidth, 1);
+        ctx.fillStyle = this._spectrumGrad;
+      }
+    }
+    // 柱底渐隐：底边 alpha 归零，柱子像是从暗面里长出来。
+    if (depth) {
+      const fadeH = Math.min(10, height * 0.28);
+      const fade = ctx.createLinearGradient(0, height - fadeH, 0, height);
+      fade.addColorStop(0, "rgba(0,0,0,0)");
+      fade.addColorStop(1, "rgba(0,0,0,0.92)");
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, height - fadeH, width, fadeH);
+      ctx.globalCompositeOperation = "source-over";
     }
     ctx.globalAlpha = 1;
   }

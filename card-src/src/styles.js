@@ -310,11 +310,24 @@ export const cardStyles = css`
     -webkit-user-select: none;
     -webkit-touch-callout: none;
     will-change: transform;
-    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-style: preserve-3d;
+    transform: rotateY(-13deg) rotateX(7deg) translateZ(6px);
+    transform-origin: 50% 50%;
+    box-shadow:
+      14px 26px 42px -16px rgba(0, 0, 0, 0.92),
+      -1px 0 0 rgba(var(--hm-a2-rgb), 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.26);
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease;
+    backface-visibility: hidden;
   }
 
   .hm-cover:hover {
-    transform: translateY(-2px) scale(1.008);
+    transform: rotateY(-6deg) rotateX(3deg) translateY(-2px) translateZ(14px) scale(1.015);
+    box-shadow:
+      18px 30px 48px -16px rgba(0, 0, 0, 0.95),
+      -1px 0 0 rgba(var(--hm-a2-rgb), 0.3),
+      0 0 28px -10px rgba(var(--hm-a1-rgb), 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
 
   .hm-cover img {
@@ -424,54 +437,54 @@ export const cardStyles = css`
 
   @keyframes hmCoverNext {
     0% {
-      transform: translateX(0) scale(1);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(0) scale(1);
       opacity: 1;
     }
     34% {
-      transform: translateX(-15%) rotate(-2.5deg) scale(0.94);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(-15%) rotate(-2.5deg) scale(0.94);
       opacity: 0.82;
     }
     70% {
-      transform: translateX(3%) rotate(0.6deg) scale(1.01);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(3%) rotate(0.6deg) scale(1.01);
       opacity: 1;
     }
     100% {
-      transform: translateX(0) scale(1);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(0) scale(1);
       opacity: 1;
     }
   }
 
   @keyframes hmCoverPrev {
     0% {
-      transform: translateX(0) scale(1);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(0) scale(1);
       opacity: 1;
     }
     34% {
-      transform: translateX(15%) rotate(2.5deg) scale(0.94);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(15%) rotate(2.5deg) scale(0.94);
       opacity: 0.82;
     }
     70% {
-      transform: translateX(-3%) rotate(-0.6deg) scale(1.01);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(-3%) rotate(-0.6deg) scale(1.01);
       opacity: 1;
     }
     100% {
-      transform: translateX(0) scale(1);
+      transform: rotateY(-13deg) rotateX(7deg) translateX(0) scale(1);
       opacity: 1;
     }
   }
 
   @keyframes hmCoverTap {
     0% {
-      transform: scale(1);
+      transform: rotateY(-13deg) rotateX(7deg) scale(1);
     }
     38% {
-      transform: scale(0.93);
+      transform: rotateY(-13deg) rotateX(7deg) scale(0.93);
     }
     72% {
-      transform: scale(1.025);
+      transform: rotateY(-13deg) rotateX(7deg) scale(1.025);
     }
     100% {
-      transform: scale(1);
+      transform: rotateY(-13deg) rotateX(7deg) scale(1);
     }
   }
 
@@ -619,6 +632,8 @@ export const cardStyles = css`
     display: block;
     width: 100%;
     height: 100%;
+    transform-origin: 50% 100%;
+    transform: rotateX(14deg) translateZ(1px);
   }
 
   .hm-wave-wrap {
@@ -1565,6 +1580,8 @@ export const cardStyles = css`
   .hm-cover-wrap {
     position: relative;
     isolation: isolate;
+    perspective: 880px;
+    perspective-origin: 50% 52%;
     min-width: 0;
     height: var(--hm-cover-size, 168px);
     min-height: 0;

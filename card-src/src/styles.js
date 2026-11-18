@@ -2860,41 +2860,40 @@ export const cardStyles = css`
   }
 
   /* 横屏短卡片（如 1024×768 平板横屏）：宽度落在窄屏断点内，但高度不足以竖排。
-     改回左右双栏，避免底部进度/控制/音量被挤出卡片。 */
-  @container (min-width: 701px) and (max-width: 820px) and (max-height: 820px) {
-    .hm-card[data-panel="true"] .hm-main {
-      display: grid;
-      grid-template-columns:
-        minmax(0, calc(var(--hm-panel-cover, 34%) + 96px))
-        minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr);
-      flex: 1 1 auto;
-      justify-content: stretch;
-      align-items: center;
-      gap: clamp(14px, 2.4cqi, 24px);
-      overflow: hidden;
-    }
+     由 _fitPanel 打上 hm-short-landscape 类，改回左右双栏，
+     避免底部进度/控制/音量被挤出卡片。 */
+  .hm-card.hm-short-landscape[data-panel="true"] .hm-main {
+    display: grid;
+    grid-template-columns:
+      minmax(0, calc(var(--hm-panel-cover, 34%) + 96px))
+      minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    flex: 1 1 auto;
+    justify-content: stretch;
+    align-items: center;
+    gap: clamp(14px, 2.4cqi, 24px);
+    overflow: hidden;
+  }
 
-    .hm-card[data-panel="true"] .hm-cover-wrap {
-      width: 100%;
-      height: 100%;
-    }
+  .hm-card.hm-short-landscape[data-panel="true"] .hm-cover-wrap {
+    width: 100%;
+    height: 100%;
+  }
 
-    .hm-card[data-panel="true"] .hm-cover {
-      width: min(100%, var(--hm-panel-cover, 100%));
-      max-height: 100%;
-      margin: 0 auto;
-    }
+  .hm-card.hm-short-landscape[data-panel="true"] .hm-cover {
+    width: min(100%, var(--hm-panel-cover, 100%));
+    max-height: 100%;
+    margin: 0 auto;
+  }
 
-    .hm-card[data-panel="true"] .hm-meta {
-      align-items: flex-start;
-      text-align: left;
-      width: 100%;
-    }
+  .hm-card.hm-short-landscape[data-panel="true"] .hm-meta {
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+  }
 
-    .hm-card[data-panel="true"] .hm-tags {
-      justify-content: flex-start;
-    }
+  .hm-card.hm-short-landscape[data-panel="true"] .hm-tags {
+    justify-content: flex-start;
   }
 
   /* ---------- 卡片选择器缩略预览（独立于仪表盘正常卡片） ---------- */

@@ -2592,6 +2592,9 @@ class HaMusicCard extends LitElement {
       this.style.removeProperty("--hm-panel-cover");
       this.style.removeProperty("--hm-panel-height");
       this._panelHeight = 0;
+      this.renderRoot
+        ?.querySelector?.(".hm-card")
+        ?.classList.remove("hm-short-landscape");
       return;
     }
     const card = this.renderRoot?.querySelector?.(".hm-card");
@@ -2620,10 +2623,17 @@ class HaMusicCard extends LitElement {
     // 竖屏/近方形卡片统一走上中下堆叠。只看宽度会漏掉 820~1024 的平板竖屏：
     // 封面按宽屏尺寸撑高主区，底部进度/控制/音量会被挤出卡片。
     const stack = cardW < 820 || cardH > cardW * 1.15;
+    // 横屏短卡片（1024×768 这类）：宽度落在窄屏断点内，但高度不够竖排，
+    // 打类切回左右双栏，避免底部控制区被挤出卡片。
+    const shortLandscape =
+      cardW >= 700 && cardW <= 821 && cardH <= 820 && cardW >= cardH * 1.02;
+    card.classList.toggle("hm-short-landscape", shortLandscape);
     let size;
-    if (stack) {
+    if (shortLandscape) {
+      size = Math.max(120, Math.min(mainH - 96, mainW * 0.30, 460));
+    } else if (stack) {
       // 窄屏/竖屏：封面在上、信息在下。手机面板不再让封面吃掉大半屏，
-      // 宽度上限约 58%/66%，高度按整卡高度的 30% 封顶，给标题/频谱/进度留空间。
+      // 宽度上限约 58%/66%，高度按整卡高度的 28% 封顶，给标题/频谱/进度留空间。
       const narrow = mainW < 560;
       const widthRatio = narrow ? 0.58 : 0.66;
       const heightBudget = cardH * 0.28;

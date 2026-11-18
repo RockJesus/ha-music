@@ -60,12 +60,23 @@ function paint(canvas, bars, glow) {
     const t = Math.abs(i - half) / half;
     const color = blend(accent[0], accent[1], t);
     const alpha = 0.5 + v * 0.48;
-    ctx.strokeStyle = rgba(color, alpha);
+    // 柱底（贴近封面的一侧）alpha 从 0 渐入，避免柱根叠加成封面外圈亮边；
+    // 外端保持原色与辉光，柱形仍有清晰的长度读数。
+    const x0 = R + c * r0;
+    const y0 = R + s * r0;
+    const x1 = R + c * (r0 + len);
+    const y1 = R + s * (r0 + len);
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    grad.addColorStop(0, rgba(color, 0));
+    grad.addColorStop(0.18, rgba(color, 0));
+    grad.addColorStop(0.46, rgba(color, alpha * 0.52));
+    grad.addColorStop(1, rgba(color, alpha));
+    ctx.strokeStyle = grad;
     ctx.shadowColor = rgba(color, 0.12 + glow * 0.26);
     ctx.lineWidth = state.lineWidth || 3;
     ctx.beginPath();
-    ctx.moveTo(R + c * r0, R + s * r0);
-    ctx.lineTo(R + c * (r0 + len), R + s * (r0 + len));
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
     ctx.stroke();
 
     // 上半环加一道近白亮芯，让紫色一端在深色背景上仍能读出柱长。

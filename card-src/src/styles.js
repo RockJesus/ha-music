@@ -1546,35 +1546,56 @@ export const cardStyles = css`
     max-width: 46%;
     padding: 3px 10px 3px 3px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(246, 248, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(246, 248, 255, 0.46);
     font-family: inherit;
     font-size: 10.5px;
     cursor: pointer;
+    opacity: 0.62;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    transition:
+      color 0.18s ease,
+      background 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease,
+      opacity 0.18s ease,
+      transform 0.18s ease;
   }
 
   .hm-entity-chip:hover {
     color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    opacity: 0.94;
+    background: rgba(255, 255, 255, 0.09);
   }
 
+  /* 选中项：实心主题底 + 高亮描边 + 外发光，和未选中项拉开明显层级 */
   .hm-entity-chip[data-active="true"] {
     color: #fff;
-    border-color: rgba(var(--hm-a1-rgb), 0.42);
-    background: rgba(var(--hm-a1-rgb), 0.14);
-    box-shadow: 0 0 16px -6px rgba(var(--hm-a1-rgb), 0.9);
+    opacity: 1;
+    font-weight: 700;
+    border-color: rgba(var(--hm-a1-rgb), 0.98);
+    background:
+      linear-gradient(
+        112deg,
+        rgba(8, 12, 20, 0.96) 0%,
+        rgba(var(--hm-a1-rgb), 0.38) 52%,
+        rgba(var(--hm-a2-rgb), 0.3) 100%
+      );
+    box-shadow:
+      0 0 0 2px rgba(var(--hm-a1-rgb), 0.16),
+      0 0 24px -5px rgba(var(--hm-a1-rgb), 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
   }
 
   .hm-entity-chip[data-playing="true"] {
     position: relative;
-    color: rgba(246, 248, 255, 0.92);
-    border-color: rgba(var(--hm-a1-rgb), 0.22);
-    background:
-      linear-gradient(105deg, rgba(var(--hm-a1-rgb), 0.1), rgba(255, 255, 255, 0.05));
+    color: rgba(246, 248, 255, 0.72);
+    opacity: 0.78;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .hm-entity-chip[data-playing="true"]::after {
@@ -1583,17 +1604,31 @@ export const cardStyles = css`
     inset: -1px;
     border-radius: inherit;
     pointer-events: none;
-    border: 1px solid rgba(var(--hm-a1-rgb), 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     opacity: 0;
-    animation: hm-entity-glow 2.4s ease-in-out infinite;
   }
 
   .hm-entity-chip[data-playing="true"][data-active="true"] {
-    border-color: rgba(var(--hm-a1-rgb), 0.5);
-    background: rgba(var(--hm-a1-rgb), 0.17);
+    color: #fff;
+    opacity: 1;
+    border-color: rgba(var(--hm-a1-rgb), 1);
+    background:
+      linear-gradient(
+        112deg,
+        rgba(8, 12, 20, 0.96) 0%,
+        rgba(var(--hm-a1-rgb), 0.42) 52%,
+        rgba(var(--hm-a2-rgb), 0.32) 100%
+      );
     box-shadow:
-      0 0 0 1px rgba(var(--hm-a1-rgb), 0.08),
-      0 0 20px -6px rgba(var(--hm-a1-rgb), 0.95);
+      0 0 0 2px rgba(var(--hm-a1-rgb), 0.2),
+      0 0 26px -4px rgba(var(--hm-a1-rgb), 1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    transform: translateY(-1px);
+  }
+
+  .hm-entity-chip[data-playing="true"][data-active="true"]::after {
+    border-color: rgba(var(--hm-a1-rgb), 0.55);
+    animation: hm-entity-glow 2.4s ease-in-out infinite;
   }
 
   .hm-entity-eq {
@@ -1634,6 +1669,17 @@ export const cardStyles = css`
   .hm-entity-eq i:nth-child(3) {
     animation-delay: -0.7s;
     animation-duration: 0.96s;
+  }
+
+  .hm-entity-chip[data-active="true"] .hm-entity-dot {
+    box-shadow:
+      0 0 0 2px rgba(var(--hm-a1-rgb), 0.95),
+      0 0 14px rgba(var(--hm-a1-rgb), 0.55);
+  }
+
+  .hm-entity-chip:not([data-active="true"]) .hm-entity-dot {
+    opacity: 0.72;
+    filter: saturate(0.8);
   }
 
   .hm-entity-dot {

@@ -106,6 +106,9 @@ function formatEntityState(state) {
   }
 }
 
+const QUEUE_WINDOW_BEFORE = 80;
+const QUEUE_WINDOW_SIZE = 260;
+
 class HaMusicCard extends LitElement {
   static get styles() {
     return cardStyles;
@@ -1919,7 +1922,7 @@ class HaMusicCard extends LitElement {
   }
 
   async _fetchMassQueueItems() {
-    const limit = clamp(Number(this._config?.max_queue) || 60, 20, 500);
+    const limit = clamp(Number(this._config?.max_queue) || 60, 20, QUEUE_WINDOW_SIZE);
     try {
       const response = await this._serviceResponse("mass_queue", "get_queue_items", {
         entity: this._eid(),
@@ -2106,26 +2109,33 @@ class HaMusicCard extends LitElement {
       const total = Number(queue?.items) || 0;
       const activeItemId = queue?.current_item?.queue_item_id || "";
       const currentIndex = Number(queue?.current_index);
-      const items = [];
-      const pageSize = 500;
-      let offset = 0;
-      while (offset < (total || 5000)) {
-        const page = await this._maSend(socket, "player_queues/items", {
-          queue_id: queueId,
-          limit: pageSize,
-          offset,
-        });
-        if (!Array.isArray(page) || !page.length) break;
-        items.push(...page);
-        offset += page.length;
-        if (page.length < pageSize) break;
+      // 只取当前曲目附近的一段：超长队列（几千首）整表拉取 + 全量渲染会把
+      // 主线程占满，抽屉要等很久才响应。当前曲目前后各取一段，完整队列走
+      // 「打开 MA」入口。
+      let start = 0;
+      if (Number.isFinite(currentIndex) && currentIndex >= 0) {
+        start = Math.max(0, currentIndex - QUEUE_WINDOW_BEFORE);
       }
-      if (!items.length) return null;
+      if (total > 0) {
+        start = Math.min(start, Math.max(0, total - QUEUE_WINDOW_SIZE));
+      }
+      const limit = total > 0
+        ? Math.min(QUEUE_WINDOW_SIZE, total - start)
+        : QUEUE_WINDOW_SIZE;
+      const page = await this._maSend(socket, "player_queues/items", {
+        queue_id: queueId,
+        limit,
+        offset: start,
+      });
+      if (!Array.isArray(page) || !page.length) return null;
+      const shown = page.length;
       return {
-        items,
-        total: total || items.length,
+        items: page,
+        total: total || shown,
         activeItemId,
         currentIndex,
+        offset: start,
+        windowed: total > 0 && shown < total,
       };
     } catch {
       return null;
@@ -2192,7 +2202,11 @@ class HaMusicCard extends LitElement {
       : massItems
         ? readMassQueueItems(massItems, currentId, contentId)
         : [];
-    const fullQueue = items.length > 0;
+    const queueOffset = Number(direct?.offset) || 0;
+    if (items.length && queueOffset > 0) {
+      items = items.map((entry, i) => ({ ...entry, index: queueOffset + i }));
+    }
+    const fullQueue = !direct?.windowed && items.length > 0;
     if (!items.length && details) {
       items = readMaQueueDetails(details, contentId);
     }
@@ -2202,13 +2216,17 @@ class HaMusicCard extends LitElement {
     if (Number.isFinite(total) && total > 0) {
       title.push(`${Number.isFinite(index) ? index + 1 : "?"}/${total}`);
     }
+    let note = !fullQueue && items.length ? t("queueLimited") : "";
+    if (direct?.windowed && items.length) {
+      note = `${t("queueWindow")} · ${queueOffset + 1}–${queueOffset + items.length}/${total}`;
+    }
     this._drawer = {
       ...this._drawer,
       items,
       loading: false,
       error: "",
       title: title.join(" · "),
-      note: !fullQueue && items.length ? t("queueLimited") : "",
+      note,
       maUrl: this._maUrl(),
       fullQueue,
     };

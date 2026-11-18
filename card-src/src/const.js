@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.2.9";
+export const CARD_VERSION = "2.3.0";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -152,6 +152,7 @@ const EN = {
   groupLeave: "Leave group",
   loading: "Loading…",
   queueEmpty: "Queue is empty",
+  queueWindow: "Showing nearby tracks only; open Music Assistant for the full queue",
   queueLimited: "Could not load the full queue. Install the Music Assistant add-on (or Mass Queue integration), or open Music Assistant for every track.",
   browseFailed: "Media library is unavailable",
   noMedia: "Nothing is playing",
@@ -209,6 +210,7 @@ const ZH = {
   groupLeave: "退出分组",
   loading: "加载中…",
   queueEmpty: "播放队列为空",
+  queueWindow: "仅显示当前曲目附近；完整队列请打开 Music Assistant",
   queueLimited: "未能读取完整队列；需安装 Music Assistant 加载项（或 Mass Queue 集成），或点右上角在 Music Assistant 查看全部曲目。",
   browseFailed: "媒体库暂不可用",
   noMedia: "当前没有播放内容",

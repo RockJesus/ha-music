@@ -1014,6 +1014,31 @@ export const cardStyles = css`
     display: none;
   }
 
+  /* 手机 App / 窄卡片：音量独占一行，位于播放控件下方 */
+  .hm-controls.is-stacked {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+
+  .hm-controls.is-stacked .hm-transport {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hm-controls.is-stacked .hm-volume {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .hm-card:not([data-layout="mini"]) .hm-controls.is-stacked .hm-volume .hm-vol-step,
+  .hm-card:not([data-layout="mini"]) .hm-controls.is-stacked .hm-volume .hm-vol-pct {
+    display: inline-flex;
+  }
+
   /* ---------- 分组 ---------- */
   .hm-group {
     display: flex;

@@ -3478,6 +3478,14 @@ class HaMusicCard extends LitElement {
     const volumeMuted =
       this._mutedOverride === null ? volume.muted : Boolean(this._mutedOverride);
     const showVolume = config.show_volume !== false && volume.supported;
+    // 手机 App 与窄卡片把音量单独放到播放控件下方，避免控制条被挤到溢出。
+    const volumeBelowControls =
+      showVolume &&
+      !this._thumbMode() &&
+      layout !== "mini" &&
+      (this._isMobileUi() ||
+        layout === "compact" ||
+        (this._width || 0) < 620);
     const canShuffle = hasFeature(state, FEATURES.SHUFFLE_SET);
     const canRepeat = hasFeature(state, FEATURES.REPEAT_SET);
     const canPrev = hasFeature(state, FEATURES.PREVIOUS_TRACK);
@@ -3835,7 +3843,10 @@ class HaMusicCard extends LitElement {
               </section>`
             : nothing}
 
-          <section class="hm-controls">
+          <section
+            class="hm-controls ${volumeBelowControls ? "is-stacked" : ""}"
+            data-volume-below=${volumeBelowControls ? "true" : "false"}
+          >
             <div class="hm-transport">
               ${canShuffle
                 ? html`<button

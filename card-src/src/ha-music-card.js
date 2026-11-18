@@ -3642,7 +3642,8 @@ class HaMusicCard extends LitElement {
     const volume = this._volumeInfo(media);
     const volumeMuted =
       this._mutedOverride === null ? volume.muted : Boolean(this._mutedOverride);
-    const showVolume = config.show_volume !== false && volume.supported;
+    const showVolume =
+      config.show_volume !== false && (volume.supported || this.preview === true);
     // 手机 App 与窄卡片把音量单独放到播放控件下方，避免控制条被挤到溢出。
     const volumeBelowControls =
       showVolume &&
@@ -3651,11 +3652,14 @@ class HaMusicCard extends LitElement {
       (this._isMobileUi() ||
         layout === "compact" ||
         (this._width || 0) < 620);
-    const canShuffle = hasFeature(state, FEATURES.SHUFFLE_SET);
-    const canRepeat = hasFeature(state, FEATURES.REPEAT_SET);
-    const canPrev = hasFeature(state, FEATURES.PREVIOUS_TRACK);
-    const canNext = hasFeature(state, FEATURES.NEXT_TRACK);
-    const canPlay = hasFeature(state, FEATURES.PLAY) || hasFeature(state, FEATURES.PAUSE);
+    // 卡片选择器预览（preview=true）里实体往往没有能力位，按完整控制骨架渲染，
+    // 否则预览只剩一个播放键，看起来像坏掉。
+    const previewUi = this.preview === true;
+    const canShuffle = previewUi || hasFeature(state, FEATURES.SHUFFLE_SET);
+    const canRepeat = previewUi || hasFeature(state, FEATURES.REPEAT_SET);
+    const canPrev = previewUi || hasFeature(state, FEATURES.PREVIOUS_TRACK);
+    const canNext = previewUi || hasFeature(state, FEATURES.NEXT_TRACK);
+    const canPlay = previewUi || hasFeature(state, FEATURES.PLAY) || hasFeature(state, FEATURES.PAUSE);
     const isOff = state.state === "off" || state.state === "standby";
     const canPower = isOff
       ? hasFeature(state, FEATURES.TURN_ON)
@@ -3895,10 +3899,15 @@ class HaMusicCard extends LitElement {
                   : nothing}
               </div>
               <h2 class="hm-title ${mediaTitle ? "" : "placeholder"}">
-                ${mediaTitle || t("noTitle")}
+                ${mediaTitle || (previewUi ? "Music Assistant" : t("noTitle"))}
               </h2>
               <div class="hm-artist">
-                ${media.artist || (media.album ? media.album : statusText)}
+                ${media.artist ||
+                (media.album
+                  ? media.album
+                  : previewUi
+                    ? "播放器预览 · 选中播放器后显示曲目"
+                    : statusText)}
               </div>
               ${showSource || showSoundMode || showGroup
                 ? html`<div class="hm-tags">
@@ -3979,7 +3988,7 @@ class HaMusicCard extends LitElement {
               </div>`
             : nothing}
 
-          ${duration > 0
+          ${duration > 0 || previewUi
             ? html`<section class="hm-progress">
                 <span class="hm-time">${formatTime(position)}</span>
                 <input

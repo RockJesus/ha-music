@@ -3217,6 +3217,20 @@ export const cardStyles = css`
     flex: 0 1 190px;
   }
 
+  /* 预览卡（卡片选择器/编辑弹窗）：内容块垂直居中，避免高预览框里被拉出大片空隙 */
+  .hm-card[data-thumb="lg"] .hm-body,
+  .hm-card[data-thumb="md"] .hm-body,
+  .hm-card[data-thumb="sm"] .hm-body {
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .hm-card[data-thumb="lg"] .hm-main,
+  .hm-card[data-thumb="md"] .hm-main,
+  .hm-card[data-thumb="sm"] .hm-main {
+    flex: 0 0 auto;
+  }
+
   /* 中等预览：保留主视觉与主要控制，收起标签和次要顶栏按钮 */
   .hm-card[data-thumb="md"] .hm-body {
     padding: 16px 18px;

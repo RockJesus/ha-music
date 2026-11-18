@@ -2186,6 +2186,35 @@ export const cardStyles = css`
     gap: clamp(5px, 1cqi, 7px);
   }
 
+  /* 超矮卡（<230 高）再收紧一圈内边距与间距 */
+  .hm-card[data-micro="true"] .hm-body {
+    padding: 6px 6px 5px;
+    gap: 4px;
+  }
+
+  .hm-card[data-micro="true"] .hm-controls {
+    gap: 6px;
+  }
+
+  .hm-card[data-micro="true"] .hm-play {
+    width: 40px;
+    height: 40px;
+  }
+
+  .hm-card[data-micro="true"] .hm-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* 超矮卡（<230 高）优先保主体，隐藏顶部状态行，避免控制条被裁 */
+  .hm-card[data-micro="true"] .hm-top {
+    display: none;
+  }
+
+  .hm-card[data-micro="true"] .hm-vis {
+    display: none;
+  }
+
   .hm-card[data-micro="true"] .hm-volume {
     display: none;
   }
@@ -3340,6 +3369,11 @@ export const cardStyles = css`
 
   .hm-card[data-thumb="sm"] .hm-artist {
     font-size: 12px;
+  }
+
+  /* 极小预览（约 300×160）优先保证主体与播放键不被裁，隐藏顶部状态行 */
+  .hm-card[data-thumb="sm"] .hm-top {
+    display: none;
   }
 
   .hm-card[data-thumb="sm"] .hm-progress {

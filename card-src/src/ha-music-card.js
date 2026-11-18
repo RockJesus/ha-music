@@ -3654,12 +3654,17 @@ class HaMusicCard extends LitElement {
         (this._width || 0) < 620);
     // 卡片选择器预览（preview=true）里实体往往没有能力位，按完整控制骨架渲染，
     // 否则预览只剩一个播放键，看起来像坏掉。
-    const previewUi = this.preview === true;
+    // sm 预览只有 ~300×160，塞不下进度+音量+五个键，只保留播放键；
+    // md/lg 预览才补全整骨架。
+    const previewUi = this.preview === true && this._thumbTier() !== "sm";
     const canShuffle = previewUi || hasFeature(state, FEATURES.SHUFFLE_SET);
     const canRepeat = previewUi || hasFeature(state, FEATURES.REPEAT_SET);
     const canPrev = previewUi || hasFeature(state, FEATURES.PREVIOUS_TRACK);
     const canNext = previewUi || hasFeature(state, FEATURES.NEXT_TRACK);
-    const canPlay = previewUi || hasFeature(state, FEATURES.PLAY) || hasFeature(state, FEATURES.PAUSE);
+    const canPlay =
+      this.preview === true ||
+      hasFeature(state, FEATURES.PLAY) ||
+      hasFeature(state, FEATURES.PAUSE);
     const isOff = state.state === "off" || state.state === "standby";
     const canPower = isOff
       ? hasFeature(state, FEATURES.TURN_ON)
@@ -3899,7 +3904,12 @@ class HaMusicCard extends LitElement {
                   : nothing}
               </div>
               <h2 class="hm-title ${mediaTitle ? "" : "placeholder"}">
-                ${mediaTitle || (previewUi ? "Music Assistant" : t("noTitle"))}
+                ${mediaTitle ||
+                (previewUi
+                  ? "Music Assistant"
+                  : this.preview === true
+                    ? "HA Music"
+                    : t("noTitle"))}
               </h2>
               <div class="hm-artist">
                 ${media.artist ||

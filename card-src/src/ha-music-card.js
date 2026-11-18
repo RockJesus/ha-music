@@ -1585,17 +1585,21 @@ class HaMusicCard extends LitElement {
   _onVolumeCommit(event) {
     const volume = clamp(Number(event.target.value) / 100, 0, 1);
     this._volumeCommitAt = Date.now();
-    this._volumePreview = null;
+    // 先保持目标值，标签和滑块立即显示拖动结果，实体回读后再收敛。
+    this._volumePreview = volume;
+    event.target.style.setProperty("--pct", `${volume * 100}%`);
+    const pctEl = this.renderRoot?.querySelector?.(".hm-vol-pct");
+    if (pctEl) pctEl.textContent = `${Math.round(volume * 100)}%`;
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTicks = 0;
-    // 兜底清除提交后补发的 input 预览，保证标签与实体一致。
+    // 1.2 秒后再让实体值接管；移动端补发的 input 由 300ms 窗口忽略。
     setTimeout(() => {
       if (this._volumeCommitAt && this._volumePreview !== null) {
         this._volumePreview = null;
         this._syncRangeValues();
         this.requestUpdate();
       }
-    }, 320);
+    }, 1200);
     // 设备音量可能被二次收敛（先接受 0.36，几秒后再降到 0.22）。
     // 提交后持续 9 秒、每 1.5 秒把滑块同步到实体值，直到音量稳定。
     this._volumeSettleTimer = setInterval(() => {

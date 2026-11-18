@@ -1285,7 +1285,8 @@ class HaMusicCard extends LitElement {
       if (!width) return "full";
       const shape = this._shape();
       if (shape === "banner") return "compact";
-      if (shape === "wide") return "full";
+      // 宽屏但不够高（1000×360 这类默认格子）：full 竖排会切掉播放键，降级紧凑单行
+      if (shape === "wide") return (height && height < 470) ? "compact" : "full";
       // 极窄卡片（≈240px 方格）连标题都会溢出，统一走单行 mini。
       // 极小方格（240×240）留 mini 会只剩控制键、没有歌名，改成紧凑版式；
       // 只有明显偏横幅的极小卡才走 mini。
@@ -1304,6 +1305,8 @@ class HaMusicCard extends LitElement {
       if (width < 340 && (!height || height < 190)) return "mini";
       // 宽但矮的网格卡片（如 460×320）不能按 full 竖排，否则封面和音量会被挤出卡片。
       if (width < 620 && height && height < 460) return "compact";
+      // 12×6 默认格子常见 1000×360 这种「宽但不高」：full 竖排会把播放键切掉，按宽高比降级紧凑。
+      if (height && width / height >= 2.0 && height < 460) return "compact";
       if (width < 460 || (height && height < 300)) return "compact";
       return "full";
     }
@@ -1328,7 +1331,9 @@ class HaMusicCard extends LitElement {
       return Math.round(Math.min(150, Math.max(56, (this._height || 0) * 0.5)));
     }
     if (shape === "wide") {
-      return Math.round(Math.min(230, Math.max(120, (this._height || 0) * 0.3)));
+      // 宽而矮的默认格子（1000×360）若封面取 120 会把底部音量行顶出卡片
+      const h = this._height || 0;
+      return Math.round(Math.min(210, Math.max(88, h * (h < 460 ? 0.24 : 0.3))));
     }
     if (shape === "tall") {
       const width = this._width || 0;

@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.6.1`
+   - URL：`/local/ha-music.js?v=2.6.2`
    - 类型：JavaScript 模块
 
 ## 配置

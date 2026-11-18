@@ -1283,6 +1283,9 @@ class HaMusicCard extends LitElement {
       const width = this._width;
       const height = this._height;
       if (!width) return "full";
+      // 注意：_shape() 里的 aspect 是局部变量，这里必须自己再算一次，
+      // 否则宽度 <300 的分支会抛 "aspect is not defined"。
+      const aspect = height ? width / height : 0;
       const shape = this._shape();
       if (shape === "banner") return "compact";
       // 宽屏但不够高（1000×360 这类默认格子）：full 竖排会切掉播放键，降级紧凑单行
@@ -1343,7 +1346,9 @@ class HaMusicCard extends LitElement {
     }
     if (layout === "mini") return 44;
     if (layout === "compact") {
-      return Math.round(Math.min(88, Math.max(52, height * 0.26)));
+      // 极矮小卡（<270）封面再收一档，否则播放键会被挤出卡片
+      const base = Math.min(88, Math.max(52, height * 0.26));
+      return this._tight() ? Math.round(Math.min(64, Math.max(40, base * 0.72))) : Math.round(base);
     }
     return Math.round(Math.min(178, Math.max(76, height * 0.22)));
   }
@@ -1351,6 +1356,18 @@ class HaMusicCard extends LitElement {
   _tight() {
     if (this._thumbMode()) return false;
     return this._layoutKey() === "compact" && (this._height || 0) < 270;
+  }
+
+  // 紧凑单行且偏矮（默认 12×6 格子、小方格）：收紧间距与控制尺寸，避免底部音量行溢出。
+  _short() {
+    if (this._thumbMode()) return false;
+    return this._layoutKey() === "compact" && (this._height || 0) < 420;
+  }
+
+  // 极小格（<230px）：固定高度的音量行已塞不下，先隐藏音量，保住播放键与进度。
+  _micro() {
+    if (this._thumbMode()) return false;
+    return this._layoutKey() === "compact" && (this._height || 0) < 230;
   }
 
   _styleVars() {
@@ -3714,6 +3731,8 @@ class HaMusicCard extends LitElement {
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
         data-tight=${this._tight() ? "true" : "false"}
+        data-short=${this._short() ? "true" : "false"}
+        data-micro=${this._micro() ? "true" : "false"}
         style=${styleMap(this._styleVars())}
         @click=${this._onCardClick}
       >
@@ -4649,9 +4668,13 @@ class HaMusicCard extends LitElement {
       this._spectrumCount = 0;
       return false;
     }
-    const rect = canvas.getBoundingClientRect();
+    // 用容器宽度量而不是 canvas 自身：canvas 的 style.width 是我们写死的 px，
+    // 直接量它会把上一次（更大）的尺寸当成当前宽度，卡片缩小时频谱只画半截。
+    const host = canvas.parentElement || canvas;
+    const rect = host.getBoundingClientRect();
+    const cssH = Math.max(1, Math.round(canvas.getBoundingClientRect().height || rect.height));
     const width = Math.max(1, Math.round(rect.width));
-    const height = Math.max(1, Math.round(rect.height));
+    const height = cssH;
     if (!width || !height) return false;
     const dpr = Math.min(
       this._isMobileUi() ? 1.5 : 2,
@@ -4661,7 +4684,7 @@ class HaMusicCard extends LitElement {
     const pixelHeight = Math.round(height * dpr);
     if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
     if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-    canvas.style.width = `${width}px`;
+    canvas.style.width = "100%";
     canvas.style.height = `${height}px`;
     this._spectrumCanvas = canvas;
     const nextCtx = canvas.getContext("2d");
@@ -4736,6 +4759,7 @@ class HaMusicCard extends LitElement {
       return;
     }
     if (!this._syncSpectrumCanvas()) return;
+    this._observeSpectrumResize();
     const reduceMotion =
       typeof matchMedia === "function" &&
       matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -4752,6 +4776,26 @@ class HaMusicCard extends LitElement {
     if (this._spectrumRaf) return;
     this._spectrumLast = 0;
     this._spectrumRaf = requestAnimationFrame((now) => this._spectrumTick(now));
+  }
+
+  // 卡片尺寸变化（编辑器预览、旋转、拖拽格）时重新量宽并重算柱数，避免频谱只画一部分。
+  _observeSpectrumResize() {
+    if (typeof ResizeObserver === "undefined") return;
+    const canvas = this._spectrumCanvas;
+    const host = canvas?.parentElement;
+    if (!host) return;
+    if (this._spectrumResizeObserved === host) return;
+    this._spectrumResizeObserver?.disconnect();
+    this._spectrumResizeObserved = host;
+    this._spectrumResizeObserver = new ResizeObserver(() => {
+      if (this._spectrumResizeRaf) return;
+      this._spectrumResizeRaf = requestAnimationFrame(() => {
+        this._spectrumResizeRaf = 0;
+        if (!this._syncSpectrumCanvas()) return;
+        if (!this._spectrumPlaying()) this._applySpectrumIdle();
+      });
+    });
+    this._spectrumResizeObserver.observe(host);
   }
 
   _applySpectrumIdle() {

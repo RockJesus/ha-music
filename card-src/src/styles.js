@@ -1394,6 +1394,35 @@ export const cardStyles = css`
     height: 54px;
   }
 
+  /* 紧凑且偏矮（<420px）：收紧留白、控制键与音量行，给内容腾出底部空间 */
+  .hm-card[data-short="true"] .hm-body {
+    padding: clamp(8px, 1.5cqi, 12px);
+    gap: clamp(6px, 1.2cqi, 9px);
+  }
+
+  .hm-card[data-short="true"] .hm-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .hm-card[data-short="true"] .hm-play {
+    width: 48px;
+    height: 48px;
+  }
+
+  .hm-card[data-short="true"] .hm-transport {
+    gap: 6px;
+  }
+
+  .hm-card[data-short="true"] .hm-volume,
+  .hm-card[data-short="true"] .hm-controls.is-stacked .hm-volume {
+    min-height: 32px;
+  }
+
+  .hm-card[data-short="true"] .hm-vis {
+    height: 12px;
+  }
+
   .hm-card[data-layout="compact"] .hm-transport {
     gap: 7px;
   }
@@ -2152,8 +2181,31 @@ export const cardStyles = css`
   }
 
   .hm-card[data-tight="true"] .hm-body {
-    padding: clamp(8px, 1.6cqi, 12px);
-    gap: clamp(6px, 1.2cqi, 8px);
+    padding: clamp(7px, 1.4cqi, 11px);
+    padding-bottom: 6px;
+    gap: clamp(5px, 1cqi, 7px);
+  }
+
+  .hm-card[data-micro="true"] .hm-volume {
+    display: none;
+  }
+
+  .hm-card[data-tight="true"] .hm-play {
+    width: 42px;
+    height: 42px;
+  }
+
+  .hm-card[data-tight="true"] .hm-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .hm-card[data-tight="true"] .hm-transport {
+    gap: 5px;
+  }
+
+  .hm-card[data-tight="true"] .hm-controls.is-stacked .hm-volume {
+    min-height: 28px;
   }
 
   .hm-card[data-tight="true"] .hm-cover-halo {

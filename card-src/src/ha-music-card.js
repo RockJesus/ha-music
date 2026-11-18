@@ -4720,68 +4720,92 @@ class HaMusicCard extends LitElement {
     const posIndex = ratio * (wave.length - 1);
     const binsPerSecond =
       duration > 0 ? wave.length / Math.max(1, duration) : wave.length / 180;
-    const span = clamp(
-      Math.round(binsPerSecond * 2.8),
-      8,
-      Math.min(wave.length, 240)
+    // MA 分析只给 RMS 波形，不是频域数据。按「当前播放点前后一小段」
+    // 统计三件事：慢能量≈低音、整体能量≈中音、相邻采样差值≈高音。
+    // 绝不能再把时间窗口一列一列摊开，那会变成一条横向跑马灯。
+    const windowSpan = clamp(
+      Math.round(binsPerSecond * 0.55),
+      6,
+      Math.min(wave.length, 96)
     );
-    const step = Math.max(1, span / Math.max(1, count - 1));
-    const raiseSpan = Math.max(1, Math.round(binsPerSecond * 0.14));
-    const raw = new Array(count);
-    const bpm = Number(data.bpm) || 0;
-    const period = bpm > 20 ? 60 / bpm : 0;
-    for (let index = 0; index < count; index += 1) {
-      const d = count > 1 ? index / (count - 1) : 0;
-      const sample = clamp(
-        Math.round(posIndex - (count - 1 - index) * step),
-        0,
-        wave.length - 1
-      );
-      const previous = clamp(sample - raiseSpan, 0, wave.length - 1);
-      const rms = Number(wave[sample]) || 0;
-      const prev = Number(wave[previous]) || 0;
-      const rise = Math.max(0, rms - prev);
-      const profile = 1.0 - 0.52 * Math.pow(d, 0.85);
-      const lowWeight = Math.pow(1 - d, 2);
-      let beat = clamp(rise * 4.2, 0, 1);
-      if (period > 0) {
-        const phase = ((((position % period) + period) % period) / period);
-        beat = Math.max(beat, Math.exp(-phase * 5.2));
-      }
-      raw[index] = clamp(
-        rms * (1.42 * profile + 0.2) + beat * 0.56 * lowWeight,
-        0,
-        1.6
-      );
-    }
-    const shaped = this._shapeAudioBars(raw);
-    const centerSample = clamp(Math.round(posIndex), 0, wave.length - 1);
-    const centerPrev = clamp(centerSample - raiseSpan, 0, wave.length - 1);
-    const centerRms = Number(wave[centerSample]) || 0;
-    const centerRise = Math.max(0, centerRms - (Number(wave[centerPrev]) || 0));
-    // 低频看 1.2 秒慢包络 + 拍点，中频看当前 RMS，高频看相邻帧瞬态抬升。
+    const from = Math.max(0, Math.round(posIndex - windowSpan / 2));
+    const to = Math.min(
+      wave.length - 1,
+      Math.max(from, Math.round(posIndex + windowSpan / 2))
+    );
     const slowSpan = Math.max(4, Math.round((binsPerSecond || 60) * 1.2));
     const slowStart = Math.max(0, Math.round(posIndex - slowSpan));
+    let winSum = 0;
+    let winN = 0;
+    let winDiff = 0;
+    let winDiffN = 0;
     let slowSum = 0;
     let slowCount = 0;
-    for (let index = slowStart; index <= centerSample; index += 1) {
+    for (let index = from; index <= to; index += 1) {
+      const value = Number(wave[index]) || 0;
+      winSum += value;
+      winN += 1;
+      if (index > from) {
+        winDiff += Math.abs(value - (Number(wave[index - 1]) || 0));
+        winDiffN += 1;
+      }
+    }
+    for (let index = slowStart; index <= Math.round(posIndex); index += 1) {
       slowSum += Number(wave[index]) || 0;
       slowCount += 1;
     }
-    const slowRms = slowCount ? slowSum / slowCount : 0;
+    const winRms = winN ? winSum / winN : 0;
+    const slowRms = slowCount ? slowSum / slowCount : winRms;
+    const diffAvg = winDiffN ? winDiff / winDiffN : 0;
+    const bpm = Number(data.bpm) || 0;
+    const period = bpm > 20 ? 60 / bpm : 0;
     const beatPhase =
       period > 0
         ? ((((position % period) + period) % period) / period)
         : 0;
     const beatPulse = period > 0 ? Math.exp(-beatPhase * 4.6) : 0;
-    const low = clamp(slowRms * 1.3 + beatPulse * 0.3 + 0.02, 0, 1);
-    const mid = clamp(centerRms + beatPulse * 0.05 + 0.01, 0, 1);
-    const high = clamp(
-      centerRise * 4.5 + Math.max(0, centerRms - slowRms) * 1.2 + 0.02,
+    // 三段能量各自独立：左段只跟低频，中段跟主体能量，右段跟瞬态/高频纹理。
+    const lowBand = clamp(slowRms * 2.7 + beatPulse * 0.24 + 0.03, 0, 1);
+    const midBand = clamp(winRms * 1.95 + beatPulse * 0.07 + 0.03, 0, 1);
+    const highBand = clamp(
+      diffAvg * 11 + Math.max(0, winRms - slowRms) * 1.5 + 0.05,
       0,
       1
     );
-    return { ...shaped, bands: [low, mid, high] };
+    const zones = [
+      Math.max(0.2, lowBand),
+      Math.max(0.17, midBand),
+      Math.max(0.2, highBand),
+    ];
+    const zoneGain = [1.18, 1.0, 1.04];
+    const clock = performance.now() / 1000;
+    const raw = new Array(count);
+    const thirds = Math.max(1, count / 3);
+    for (let index = 0; index < count; index += 1) {
+      const zone = index < thirds ? 0 : index < thirds * 2 ? 1 : 2;
+      const local = (index - zone * thirds) / Math.max(1, thirds - 1);
+      // 每根柱子有固定纹理（不随时间横移），整段只随本频段能量一起起落。
+      const seed = hashString(`spec#${zone}#${index}`) % 1000;
+      // 每根柱子有自己的相位和速度：随本频段能量各自抖动，
+      // 但不会整排一起平移，所以不会出现跑马灯。
+      const phase = (seed / 1000) * Math.PI * 2;
+      const speed = 1.5 + (seed % 7) * 0.22;
+      const wobble = 0.58 + 0.42 * Math.sin(clock * speed + phase);
+      const grain = 0.46 + (seed / 1000) * 0.92;
+      const ridge = 0.78 + 0.22 * Math.sin(index * 2.7 + 0.6);
+      const taper = 1 - local * [0.06, 0.09, 0.12][zone];
+      const drive =
+        zones[zone] *
+        zoneGain[zone] *
+        (0.5 + wobble * 0.62) *
+        grain *
+        ridge *
+        taper;
+      const kick = beatPulse * Math.pow(1 - index / Math.max(1, count - 1), 2) * 0.3;
+      raw[index] = clamp(drive + kick, 0, 1.6);
+    }
+    const shaped = this._shapeAudioBars(raw);
+    return { ...shaped, bands: [lowBand, midBand, highBand] };
   }
 
   _spectrumTick(now) {
@@ -4899,7 +4923,12 @@ class HaMusicCard extends LitElement {
         );
       }
       // 顶部留出约 18% 余量，并用 gamma 拉开强弱差，避免整排柱子顶满、只剩细小锯齿。
-      target = clamp(0.055 + Math.pow(clamp(target, 0, 1), 1.6) * 0.76, 0.045, 0.82);
+      target = clamp(
+        0.07 + Math.pow(clamp(target, 0, 1), 1.32) * 0.84,
+        0.06,
+        0.9
+      );
+      if (this._isMobileUi()) target = clamp(target * 1.3 + 0.02, 0.08, 0.94);
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
       const realTargets = audioTargets || maTargets;
       const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;

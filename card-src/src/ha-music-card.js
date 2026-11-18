@@ -62,6 +62,22 @@ function positionAnchor(stamp, now = Date.now()) {
   return Math.min(parsed, now);
 }
 
+// Lit 的文本绑定靠注释标记（marker comment）定位，直接写 textContent 会把标记一起抹掉，
+// 下一次渲染就会抛 "Cannot set properties of null (setting 'data')" 并整次更新中断
+// （封面旋转、歌词同步、频谱都会停在旧状态，表现为刷新几次才对）。这里只改标记之间的文本节点。
+function setLitText(el, text) {
+  if (!el) return;
+  const value = String(text);
+  let node = el.firstChild;
+  while (node && node.nodeType === 8) node = node.nextSibling;
+  if (node && node.nodeType === 3) {
+    if (node.data !== value) node.data = value;
+    return;
+  }
+  // 没有绑定文本节点时（纯静态内容）才退回 textContent。
+  if (!el.querySelector?.("*")) el.textContent = value;
+}
+
 const REPEAT_CYCLE = ["off", "all", "one"];
 const DRAWER_ANIM_MS = 260;
 
@@ -273,6 +289,8 @@ class HaMusicCard extends LitElement {
     // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
     this._syncArt(readMedia(state), entityId);
+    // 封面旋转跟播放状态走：不依赖 Lit 是否真的重绘（重绘失败或签名未变时也能纠正）。
+    this._safeEffect("cover-spin", () => this._syncCoverSpinEffect());
     // 静音/音量以实体属性为准：状态回传到本地后清掉乐观值，再强制同步一次控件。
     if (this._mutedOverride !== null) {
       const actualMuted = Boolean(attrs.is_volume_muted);
@@ -1633,8 +1651,10 @@ class HaMusicCard extends LitElement {
     const value = Number(event.target.value) / 100;
     this._volumePreview = value;
     event.target.style.setProperty("--pct", `${value * 100}%`);
-    const pctEl = this.renderRoot?.querySelector?.(".hm-vol-pct");
-    if (pctEl) pctEl.textContent = `${Math.round(value * 100)}%`;
+    setLitText(
+      this.renderRoot?.querySelector?.(".hm-vol-pct"),
+      `${Math.round(value * 100)}%`
+    );
   }
 
   _onVolumeCommit(event) {
@@ -1643,8 +1663,10 @@ class HaMusicCard extends LitElement {
     // 先保持目标值，标签和滑块立即显示拖动结果，实体回读后再收敛。
     this._volumePreview = volume;
     event.target.style.setProperty("--pct", `${volume * 100}%`);
-    const pctEl = this.renderRoot?.querySelector?.(".hm-vol-pct");
-    if (pctEl) pctEl.textContent = `${Math.round(volume * 100)}%`;
+    setLitText(
+      this.renderRoot?.querySelector?.(".hm-vol-pct"),
+      `${Math.round(volume * 100)}%`
+    );
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTicks = 0;
     // 1.2 秒后再让实体值接管；移动端补发的 input 由 300ms 窗口忽略。
@@ -2660,31 +2682,54 @@ class HaMusicCard extends LitElement {
     if (!card) return;
     const media = this._readMedia();
     const entityId = this._eid();
-    this._syncArt(media, entityId);
-    if (this._artUrl !== this._artApplied) {
-      this._crossFadeArt(card, this._artUrl);
+    this._safeEffect("art", () => {
+      this._syncArt(media, entityId);
+      if (this._artUrl !== this._artApplied) {
+        this._crossFadeArt(card, this._artUrl);
+      }
+    });
+    this._safeEffect("range", () => this._syncRangeValues());
+    this._safeEffect("panel", () => {
+      this._syncPanelFlag();
+      this._queuePanelFit();
+    });
+    this._safeEffect("dock", () => {
+      this._installDock();
+      this._installLyricDock();
+    });
+    this._safeEffect("cover-spin", () => this._syncCoverSpinEffect());
+    this._safeEffect("cover-eq", () => this._syncCoverEq());
+    this._safeEffect("lyrics", () => {
+      this._maybeLoadLyrics();
+      if (
+        (this._lyricsOpen || this._sideLyricsVisible()) &&
+        this._lyricsActive !== this._lyricsScrolled
+      ) {
+        this._lyricsScrolled = this._lyricsActive;
+        this._centerActiveLyric();
+      }
+      this._observeLyricsScroll();
+    });
+    this._safeEffect("spectrum", () => this._syncSpectrum());
+    this._safeEffect("ticker", () => this._syncProgressTicker());
+  }
+
+  // 一次效果同步失败不应该拖垮其他效果（旧版任何一个异常都会让后续封面/歌词停在旧状态）。
+  _safeEffect(name, fn) {
+    try {
+      fn();
+    } catch (error) {
+      if (!this._effectErrors) this._effectErrors = new Set();
+      if (this._effectErrors.has(name)) return;
+      this._effectErrors.add(name);
+      console.error(`ha-music: ${name} 同步失败`, error);
     }
-    this._syncRangeValues();
-    this._syncPanelFlag();
-    this._queuePanelFit();
-    this._installDock();
-    this._installLyricDock();
-    syncCoverSpin(
-      this.renderRoot?.querySelector?.(".hm-cover img"),
-      this._state()?.state === "playing",
-    );
-    this._syncCoverEq();
-    this._maybeLoadLyrics();
-    if (
-      (this._lyricsOpen || this._sideLyricsVisible()) &&
-      this._lyricsActive !== this._lyricsScrolled
-    ) {
-      this._lyricsScrolled = this._lyricsActive;
-      this._centerActiveLyric();
-    }
-    this._observeLyricsScroll();
-    this._syncSpectrum();
-    this._syncProgressTicker();
+  }
+
+  _syncCoverSpinEffect() {
+    const img = this.renderRoot?.querySelector?.(".hm-cover img");
+    if (!img) return;
+    syncCoverSpin(img, this._state()?.state === "playing");
   }
 
   _queuePanelFit() {
@@ -3172,16 +3217,15 @@ class HaMusicCard extends LitElement {
     const second = Math.floor(position);
     if (second !== this._progressLastSecond) {
       this._progressLastSecond = second;
-      const start = this.renderRoot?.querySelector?.(".hm-time");
-      if (start) start.textContent = formatTime(position);
+      setLitText(this.renderRoot?.querySelector?.(".hm-time"), formatTime(position));
       // 切歌后模板可能还保留上一首的结束时间；这里每帧用当前时长校正，
       // 不只更新当前时间，避免总时长标签停在旧值直到整卡重绘。
-      const end = this.renderRoot?.querySelector?.(".hm-time.end");
-      if (end) {
-        end.textContent = this._showRemaining
+      setLitText(
+        this.renderRoot?.querySelector?.(".hm-time.end"),
+        this._showRemaining
           ? `-${formatTime(Math.max(duration - position, 0))}`
-          : formatTime(duration);
-      }
+          : formatTime(duration)
+      );
     }
     this._progressRaf = requestAnimationFrame(() => this._progressTick());
   }
@@ -3211,8 +3255,7 @@ class HaMusicCard extends LitElement {
       volume.style.setProperty("--pct", `${level * 100}%`);
       volume.setAttribute("data-disabled", String(!info.supported));
       // 百分比标签直接回写：不依赖下一轮 Lit 重绘，避免移动端拖完后标签停在旧值。
-      const pctEl = root.querySelector?.(".hm-vol-pct");
-      if (pctEl) pctEl.textContent = `${pct}%`;
+      setLitText(root.querySelector?.(".hm-vol-pct"), `${pct}%`);
     }
     // 静音按钮同样直接回写：模板缓存/延迟重绘时图标也不会停在旧状态。
     const muteBtn = root.querySelector?.(".hm-volume .hm-volume-mute");

@@ -3026,6 +3026,21 @@ export const cardStyles = css`
     }
   }
 
+  /* 583 这类中等窄面板：收紧留白、隐藏单行歌词、压低声谱，保证音量两行完整可见 */
+  @container (min-width: 520px) and (max-width: 620px) {
+    .hm-card[data-panel="true"]:has(.hm-controls.is-stacked) .hm-body {
+      padding: 12px 18px;
+    }
+
+    .hm-card[data-panel="true"]:has(.hm-controls.is-stacked) .hm-now-lyric {
+      display: none;
+    }
+
+    .hm-card[data-panel="true"]:has(.hm-controls.is-stacked) .hm-vis {
+      height: 40px;
+    }
+  }
+
   /* 面板里宽而矮的格子按紧凑布局：小封面 + 信息，控制区在下方 */
   .hm-card[data-panel="true"][data-layout="compact"] .hm-main {
     grid-template-columns: 72px minmax(0, 1fr);

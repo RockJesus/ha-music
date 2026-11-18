@@ -3492,4 +3492,168 @@ export const cardStyles = css`
       animation: none !important;
     }
   }
+
+  /* 单行说明（专辑/来源）在窄列里必须省略，不能横向顶出卡片 */
+  .hm-kicker {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- 宽高比形态（data-shape） ---------- */
+
+  /* 完整布局不再死守 760px：按卡片可用宽度放宽，16:9 大卡也不会缩成中间的窄条 */
+  .hm-card[data-layout="full"] .hm-body {
+    max-width: min(1180px, 94cqi);
+  }
+
+  /* 宽屏：内容不再固定 760px，超宽屏按比例放宽，避免左右大片留白 */
+  .hm-card[data-shape="wide"] .hm-body {
+    max-width: min(1480px, 94cqi);
+  }
+
+  .hm-card[data-shape="wide"] .hm-title {
+    font-size: clamp(26px, 2.6cqi, 44px);
+  }
+
+  .hm-card[data-shape="wide"] .hm-main {
+    gap: clamp(18px, 3cqi, 34px);
+  }
+
+  /* 竖长：内容纵向居中，不再被 space-between 拆成上下两截 */
+  .hm-card[data-shape="tall"] .hm-body {
+    justify-content: center;
+    max-width: 560px;
+    gap: clamp(12px, 3cqi, 22px);
+  }
+
+  /* 竖长卡片改为「封面在上、信息在下」的纵向堆叠，避免左右两栏把歌名挤到裁切 */
+  .hm-card[data-shape="tall"] .hm-main {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+    gap: 14px;
+  }
+
+  .hm-card[data-shape="tall"] .hm-info,
+  .hm-card[data-shape="tall"] .hm-meta {
+    justify-items: center;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .hm-card[data-shape="tall"] .hm-title,
+  .hm-card[data-shape="tall"] .hm-artist,
+  .hm-card[data-shape="tall"] .hm-kicker,
+  .hm-card[data-shape="tall"] .hm-now-lyric {
+    text-align: center;
+    justify-content: center;
+  }
+
+  .hm-card[data-shape="tall"] .hm-tags {
+    justify-content: center;
+  }
+
+  .hm-card[data-shape="tall"] .hm-kicker {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 极小卡片：只保留必要按钮，收紧控件，避免顶栏与播放键溢出 */
+  @container (max-width: 330px) {
+    .hm-card[data-layout="compact"] .hm-top .hm-status-text,
+    .hm-card[data-layout="compact"] .hm-top .hm-kicker-sep {
+      display: none;
+    }
+
+    .hm-top-actions .hm-lyrics-btn,
+    .hm-top-actions .hm-ma,
+    .hm-top-actions .hm-icon-btn[data-role="power"] {
+      display: none;
+    }
+
+    .hm-icon-btn {
+      width: 30px;
+      height: 30px;
+    }
+
+    .hm-btn {
+      width: 34px;
+      height: 34px;
+    }
+
+    .hm-play {
+      width: 46px;
+      height: 46px;
+    }
+
+    .hm-volume .hm-vol-step {
+      display: none;
+    }
+  }
+
+  /* 超宽矮条：单行横排——左封面、中间信息+进度、右侧播放与音量 */
+  .hm-card[data-shape="banner"] .hm-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top top top"
+      "main main ctrl"
+      "prog prog ctrl";
+    align-content: center;
+    gap: 8px 20px;
+    max-width: 2400px;
+    padding: 12px 24px;
+  }
+
+  .hm-card[data-shape="banner"] .hm-top {
+    grid-area: top;
+    min-height: 0;
+  }
+
+  .hm-card[data-shape="banner"] .hm-entities {
+    display: none;
+  }
+
+  .hm-card[data-shape="banner"] .hm-main {
+    grid-area: main;
+    grid-template-columns: var(--hm-cover-size, 84px) minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .hm-card[data-shape="banner"] .hm-progress {
+    grid-area: prog;
+  }
+
+  .hm-card[data-shape="banner"] .hm-controls {
+    grid-area: ctrl;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 8px;
+    min-width: min(300px, 34vw);
+  }
+
+  .hm-card[data-shape="banner"] .hm-controls .hm-transport {
+    justify-content: flex-end;
+  }
+
+  .hm-card[data-shape="banner"] .hm-controls .hm-volume {
+    width: 100%;
+  }
+
+  .hm-card[data-shape="banner"] .hm-vis,
+  .hm-card[data-shape="banner"] .hm-tags,
+  .hm-card[data-shape="banner"] .hm-kicker,
+  .hm-card[data-shape="banner"] .hm-now-lyric {
+    display: none;
+  }
+
+  .hm-card[data-shape="banner"] .hm-title {
+    font-size: clamp(18px, 2.2cqi, 30px);
+    -webkit-line-clamp: 1;
+  }
 `;

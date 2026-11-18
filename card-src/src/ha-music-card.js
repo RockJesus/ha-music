@@ -68,13 +68,27 @@ function positionAnchor(stamp, now = Date.now()) {
 function setLitText(el, text) {
   if (!el) return;
   const value = String(text);
-  let node = el.firstChild;
-  while (node && node.nodeType === 8) node = node.nextSibling;
-  if (node && node.nodeType === 3) {
-    if (node.data !== value) node.data = value;
+  // 必须从 Lit 的 marker comment 之后取绑定节点：模板里的换行/缩进会先产生空白 Text 节点，
+  // 若写进空白节点，下一次 Lit 渲染仍会往自己的绑定节点写，界面上就会出现两份文字
+  // （例如「3:283:28」「62%%」这类叠字）。
+  let marker = null;
+  for (let n = el.firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 8) {
+      marker = n;
+      break;
+    }
+  }
+  if (marker) {
+    let node = marker.nextSibling;
+    while (node && node.nodeType === 8) node = node.nextSibling;
+    if (node && node.nodeType === 3) {
+      if (node.data !== value) node.data = value;
+      return;
+    }
+    // 绑定位置不是文本节点（条件渲染换了元素）时不动 DOM，交给 Lit 自己更新。
     return;
   }
-  // 没有绑定文本节点时（纯静态内容）才退回 textContent。
+  // 元素里没有任何绑定标记，说明是纯静态文本，才退回 textContent。
   if (!el.querySelector?.("*")) el.textContent = value;
 }
 
@@ -1233,6 +1247,30 @@ class HaMusicCard extends LitElement {
     this.requestUpdate();
   }
 
+  // 宽高比形态：用于给模板打 data-shape，让 CSS 能针对超宽/竖长/方形重排。
+  // 只按宽高比例判定，不改动原有 full/compact/mini 语义。
+  _shape() {
+    if (this._thumbMode()) return "normal";
+    const width = this._width || 0;
+    const height = this._height || 0;
+    if (!width || !height) return "normal";
+    const aspect = width / height;
+    if (!this._panel) {
+      // 超宽矮条（3440×300、1680×220 这类横幅）：上下分栏会把内容压扁，改成单行横排。
+      if (
+        (width >= 720 && height <= 320 && aspect >= 2.6) ||
+        (width >= 560 && height <= 280 && aspect >= 2.2)
+      ) {
+        return "banner";
+      }
+      // 宽屏横排：放宽内容宽度，避免超宽屏两侧大片留白。
+      if (width >= 760 && height >= 340 && aspect >= 2.1) return "wide";
+      if (aspect <= 0.62 && height >= 480) return "tall";
+      if (aspect >= 0.8 && aspect <= 1.25 && width >= 320 && height >= 320) return "square";
+    }
+    return "normal";
+  }
+
   _layoutKey() {
     if (this._thumbMode()) return "full";
     if (this._panel) {
@@ -1245,6 +1283,19 @@ class HaMusicCard extends LitElement {
       const width = this._width;
       const height = this._height;
       if (!width) return "full";
+      const shape = this._shape();
+      if (shape === "banner") return "compact";
+      if (shape === "wide") return "full";
+      // 极窄卡片（≈240px 方格）连标题都会溢出，统一走单行 mini。
+      // 极小方格（240×240）留 mini 会只剩控制键、没有歌名，改成紧凑版式；
+      // 只有明显偏横幅的极小卡才走 mini。
+      if (width < 300 && (aspect >= 1.5 || !height || height < 180)) return "mini";
+      if (shape === "tall") return "full";
+      if (shape === "square") {
+        return width < 520 || (height && height < 440) ? "compact" : "full";
+      }
+      // 明显偏矮（<330）且不宽的格子：上下分栏必然裁切，降级紧凑。
+      if (height && height < 330 && width < 900) return "compact";
       // 网格卡片可能很矮（例如 6 列 × 2 行）：只按宽度判断会把大卡片
       // 塞进矮格子里，导致封面/控制条被裁掉。这里同时看可用高度。
       // 卡片选择器可能是 280×600 这种窄高比例：此时不能用 mini，
@@ -1271,6 +1322,19 @@ class HaMusicCard extends LitElement {
         );
       }
       return Math.round(Math.min(120, Math.max(64, height * 0.30)));
+    }
+    const shape = this._shape();
+    if (shape === "banner") {
+      return Math.round(Math.min(150, Math.max(56, (this._height || 0) * 0.5)));
+    }
+    if (shape === "wide") {
+      return Math.round(Math.min(230, Math.max(120, (this._height || 0) * 0.3)));
+    }
+    if (shape === "tall") {
+      const width = this._width || 0;
+      return Math.round(
+        Math.min(260, Math.max(140, Math.min(width * 0.6, (this._height || 0) * 0.3)))
+      );
     }
     if (layout === "mini") return 44;
     if (layout === "compact") {
@@ -1651,9 +1715,10 @@ class HaMusicCard extends LitElement {
     const value = Number(event.target.value) / 100;
     this._volumePreview = value;
     event.target.style.setProperty("--pct", `${value * 100}%`);
+    // 模板里 "%" 是静态文本，这里只写数字，否则会渲染成「62%%」。
     setLitText(
       this.renderRoot?.querySelector?.(".hm-vol-pct"),
-      `${Math.round(value * 100)}%`
+      String(Math.round(value * 100))
     );
   }
 
@@ -1665,7 +1730,7 @@ class HaMusicCard extends LitElement {
     event.target.style.setProperty("--pct", `${volume * 100}%`);
     setLitText(
       this.renderRoot?.querySelector?.(".hm-vol-pct"),
-      `${Math.round(volume * 100)}%`
+      String(Math.round(volume * 100))
     );
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTicks = 0;
@@ -3255,7 +3320,7 @@ class HaMusicCard extends LitElement {
       volume.style.setProperty("--pct", `${level * 100}%`);
       volume.setAttribute("data-disabled", String(!info.supported));
       // 百分比标签直接回写：不依赖下一轮 Lit 重绘，避免移动端拖完后标签停在旧值。
-      setLitText(root.querySelector?.(".hm-vol-pct"), `${pct}%`);
+      setLitText(root.querySelector?.(".hm-vol-pct"), String(pct));
     }
     // 静音按钮同样直接回写：模板缓存/延迟重绘时图标也不会停在旧状态。
     const muteBtn = root.querySelector?.(".hm-volume .hm-volume-mute");
@@ -3270,6 +3335,9 @@ class HaMusicCard extends LitElement {
   }
 
   getCardSize() {
+    const shape = this._shape();
+    if (shape === "banner") return 2;
+    if (shape === "wide") return 5;
     const layout = this._layoutKey();
     if (layout === "mini") return 1;
     if (layout === "compact") return 3;
@@ -3491,7 +3559,8 @@ class HaMusicCard extends LitElement {
 
     if (!hass) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbMode() ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
+        <div class="hm-card" data-layout=${layout}
+        data-shape=${this._shape()} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbMode() ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">${t("loading")}</div>
           </div>
@@ -3503,7 +3572,8 @@ class HaMusicCard extends LitElement {
     const state = hass.states?.[entityId];
     if (!state) {
       return html`
-        <div class="hm-card" data-layout=${layout} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbMode() ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
+        <div class="hm-card" data-layout=${layout}
+        data-shape=${this._shape()} data-panel=${this._panel ? "true" : "false"} data-thumb=${this._thumbMode() ? this._thumbTier() : "false"} data-theme=${themeKey} style=${styleMap(this._styleVars())}>
           <div class="hm-body">
             <div class="hm-empty">
               ${entityId ? `实体未找到：${entityId}` : "ha-music: entity 未配置"}
@@ -3609,6 +3679,7 @@ class HaMusicCard extends LitElement {
         class="hm-card"
         data-theme=${themeKey}
         data-layout=${layout}
+        data-shape=${this._shape()}
         data-panel=${this._panel ? "true" : "false"}
         data-thumb=${this._thumbMode() ? this._thumbTier() : "false"}
         data-playing=${playing ? "true" : "false"}

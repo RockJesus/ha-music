@@ -145,6 +145,8 @@ class HaMusicCard extends LitElement {
     this._seekSettleTimer = null;
     this._volumePreview = null;
     this._volumeCommitAt = 0;
+    this._mutedOverride = null;
+    this._muteSettleTimer = null;
     this._volumeSettleTimer = null;
     this._volumeSettleTicks = 0;
     this._showRemaining = false;
@@ -271,6 +273,16 @@ class HaMusicCard extends LitElement {
     // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
     this._syncArt(readMedia(state), entityId);
+    // 静音/音量以实体属性为准：状态回传到本地后清掉乐观值，再强制同步一次控件。
+    if (this._mutedOverride !== null) {
+      const actualMuted = Boolean(attrs.is_volume_muted);
+      if (actualMuted === this._mutedOverride) {
+        this._mutedOverride = null;
+        if (this._muteSettleTimer) clearTimeout(this._muteSettleTimer);
+        this._muteSettleTimer = null;
+      }
+    }
+    queueMicrotask(() => this._syncRangeValues());
     const sig = this._computeSig(hass);
     if (sig !== this._sig || previous === undefined) {
       this._sig = sig;
@@ -407,6 +419,9 @@ class HaMusicCard extends LitElement {
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTimer = null;
     this._volumeSettleTicks = 0;
+    if (this._muteSettleTimer) clearTimeout(this._muteSettleTimer);
+    this._muteSettleTimer = null;
+    this._mutedOverride = null;
     if (this._onMobileChange) {
       if (this._mobileMq?.removeEventListener) {
         this._mobileMq.removeEventListener("change", this._onMobileChange);
@@ -543,7 +558,16 @@ class HaMusicCard extends LitElement {
       if (key in attrs) picked[key] = attrs[key];
     }
     const volumeEntity = this._config?.volume_entity;
-    const volumeState = volumeEntity ? hass.states?.[volumeEntity]?.state : null;
+    const volumeState = volumeEntity ? hass.states?.[volumeEntity] : null;
+    const volumeSig = volumeState
+      ? [
+          volumeState.state,
+          volumeState.attributes?.volume_level,
+          volumeState.attributes?.is_volume_muted,
+          volumeState.attributes?.min,
+          volumeState.attributes?.max,
+        ]
+      : null;
     const others = this._entities().map((id) => {
       const item = hass.states?.[id];
       return [id, item?.state, item?.attributes?.entity_picture];
@@ -552,7 +576,7 @@ class HaMusicCard extends LitElement {
       entityId,
       state?.state,
       picked,
-      volumeState,
+      volumeSig,
       others,
       hass.language,
       this._config,
@@ -1603,6 +1627,8 @@ class HaMusicCard extends LitElement {
     const value = Number(event.target.value) / 100;
     this._volumePreview = value;
     event.target.style.setProperty("--pct", `${value * 100}%`);
+    const pctEl = this.renderRoot?.querySelector?.(".hm-vol-pct");
+    if (pctEl) pctEl.textContent = `${Math.round(value * 100)}%`;
   }
 
   _onVolumeCommit(event) {
@@ -1661,17 +1687,30 @@ class HaMusicCard extends LitElement {
   _toggleMute() {
     const media = this._readMedia();
     const info = this._volumeInfo(media);
+    const next = !info.muted;
+    // 先乐观切换图标，不等 HA 下一次状态回传；实体回传一致后自动清除。
+    this._mutedOverride = next;
+    if (this._muteSettleTimer) clearTimeout(this._muteSettleTimer);
+    this._muteSettleTimer = setTimeout(() => {
+      if (this._mutedOverride === next) {
+        this._mutedOverride = null;
+        this._syncRangeValues();
+        this.requestUpdate();
+      }
+    }, 3000);
+    this._syncRangeValues();
+    this.requestUpdate();
     if (info.external) {
       if (info.domain === "media_player") {
         this._guard(
-          this._call("volume_mute", { is_volume_muted: !info.muted }, "media_player", info.entityId)
+          this._call("volume_mute", { is_volume_muted: next }, "media_player", info.entityId)
         );
       } else {
         this._notify(translator(this._hass?.language)("volumeEntityMissing"));
       }
       return;
     }
-    this._guard(this._call("volume_mute", { is_volume_muted: !media.muted }));
+    this._guard(this._call("volume_mute", { is_volume_muted: next }));
   }
 
   _volumeStep(delta) {
@@ -1687,6 +1726,7 @@ class HaMusicCard extends LitElement {
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTimer = null;
     this.requestUpdate();
+    this._syncRangeValues();
     setTimeout(() => {
       if (this._volumePreview === volume) {
         this._volumePreview = null;
@@ -3146,6 +3186,7 @@ class HaMusicCard extends LitElement {
     const seek = root.querySelector?.('input.hm-range[data-role="seek"]');
     const volume = root.querySelector?.('input.hm-range[data-role="volume"]');
     const media = this._readMedia();
+    const info = this._volumeInfo(media);
     if (seek && this._seekPreview === null) {
       const max = media.duration || 0;
       const value = clamp(media.position, 0, max || media.position);
@@ -3156,15 +3197,26 @@ class HaMusicCard extends LitElement {
         `${max ? clamp((value / max) * 100, 0, 100) : 0}%`
       );
     }
-    if (volume && this._volumePreview === null) {
-      const info = this._volumeInfo(media);
-      const pct = Math.round(info.level * 100);
+    if (volume) {
+      const level =
+        this._volumePreview === null ? info.level : clamp(this._volumePreview, 0, 1);
+      const pct = Math.round(level * 100);
       volume.value = String(pct);
-      volume.style.setProperty("--pct", `${info.level * 100}%`);
+      volume.style.setProperty("--pct", `${level * 100}%`);
       volume.setAttribute("data-disabled", String(!info.supported));
       // 百分比标签直接回写：不依赖下一轮 Lit 重绘，避免移动端拖完后标签停在旧值。
       const pctEl = root.querySelector?.(".hm-vol-pct");
       if (pctEl) pctEl.textContent = `${pct}%`;
+    }
+    // 静音按钮同样直接回写：模板缓存/延迟重绘时图标也不会停在旧状态。
+    const muteBtn = root.querySelector?.(".hm-volume .hm-volume-mute");
+    if (muteBtn) {
+      const muted = this._mutedOverride === null ? info.muted : this._mutedOverride;
+      const t = translator(this._hass?.language);
+      muteBtn.setAttribute("data-muted", muted ? "true" : "false");
+      muteBtn.setAttribute("data-on", muted ? "true" : "false");
+      muteBtn.setAttribute("aria-label", t(muted ? "unmute" : "mute"));
+      muteBtn.setAttribute("title", t(muted ? "unmute" : "mute"));
     }
   }
 
@@ -3423,6 +3475,8 @@ class HaMusicCard extends LitElement {
       media.appName ||
       (statusKey === "playing" ? t("playing") : statusText);
     const volume = this._volumeInfo(media);
+    const volumeMuted =
+      this._mutedOverride === null ? volume.muted : Boolean(this._mutedOverride);
     const showVolume = config.show_volume !== false && volume.supported;
     const canShuffle = hasFeature(state, FEATURES.SHUFFLE_SET);
     const canRepeat = hasFeature(state, FEATURES.REPEAT_SET);
@@ -3851,12 +3905,15 @@ class HaMusicCard extends LitElement {
             ${showVolume
               ? html`<div class="hm-volume">
                   <button
-                    class="hm-icon-btn"
-                    aria-label=${volume.muted ? t("unmute") : t("mute")}
-                    title=${volume.muted ? t("unmute") : t("mute")}
+                    class="hm-icon-btn hm-volume-mute"
+                    data-muted=${volumeMuted ? "true" : "false"}
+                    data-on=${volumeMuted ? "true" : "false"}
+                    aria-label=${volumeMuted ? t("unmute") : t("mute")}
+                    title=${volumeMuted ? t("unmute") : t("mute")}
                     @click=${() => this._toggleMute()}
                   >
-                    ${icon(volume.muted ? "mute" : "volume", 16)}
+                    <span class="hm-vol-ico hm-vol-ico-on">${icon("volume", 16)}</span>
+                    <span class="hm-vol-ico hm-vol-ico-muted">${icon("mute", 16)}</span>
                   </button>
                   <button
                     class="hm-icon-btn hm-vol-step"

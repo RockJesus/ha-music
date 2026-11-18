@@ -959,6 +959,27 @@ export const cardStyles = css`
     background: rgba(255, 255, 255, 0.1);
   }
 
+  /* 音量/静音两枚图标常驻 DOM，只切换显示，避免状态回传时图标停在旧图。 */
+  .hm-volume .hm-volume-mute .hm-vol-ico {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+
+  .hm-volume .hm-volume-mute .hm-vol-ico-muted {
+    display: none;
+  }
+
+  .hm-volume .hm-volume-mute[data-muted="true"] .hm-vol-ico-on {
+    display: none;
+  }
+
+  .hm-volume .hm-volume-mute[data-muted="true"] .hm-vol-ico-muted {
+    display: inline-flex;
+  }
+
   .hm-volume .hm-range {
     height: 36px;
     flex: 1 1 auto;

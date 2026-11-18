@@ -1377,6 +1377,11 @@ class HaMusicMini extends HTMLElement {
       this._mini.style.display = "none";
       return;
     }
+    // 手机上主卡片已自带完整控制，右下 FAB 会压住循环键与音量百分比，直接隐藏。
+    if (this._mode === "fab" && mobile) {
+      this._mini.style.display = "none";
+      return;
+    }
     if (this._mode === "fab") {
       const mini = this._mini;
       const rect = mini.getBoundingClientRect();

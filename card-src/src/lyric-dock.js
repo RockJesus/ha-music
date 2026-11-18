@@ -214,11 +214,15 @@ const STYLE = `
     border-style: double;
     border-width: 2px;
   }
-  @media (max-width: 520px) {
+  @media (max-width: 700px) {
     .lyric {
       max-width: calc(100vw - 24px);
       font-size: 13px;
     }
+  }
+  /* 手机主卡片自带歌词行，悬浮歌词层会压住顶栏 mini，直接隐藏。 */
+  @media (max-width: 700px) {
+    .lyric { display: none !important; }
   }
   /* 不要胶囊和底板：只保留主题渐变歌词文字。 */
   .lyric[data-theme] {

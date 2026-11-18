@@ -3350,13 +3350,26 @@ class HaMusicCard extends LitElement {
   }
 
   getGridOptions() {
-    const rows = this.getCardSize();
+    // 面板/全屏保留固定高；Sections 下按内容高度自适应（rows:"auto"），
+    // 避免声明的行数小于真实内容导致底部音量行被裁。
+    if (this._panel) {
+      return {
+        columns: "full",
+        rows: Math.max(6, this.getCardSize()),
+        min_columns: 12,
+        min_rows: 4,
+        max_columns: 24,
+        max_rows: 24,
+      };
+    }
+    const shape = this._shape();
+    const minRows = shape === "mini" || shape === "banner" ? 1 : shape === "compact" ? 2 : 4;
     return {
-      columns: this._panel ? "full" : 12,
-      rows: this._panel ? Math.max(6, rows) : rows,
-      min_columns: this._panel ? 12 : 4,
-      min_rows: this._panel ? 4 : 2,
+      columns: 12,
+      rows: "auto",
+      min_columns: 4,
       max_columns: 24,
+      min_rows: minRows,
       max_rows: 24,
     };
   }
@@ -3365,7 +3378,7 @@ class HaMusicCard extends LitElement {
     const grid = this.getGridOptions();
     return {
       grid_columns: grid.columns === "full" ? 12 : grid.columns,
-      grid_rows: grid.rows,
+      grid_rows: typeof grid.rows === "number" ? grid.rows : this.getCardSize(),
       grid_min_columns: grid.min_columns,
       grid_max_columns: grid.max_columns,
       grid_min_rows: grid.min_rows,

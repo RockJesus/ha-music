@@ -3594,7 +3594,12 @@ class HaMusicCard extends LitElement {
                 <div class="hm-entities">
                   ${entities.map((id) => {
                     const item = hass.states?.[id];
-                    const art = normalizeArt(hass, item?.attributes?.entity_picture);
+                    // 选中项的封面优先用卡片已解析的 blob，避免 HTTPS 页面直接加载
+                    // 局域网 http 封面被混合内容策略拦截，出现空心头像。
+                    const art =
+                      id === entityId && this._artUrl
+                        ? this._artUrl
+                        : normalizeArt(hass, item?.attributes?.entity_picture);
                     const itemPlaying =
                       item?.state === "playing" || item?.state === "buffering";
                     return html`<button

@@ -3011,6 +3011,27 @@ export const cardStyles = css`
     justify-content: flex-start;
   }
 
+  /* 面板/预览窄宽：音量在播放控件下方，覆盖面板默认的单行布局 */
+  .hm-card[data-panel="true"] .hm-controls.is-stacked {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .hm-card[data-panel="true"] .hm-controls.is-stacked .hm-transport {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hm-card[data-panel="true"] .hm-controls.is-stacked .hm-volume {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+
   /* ---------- 卡片选择器缩略预览（独立于仪表盘正常卡片） ---------- */
   .hm-card[data-thumb="lg"],
   .hm-card[data-thumb="md"],

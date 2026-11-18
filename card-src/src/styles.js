@@ -3019,6 +3019,25 @@ export const cardStyles = css`
     justify-content: flex-start;
   }
 
+  /* 窄面板音量下移后会多占一行高度，封面同步收小，避免底部音量被裁掉 */
+  @container (max-width: 620px) {
+    .hm-card[data-panel="true"] .hm-cover {
+      width: min(100%, 180px);
+    }
+  }
+
+  /* 面板里宽而矮的格子按紧凑布局：小封面 + 信息，控制区在下方 */
+  .hm-card[data-panel="true"][data-layout="compact"] .hm-main {
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .hm-card[data-panel="true"][data-layout="compact"] .hm-cover {
+    width: 72px;
+    max-height: 72px;
+  }
+
   /* 面板/预览窄宽：音量在播放控件下方，覆盖面板默认的单行布局 */
   .hm-card[data-panel="true"] .hm-controls.is-stacked {
     flex-direction: column;

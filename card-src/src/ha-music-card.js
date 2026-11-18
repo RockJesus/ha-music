@@ -450,6 +450,8 @@ class HaMusicCard extends LitElement {
       this._lyricsAbort.abort();
       this._lyricsAbort = null;
     }
+    if (this._lyricsRetryTimer) clearTimeout(this._lyricsRetryTimer);
+    this._lyricsRetryTimer = null;
   }
 
   /* ---------------- 状态推导 ---------------- */
@@ -793,7 +795,7 @@ class HaMusicCard extends LitElement {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       signal.addEventListener("abort", onAbort, { once: true });
     }
-    const timer = setTimeout(() => local.abort(), 3000);
+    const timer = setTimeout(() => local.abort(), 8000);
     try {
       const response = await fetch(url.toString(), {
         signal: local.signal,
@@ -895,7 +897,7 @@ class HaMusicCard extends LitElement {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       signal.addEventListener("abort", onAbort, { once: true });
     }
-    const timer = setTimeout(() => local.abort(), 4500);
+    const timer = setTimeout(() => local.abort(), 8000);
     try {
       const response = await fetch(
         `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`,
@@ -1058,7 +1060,7 @@ class HaMusicCard extends LitElement {
   async _fetchLyrics(media, key) {
     const controller = new AbortController();
     this._lyricsAbort = controller;
-    const timer = setTimeout(() => controller.abort(), 20000);
+    const timer = setTimeout(() => controller.abort(), 35000);
     let lastError = null;
     try {
       const source = this._lyricsSource();
@@ -1122,6 +1124,7 @@ class HaMusicCard extends LitElement {
         instrumental: false,
         source: "歌词接口",
       };
+      if (lastError) this._scheduleLyricsRetry(key);
       this.requestUpdate();
     } catch (error) {
       if (key !== this._lyricsKey) return;
@@ -1133,6 +1136,7 @@ class HaMusicCard extends LitElement {
           instrumental: false,
           source: "歌词接口",
         };
+        this._scheduleLyricsRetry(key);
         this.requestUpdate();
         return;
       }
@@ -1143,11 +1147,23 @@ class HaMusicCard extends LitElement {
         instrumental: false,
         source: "歌词接口",
       };
+      this._scheduleLyricsRetry(key);
       this.requestUpdate();
     } finally {
       clearTimeout(timer);
       if (this._lyricsAbort === controller) this._lyricsAbort = null;
     }
+  }
+
+  _scheduleLyricsRetry(key) {
+    if (this._lyricsRetryTimer) clearTimeout(this._lyricsRetryTimer);
+    this._lyricsRetryTimer = setTimeout(() => {
+      this._lyricsRetryTimer = null;
+      if (!this.isConnected || key !== this._lyricsKey) return;
+      if (this._lyrics.status !== "error") return;
+      this._lyricsKey = "";
+      this._maybeLoadLyrics();
+    }, 10000);
   }
 
   _sideLyricsVisible() {

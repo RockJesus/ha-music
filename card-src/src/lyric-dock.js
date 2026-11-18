@@ -279,6 +279,7 @@ class HaMusicLyric extends HTMLElement {
     this._linesKey = "";
     this._requestKey = "";
     this._requestController = null;
+    this._retryAt = 0;
     this._offset = 0;
     this._clock = null;
     this._poll = null;
@@ -385,6 +386,12 @@ class HaMusicLyric extends HTMLElement {
 
   _sync() {
     if (!this._pill) return;
+    if (this._status === "error" && this._retryAt && Date.now() >= this._retryAt) {
+      this._status = "idle";
+      this._linesKey = "";
+      this._requestKey = "";
+      this._retryAt = 0;
+    }
     const hass = resolveHass() || this._hass;
     if (hass?.states) this._hass = hass;
     const preferred = this._preferred || this._entity;
@@ -492,8 +499,10 @@ class HaMusicLyric extends HTMLElement {
         }
         this._lines = [];
         this._plain = [];
-        this._linesKey = key;
+        // 失败不要锁死这首歌：清掉已解析键，过几秒由 500ms 轮询自动重试。
+        this._linesKey = "";
         this._status = "error";
+        this._retryAt = Date.now() + 8000;
         this._sync();
       })
       .finally(() => {

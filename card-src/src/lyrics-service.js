@@ -6,7 +6,7 @@ import { readMedia } from "./util.js";
 const NETEASE_API = "/api/netease_lyrics/lyrics";
 const LRCLIB_API = "https://lrclib.net/api";
 const LYRICS_OVH_API = "https://api.lyrics.ovh/v1";
-const REQUEST_TIMEOUT = 4500;
+const REQUEST_TIMEOUT = 8000;
 
 const cache = new Map();
 const inflight = new Map();
@@ -100,7 +100,11 @@ export function pickGlobalLyricsEntity(hass, preferred = "") {
 
 function withTimeout(signal) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, REQUEST_TIMEOUT);
   const onAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) controller.abort();
@@ -108,6 +112,7 @@ function withTimeout(signal) {
   }
   return {
     signal: controller.signal,
+    timedOut: () => timedOut,
     cleanup() {
       clearTimeout(timer);
       if (signal) signal.removeEventListener("abort", onAbort);
@@ -126,6 +131,11 @@ async function requestJson(url, { signal, headers } = {}) {
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`lyrics HTTP ${response.status}`);
     return response.json();
+  } catch (error) {
+    // 单个歌词源超时只代表这一路不可用，继续尝试下一路；
+    // 只有调用方主动取消（切歌/卸载）才向上抛出。
+    if (error?.name === "AbortError" && guard.timedOut() && !signal?.aborted) return null;
+    throw error;
   } finally {
     guard.cleanup();
   }
@@ -308,8 +318,11 @@ export function fetchGlobalLyrics(state, options = {}) {
 
   const promise = resolveLyrics(media, options)
     .then((result) => {
-      cache.set(key, result);
-      if (cache.size > 40) cache.delete(cache.keys().next().value);
+      // 失败结果不进缓存，否则同一首歌会一直空白到刷新。
+      if (result?.status !== "error") {
+        cache.set(key, result);
+        if (cache.size > 40) cache.delete(cache.keys().next().value);
+      }
       return result;
     })
     .catch((error) => {

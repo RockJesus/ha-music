@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.6.7`
+   - URL：`/local/ha-music.js?v=2.6.8`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -116,6 +116,7 @@ entity: media_player.living_room
 | `mobile_hide_dock` | bool | `true` | 手机端自动隐藏悬浮播放器；仅粗指针窄屏/横屏矮屏生效，桌面和平板不受影响 |
 | `mobile_hide_lyrics` | bool | `true` | 手机端自动隐藏全局歌词悬浮窗；仅粗指针窄屏/横屏矮屏生效，桌面和平板不受影响 |
 | `show_source` | bool | `true` | 显示音源 chip |
+| `show_spec` | bool | `true` | 在歌手下方显示当前曲目音频参数（编码 / 位深 / 采样率 / 码率，来自 Music Assistant 的 `stream_details`） |
 | `show_queue` | bool | `true` | 显示当前播放列表按钮；MA 播放器自动读取完整队列（需 Music Assistant 加载项）；读取失败时回退当前/下一首 |
 | `show_library` | bool | `true` | 显示媒体库按钮（需支持 `BROWSE_MEDIA`） |
 | `show_group` | bool | `true` | 显示分组标签与分组成员 |

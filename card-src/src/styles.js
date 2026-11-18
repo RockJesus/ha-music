@@ -543,6 +543,37 @@ export const cardStyles = css`
     white-space: nowrap;
   }
 
+  .hm-spec {
+    font-size: clamp(10px, 2.4cqi, 11.5px);
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    color: rgba(226, 232, 255, 0.46);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hm-spec-short {
+    display: none;
+  }
+
+  @container (max-width: 520px) {
+    .hm-spec-full {
+      display: none;
+    }
+
+    .hm-spec-short {
+      display: inline;
+    }
+  }
+
+  .hm-card[data-layout="mini"] .hm-spec,
+  .hm-card[data-micro="true"] .hm-spec,
+  .hm-card[data-thumb="sm"] .hm-spec {
+    display: none;
+  }
+
   .hm-tags {
     display: flex;
     flex-wrap: nowrap;
@@ -1416,7 +1447,11 @@ export const cardStyles = css`
 
   .hm-card[data-short="true"] .hm-volume,
   .hm-card[data-short="true"] .hm-controls.is-stacked .hm-volume {
-    min-height: 32px;
+    min-height: 28px;
+  }
+
+  .hm-card[data-short="true"] .hm-controls.is-stacked {
+    gap: 4px;
   }
 
   .hm-card[data-short="true"] .hm-vis {

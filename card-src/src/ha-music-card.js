@@ -187,6 +187,9 @@ class HaMusicCard extends LitElement {
     this._artApplied = "";
     this._artLoading = "";
     this._artFailedSource = "";
+    this._audioSpec = null;
+    this._audioSpecKey = "";
+    this._audioSpecAt = 0;
     this._artSeq = 0;
     this._artSlot = 0;
     this._dockOwner = false;
@@ -302,6 +305,7 @@ class HaMusicCard extends LitElement {
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
     // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
+    if (trackChanged || !prior) this._loadAudioSpec(trackKey);
     this._syncArt(readMedia(state), entityId);
     // 封面旋转跟播放状态走：不依赖 Lit 是否真的重绘（重绘失败或签名未变时也能纠正）。
     this._safeEffect("cover-spin", () => this._syncCoverSpinEffect());
@@ -2143,6 +2147,70 @@ class HaMusicCard extends LitElement {
     }
   }
 
+  // Music Assistant 的队列快照里带 current_item.media_item.stream_details，
+  // 本地库/主流音乐源会给出编码、采样率、位深、码率；流媒体源可能只有编码。
+  async _loadAudioSpec(trackKey) {
+    const hass = this._hass;
+    const entityId = this._eid();
+    if (!hass || !entityId) return;
+    if (this._config?.show_spec === false) return;
+    if (!this._isMaPlayer(entityId)) return;
+    if (trackKey && trackKey === this._audioSpecKey) return;
+    const now = Date.now();
+    if (now - this._audioSpecAt < 2000) return;
+    this._audioSpecAt = now;
+    this._audioSpecKey = trackKey || "";
+    try {
+      const response = await this._serviceResponse("music_assistant", "get_queue", {
+        entity_id: entityId,
+      });
+      const queue = this._pickQueueResponse(response);
+      const details = queue?.current_item?.media_item?.stream_details || null;
+      const sampleRate = Number(details?.sample_rate) || 0;
+      const bitDepth = Number(details?.bit_depth) || 0;
+      const bitRate = Number(details?.bit_rate) || 0;
+      const channels = Number(details?.channels) || 0;
+      const codec = String(details?.content_type || "").trim();
+      if (!codec && !sampleRate && !bitDepth && !bitRate) {
+        this._audioSpec = null;
+      } else {
+        this._audioSpec = { codec, sampleRate, bitDepth, bitRate, channels };
+      }
+    } catch {
+      this._audioSpec = null;
+    }
+    this.requestUpdate();
+  }
+
+  _audioSpecText(compact = false) {
+    const spec = this._audioSpec;
+    if (!spec) return "";
+    const parts = [];
+    if (spec.codec) parts.push(spec.codec.toUpperCase());
+    if (compact) {
+      if (spec.bitDepth && spec.sampleRate) {
+        parts.push(`${spec.bitDepth}/${Math.round(spec.sampleRate / 1000)}k`);
+      } else if (spec.sampleRate) {
+        parts.push(`${Math.round(spec.sampleRate / 1000)}kHz`);
+      }
+    } else {
+      if (spec.bitDepth) parts.push(`${spec.bitDepth}-bit`);
+      if (spec.sampleRate) {
+        const khz = spec.sampleRate / 1000;
+        parts.push(`${Number.isInteger(khz) ? khz : khz.toFixed(1)} kHz`);
+      }
+      if (spec.channels > 2) parts.push(`${spec.channels}ch`);
+      if (spec.bitRate > 0) {
+        parts.push(
+          spec.bitRate >= 1000000
+            ? `${(spec.bitRate / 1000000).toFixed(1)} Mb/s`
+            : `${Math.round(spec.bitRate / 1000)} kb/s`
+        );
+      }
+    }
+    return parts.join(" · ");
+  }
+
   async _fetchMaQueueDetails() {
     try {
       const response = await this._serviceResponse("music_assistant", "get_queue", {
@@ -3919,6 +3987,12 @@ class HaMusicCard extends LitElement {
                     ? "播放器预览 · 选中播放器后显示曲目"
                     : statusText)}
               </div>
+              ${this._audioSpecText() && !previewUi
+                ? html`<div class="hm-spec" title=${this._audioSpecText()}>
+                    <span class="hm-spec-full">${this._audioSpecText()}</span>
+                    <span class="hm-spec-short">${this._audioSpecText(true)}</span>
+                  </div>`
+                : nothing}
               ${showSource || showSoundMode || showGroup
                 ? html`<div class="hm-tags">
                     ${showSource

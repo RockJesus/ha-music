@@ -2626,7 +2626,7 @@ class HaMusicCard extends LitElement {
       // 宽度上限约 58%/66%，高度按整卡高度的 30% 封顶，给标题/频谱/进度留空间。
       const narrow = mainW < 560;
       const widthRatio = narrow ? 0.58 : 0.66;
-      const heightBudget = cardH * 0.3;
+      const heightBudget = cardH * 0.28;
       size = Math.max(120, Math.min(mainW * widthRatio, heightBudget));
     } else {
       // 宽屏：封面不再吃满主区高度，预留 96px 给封面外圈音柱和底部频谱，

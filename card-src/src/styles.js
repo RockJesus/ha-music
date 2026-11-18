@@ -1371,6 +1371,14 @@ export const cardStyles = css`
     flex: 0 1 150px;
   }
 
+  .hm-card[data-layout="compact"] .hm-controls.is-stacked .hm-volume {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+
   .hm-card[data-layout="compact"] .hm-volume .hm-vol-pct,
   .hm-card[data-layout="compact"] .hm-volume .hm-vol-step {
     display: none;

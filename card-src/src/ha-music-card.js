@@ -1217,7 +1217,11 @@ class HaMusicCard extends LitElement {
 
   _layoutKey() {
     if (this._thumbMode()) return "full";
-    if (this._panel) return "full";
+    if (this._panel) {
+      // 面板/预览也可能是宽而矮的格子（如 460×320），不能一律 full 竖排。
+      if (this._width && this._height && this._width < 620 && this._height < 460) return "compact";
+      return "full";
+    }
     const requested = this._config?.layout || "adaptive";
     if (requested === "adaptive") {
       const width = this._width;

@@ -242,8 +242,11 @@ export function readMedia(state) {
   const attrs = state?.attributes ?? {};
   const meta = attrs.media_metadata ?? {};
   // Music Assistant 切歌时先更新 media_metadata，扁平的 media_title/artist
-  // 会晚一拍；优先读元数据，避免卡片继续显示上一首。
-  const duration = Number(meta.duration ?? attrs.media_duration ?? 0);
+  // 会晚一拍；但 media_metadata.duration 可能仍是上一首的旧值。
+  // 时长优先用扁平 media_duration（HA 会随当前队列项更新），缺失才回退元数据。
+  const flatDuration = Number(attrs.media_duration ?? 0);
+  const metaDuration = Number(meta.duration ?? 0);
+  const duration = flatDuration > 0 ? flatDuration : metaDuration;
   let position = Number(attrs.media_position ?? 0);
   const updatedAt = attrs.media_position_updated_at;
   if (state?.state === "playing" && updatedAt) {
@@ -269,9 +272,9 @@ export function readMedia(state) {
     duration: Number.isFinite(duration) ? duration : 0,
     position: Number.isFinite(position) ? position : 0,
     art:
+      attrs.entity_picture ||
       meta.entity_picture ||
       meta.image_url ||
-      attrs.entity_picture ||
       attrs.media_image_url ||
       "",
     appName: attrs.app_name || "",

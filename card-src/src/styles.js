@@ -2597,10 +2597,10 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"] .hm-volume {
-      flex: 0 1 clamp(250px, 30cqi, 380px);
-      width: clamp(250px, 30cqi, 380px);
-      max-width: 380px;
-      min-width: 250px;
+      flex: 0 1 clamp(280px, 40cqi, 400px);
+      width: clamp(280px, 40cqi, 400px);
+      max-width: 400px;
+      min-width: 280px;
       min-height: 36px;
       margin: 0;
       padding: 4px 12px 4px 4px;

@@ -3563,6 +3563,14 @@ export const cardStyles = css`
   }
 
   /* 极小卡片：只保留必要按钮，收紧控件，避免顶栏与播放键溢出 */
+  /* 窄竖卡片：随机/循环键会让播放键挤出卡边，先隐藏这两个次要键 */
+  @container (max-width: 380px) {
+    .hm-transport .hm-btn[data-role="shuffle"],
+    .hm-transport .hm-btn[data-role="repeat"] {
+      display: none;
+    }
+  }
+
   @container (max-width: 330px) {
     .hm-card[data-layout="compact"] .hm-top .hm-status-text,
     .hm-card[data-layout="compact"] .hm-top .hm-kicker-sep {

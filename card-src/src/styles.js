@@ -3037,7 +3037,7 @@ export const cardStyles = css`
     }
 
     .hm-card[data-panel="true"]:has(.hm-controls.is-stacked) .hm-vis {
-      height: 40px;
+      display: none;
     }
   }
 

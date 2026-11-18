@@ -1526,8 +1526,11 @@ export const cardStyles = css`
       display: none;
     }
 
+    /* 极窄卡也保留音柱，只是压成一条细柱 */
     .hm-card[data-layout="full"] .hm-vis {
-      display: none;
+      display: flex;
+      height: 14px;
+      opacity: 0.8;
     }
 
   }
@@ -3653,6 +3656,7 @@ export const cardStyles = css`
     width: 100%;
   }
 
+  /* 横条高度太矮，音柱会挤掉歌名与进度，这里不显示；竖屏/桌面/小卡仍保留 */
   .hm-card[data-shape="banner"] .hm-vis,
   .hm-card[data-shape="banner"] .hm-tags,
   .hm-card[data-shape="banner"] .hm-kicker,

@@ -153,6 +153,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
+    this._artLoading = "";
     this._artFailedSource = "";
     this._artSeq = 0;
     this._artSlot = 0;
@@ -1657,6 +1658,40 @@ class HaMusicCard extends LitElement {
     this._guard(this._call("volume_mute", { is_volume_muted: !media.muted }));
   }
 
+  _volumeStep(delta) {
+    const info = this._volumeInfo(this._readMedia());
+    if (!info.supported) {
+      this._notify(translator(this._hass?.language)("volumeEntityMissing"));
+      return;
+    }
+    const from = this._volumePreview ?? info.level;
+    const volume = clamp(Number(from) + delta, 0, 1);
+    this._volumeCommitAt = Date.now();
+    this._volumePreview = volume;
+    if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
+    this._volumeSettleTimer = null;
+    this.requestUpdate();
+    setTimeout(() => {
+      if (this._volumePreview === volume) {
+        this._volumePreview = null;
+        this._syncRangeValues();
+        this.requestUpdate();
+      }
+    }, 1200);
+    if (info.domain === "media_player") {
+      this._guard(
+        this._call("volume_set", { volume_level: volume }, "media_player", info.entityId)
+      );
+    } else {
+      const state = this._hass?.states?.[info.entityId];
+      const max = Number(state?.attributes?.max ?? 100);
+      const min = Number(state?.attributes?.min ?? 0);
+      this._guard(
+        this._call("set_value", { value: Math.round(min + volume * (max - min)) }, info.domain, info.entityId)
+      );
+    }
+  }
+
   _selectSource(source) {
     this._menu = null;
     this._guard(this._call("select_source", { source }));
@@ -2565,7 +2600,6 @@ class HaMusicCard extends LitElement {
     const entityId = this._eid();
     this._syncArt(media, entityId);
     if (this._artUrl !== this._artApplied) {
-      this._artApplied = this._artUrl;
       this._crossFadeArt(card, this._artUrl);
     }
     this._syncRangeValues();
@@ -2923,6 +2957,7 @@ class HaMusicCard extends LitElement {
     this._artSource = artSource;
     this._artFailedSource = "";
     const seq = ++this._artSeq;
+    this._artLoading = "";
     if (!artSource) {
       this._artUrl = "";
       this._artApplied = "";
@@ -2934,6 +2969,10 @@ class HaMusicCard extends LitElement {
       if (url === this._artUrl) return;
       this._artUrl = url;
       this.requestUpdate();
+      // 不依赖下一次 updated()：新封面解析完成后立刻落到底层背景，
+      // 否则自动切歌/外部切歌时会出现“标题已换、背景仍是上一首”。
+      const card = this.renderRoot?.querySelector?.(".hm-card");
+      if (card) this._crossFadeArt(card, url);
     });
   }
 
@@ -2947,6 +2986,7 @@ class HaMusicCard extends LitElement {
     this._artFailedSource = this._artSource;
     this._artUrl = "";
     this._artApplied = "";
+    this._artLoading = "";
     const card = this.renderRoot?.querySelector?.(".hm-card");
     const layers = card?.querySelectorAll?.(".hm-bg-art") || [];
     layers.forEach((layer) => {
@@ -2961,10 +3001,9 @@ class HaMusicCard extends LitElement {
   _crossFadeArt(card, url) {
     const layers = card.querySelectorAll(".hm-bg-art");
     if (!layers.length) return;
-    const nextIndex = layers.length > 1 ? (this._artSlot + 1) % 2 : 0;
-    const next = layers[nextIndex];
-    const previous = layers[this._artSlot];
     if (!url) {
+      this._artLoading = "";
+      this._artApplied = "";
       layers.forEach((layer) => {
         layer.classList.remove("on");
         layer.style.backgroundImage = "";
@@ -2973,9 +3012,17 @@ class HaMusicCard extends LitElement {
       this._maybePalette("");
       return;
     }
+    if (url === this._artApplied || url === this._artLoading) return;
+    this._artLoading = url;
+    const nextIndex = layers.length > 1 ? (this._artSlot + 1) % 2 : 0;
+    const next = layers[nextIndex];
+    const previous = layers[this._artSlot];
     const image = new Image();
     image.decoding = "async";
     image.onload = () => {
+      if (this._artLoading !== url || this._artUrl !== url) return;
+      this._artLoading = "";
+      this._artApplied = url;
       next.style.backgroundImage = `url("${url}")`;
       next.classList.add("on");
       previous?.classList.remove("on");
@@ -2983,6 +3030,7 @@ class HaMusicCard extends LitElement {
       this._maybePalette(url);
     };
     image.onerror = () => {
+      if (this._artLoading === url) this._artLoading = "";
       this._onArtError();
     };
     image.src = url;
@@ -3789,6 +3837,14 @@ class HaMusicCard extends LitElement {
                   >
                     ${icon(volume.muted ? "mute" : "volume", 16)}
                   </button>
+                  <button
+                    class="hm-icon-btn hm-vol-step"
+                    aria-label=${t("volumeDown")}
+                    title=${t("volumeDown")}
+                    @click=${() => this._volumeStep(-0.05)}
+                  >
+                    ${icon("minus", 16)}
+                  </button>
                   <input
                     class="hm-range"
                     data-role="volume"
@@ -3802,6 +3858,14 @@ class HaMusicCard extends LitElement {
                     @change=${this._onVolumeCommit}
                     aria-label=${t("volume")}
                   />
+                  <button
+                    class="hm-icon-btn hm-vol-step"
+                    aria-label=${t("volumeUp")}
+                    title=${t("volumeUp")}
+                    @click=${() => this._volumeStep(0.05)}
+                  >
+                    ${icon("plus", 16)}
+                  </button>
                   <span class="hm-vol-pct">${volumePercent}%</span>
                 </div>`
               : nothing}

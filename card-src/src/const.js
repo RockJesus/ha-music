@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.3.1";
+export const CARD_VERSION = "2.3.2";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -127,6 +127,8 @@ const EN = {
   previous: "Previous track",
   next: "Next track",
   volume: "Volume",
+  volumeUp: "Volume up",
+  volumeDown: "Volume down",
   mute: "Mute",
   unmute: "Unmute",
   shuffle: "Shuffle",
@@ -185,6 +187,8 @@ const ZH = {
   previous: "上一首",
   next: "下一首",
   volume: "音量",
+  volumeUp: "增大音量",
+  volumeDown: "减小音量",
   mute: "静音",
   unmute: "取消静音",
   shuffle: "随机播放",

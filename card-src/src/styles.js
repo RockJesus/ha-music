@@ -931,7 +931,7 @@ export const cardStyles = css`
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 0 1 220px;
+    flex: 0 1 clamp(250px, 30cqi, 380px);
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
@@ -939,6 +939,11 @@ export const cardStyles = css`
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.07);
     background: rgba(255, 255, 255, 0.045);
+  }
+
+  .hm-volume .hm-vol-step {
+    width: 30px;
+    height: 30px;
   }
 
   .hm-volume .hm-icon-btn {
@@ -1318,6 +1323,11 @@ export const cardStyles = css`
   .hm-card[data-layout="compact"] .hm-volume {
     margin-left: auto;
     flex: 0 1 150px;
+  }
+
+  .hm-card[data-layout="compact"] .hm-volume .hm-vol-pct,
+  .hm-card[data-layout="compact"] .hm-volume .hm-vol-step {
+    display: none;
   }
 
   .hm-card[data-layout="compact"] .hm-btn {
@@ -1916,9 +1926,14 @@ export const cardStyles = css`
       height: 46px;
     }
 
+    .hm-volume .hm-vol-step {
+      width: 38px;
+      height: 38px;
+    }
+
     .hm-volume {
       gap: 8px;
-      flex: 0 1 230px;
+      flex: 0 1 clamp(250px, 30cqi, 380px);
     }
 
     .hm-volume .hm-range::-webkit-slider-runnable-track {
@@ -2572,22 +2587,25 @@ export const cardStyles = css`
     }
   }
 
-  /* 宽屏音量与手机端保持一致：整行铺开、无胶囊底色，细轨道 + 主题光效滑块。 */
+  /* 宽屏：音量紧跟在播放控件之后，长度随卡片宽度自适应，不再独占一整行。 */
   @container (min-width: 821px) {
     .hm-card[data-panel="true"] .hm-controls {
-      flex-wrap: wrap;
-      gap: 10px;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      align-items: center;
+      gap: clamp(10px, 2.2cqi, 24px);
     }
 
     .hm-card[data-panel="true"] .hm-volume {
-      flex: 1 1 100%;
-      width: 100%;
-      max-width: 100%;
+      flex: 0 1 clamp(250px, 30cqi, 380px);
+      width: clamp(250px, 30cqi, 380px);
+      max-width: 380px;
+      min-width: 250px;
       min-height: 36px;
       margin: 0;
-      padding: 0 2px 0 0;
-      border: none;
-      background: transparent;
+      padding: 4px 12px 4px 4px;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(255, 255, 255, 0.045);
       box-sizing: border-box;
     }
 
@@ -2595,6 +2613,11 @@ export const cardStyles = css`
       width: 40px;
       height: 40px;
       border-radius: 50%;
+    }
+
+    .hm-card[data-panel="true"] .hm-volume .hm-vol-step {
+      width: 32px;
+      height: 32px;
     }
 
     .hm-card[data-panel="true"] .hm-volume .hm-range {

@@ -106,8 +106,8 @@ function formatEntityState(state) {
   }
 }
 
-const QUEUE_WINDOW_BEFORE = 80;
-const QUEUE_WINDOW_SIZE = 260;
+const QUEUE_WINDOW_BEFORE = 40;
+const QUEUE_WINDOW_SIZE = 120;
 
 class HaMusicCard extends LitElement {
   static get styles() {

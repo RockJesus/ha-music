@@ -1002,6 +1002,8 @@ class HaMusicCard extends LitElement {
       maxSize: 1200,
       target: cover,
       applyShadow: false,
+      maxFps: this._isMobileUi() ? 30 : 0,
+      dpr: this._isMobileUi() ? 1.5 : 2,
       accent,
       title: first(media.title),
       artist: first(media.artist),
@@ -2965,6 +2967,7 @@ class HaMusicCard extends LitElement {
     if (this._progressRaf) cancelAnimationFrame(this._progressRaf);
     this._progressRaf = null;
     this._progressLastSecond = -1;
+    this._progressPaintAt = 0;
   }
 
   _syncProgressTicker() {
@@ -3005,6 +3008,12 @@ class HaMusicCard extends LitElement {
     }
     const position = clamp(Number(media.position) || 0, 0, duration);
     const percent = clamp((position / duration) * 100, 0, 100);
+    const paintNow = performance.now();
+    if (this._isMobileUi() && this._progressPaintAt && paintNow - this._progressPaintAt < 32) {
+      this._progressRaf = requestAnimationFrame(() => this._progressTick());
+      return;
+    }
+    this._progressPaintAt = paintNow;
     // 只更新进度条本身，不触发整卡重绘；播放时按帧推进，拖动时由用户接管。
     seek.value = String(position);
     seek.style.setProperty("--pct", `${percent}%`);
@@ -3846,6 +3855,7 @@ class HaMusicCard extends LitElement {
     if (this._spectrumRaf) cancelAnimationFrame(this._spectrumRaf);
     this._spectrumRaf = null;
     this._spectrumLast = 0;
+    this._spectrumPaintAt = 0;
   }
 
   _spectrumPlaying() {
@@ -4295,7 +4305,10 @@ class HaMusicCard extends LitElement {
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
     if (!width || !height) return false;
-    const dpr = Math.min(2, Math.max(1, Number(window.devicePixelRatio) || 1));
+    const dpr = Math.min(
+      this._isMobileUi() ? 1.5 : 2,
+      Math.max(1, Number(window.devicePixelRatio) || 1)
+    );
     const pixelWidth = Math.round(width * dpr);
     const pixelHeight = Math.round(height * dpr);
     if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
@@ -4303,7 +4316,9 @@ class HaMusicCard extends LitElement {
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     this._spectrumCanvas = canvas;
-    this._spectrumCtx = canvas.getContext("2d");
+    const nextCtx = canvas.getContext("2d");
+    if (nextCtx !== this._spectrumCtx) this._spectrumGrad = null;
+    this._spectrumCtx = nextCtx;
     this._spectrumCssW = width;
     this._spectrumCssH = height;
     this._spectrumDpr = dpr;
@@ -4330,17 +4345,24 @@ class HaMusicCard extends LitElement {
     const barWidth = Math.max(1, cell - gap);
     const radius = Math.min(1.5, barWidth / 2);
     const accent = this._spectrumAccent();
-    const grad = ctx.createLinearGradient(0, 0, width, 0);
-    grad.addColorStop(0, accent[0]);
-    grad.addColorStop(1, accent[1]);
-    ctx.fillStyle = grad;
+    const mobile = this._isMobileUi();
+    const gradKey = `${accent[0]}|${accent[1]}|${width}`;
+    if (!this._spectrumGrad || this._spectrumGradKey !== gradKey) {
+      const grad = ctx.createLinearGradient(0, 0, width, 0);
+      grad.addColorStop(0, accent[0]);
+      grad.addColorStop(1, accent[1]);
+      this._spectrumGrad = grad;
+      this._spectrumGradKey = gradKey;
+    }
+    ctx.fillStyle = this._spectrumGrad;
+    if (mobile) ctx.globalAlpha = idle ? 0.5 : 0.84;
     for (let index = 0; index < count; index += 1) {
       const level = clamp(Number(levels[index]) || 0, 0.02, 1);
       const barHeight = Math.max(2, level * height);
       const x = index * cell + (cell - barWidth) / 2;
       const y = height - barHeight;
-      ctx.globalAlpha = idle ? 0.5 : 0.58 + level * 0.36;
-      if (typeof ctx.roundRect === "function" && barWidth >= 3) {
+      if (!mobile) ctx.globalAlpha = idle ? 0.5 : 0.58 + level * 0.36;
+      if (!mobile && typeof ctx.roundRect === "function" && barWidth >= 3) {
         ctx.beginPath();
         ctx.roundRect(x, y, barWidth, barHeight, [radius, radius, 0, 0]);
         ctx.fill();
@@ -4575,6 +4597,12 @@ class HaMusicCard extends LitElement {
         return;
       }
     }
+    // 手机端 30fps 足够表现频谱律动；屏幕 90/120Hz 时不做上限会成倍放大合成开销。
+    if (this._isMobileUi() && this._spectrumPaintAt && now - this._spectrumPaintAt < 32) {
+      this._spectrumRaf = requestAnimationFrame((nextNow) => this._spectrumTick(nextNow));
+      return;
+    }
+    this._spectrumPaintAt = now;
     const dt = this._spectrumLast
       ? Math.min(0.05, Math.max(0.001, (now - this._spectrumLast) / 1000))
       : 0.016;

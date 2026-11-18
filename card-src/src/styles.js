@@ -3247,4 +3247,34 @@ export const cardStyles = css`
       animation: none !important;
     }
   }
+
+  /* 手机端性能模式：WebView 上多层 backdrop-filter + 全卡动画网格会逐帧重算合成，
+     是手机 HA App 卡顿的主要来源。手机上改为不透明底色、静态网格，保留视觉层次。 */
+  @media (max-width: 700px) {
+    .hm-grid {
+      animation: none !important;
+    }
+
+    .hm-noise {
+      display: none;
+    }
+
+    .hm-bg-art {
+      filter: brightness(0.5) saturate(1.35);
+    }
+
+    .hm-icon-btn,
+    .hm-btn,
+    .hm-entity-chip,
+    .hm-cover-eq-glow {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    .hm-entity-eq i,
+    .hm-entity-chip[data-playing="true"]::after,
+    .hm-dot {
+      animation: none !important;
+    }
+  }
 `;

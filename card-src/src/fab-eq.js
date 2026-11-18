@@ -39,15 +39,17 @@ function paint(canvas, bars, glow) {
   const { ctx } = state;
   const size = state.size || SIZE;
   const r0 = state.r0 || 33.5;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const dpr = state.dpr || DPR;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, size, size);
   const R = size / 2;
   const maxLen = Math.max(4, R - r0 - 3);
   const accent = state.accent || FALLBACK_ACCENT;
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
+  const glowOn = state.applyShadow !== false;
   ctx.lineCap = state.cap || "round";
-  ctx.shadowBlur = 5 + glow * 7;
+  ctx.shadowBlur = glowOn ? 5 + glow * 7 : 0;
 
   for (let i = 0; i < barCount; i += 1) {
     const v = clamp(bars[i] || 0, 0, 1);
@@ -73,7 +75,7 @@ function paint(canvas, bars, glow) {
       ctx.strokeStyle = `rgba(255, 255, 255, ${((0.05 + v * 0.24) * core).toFixed(2)})`;
       ctx.lineWidth = 1.1;
       ctx.stroke();
-      ctx.shadowBlur = 5 + glow * 7;
+      ctx.shadowBlur = glowOn ? 5 + glow * 7 : 0;
     }
   }
   ctx.shadowBlur = 0;
@@ -84,7 +86,8 @@ function clear(canvas) {
   const state = states.get(canvas);
   if (!state?.ctx) return;
   const size = state.size || SIZE;
-  state.ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const dpr = state.dpr || DPR;
+  state.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   state.ctx.clearRect(0, 0, size, size);
 }
 
@@ -114,6 +117,13 @@ function frame(canvas, now) {
     state.playing = false;
     return;
   }
+  // 手机 WebView 上按 30fps 出帧即可，省掉一半合成开销；桌面保持原刷新率。
+  const minGap = state.maxFps ? 1000 / state.maxFps : 0;
+  if (minGap && state.lastPaint && now - state.lastPaint < minGap) {
+    state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
+    return;
+  }
+  state.lastPaint = now;
 
   const t = state.position + Math.max(0, now - state.since) / 1000;
   const angle = (t / state.period) * Math.PI * 2 + state.phase;
@@ -208,6 +218,9 @@ export function syncFabEq(canvas, root, media = {}) {
       r0: 33.5,
       lineWidth: 3,
       cap: "round",
+      dpr: DPR,
+      maxFps: 0,
+      lastPaint: 0,
       target: null,
       applyShadow: true,
       playing: false,
@@ -249,9 +262,12 @@ export function syncFabEq(canvas, root, media = {}) {
   state.target = media.target || null;
   state.bands = Array.isArray(media.bands) && media.bands.length ? media.bands : null;
   state.applyShadow = media.applyShadow !== false;
-  if (canvas.width !== Math.round(size * DPR)) {
-    canvas.width = Math.round(size * DPR);
-    canvas.height = Math.round(size * DPR);
+  state.maxFps = Math.max(0, Number(media.maxFps) || 0);
+  const dpr = Math.min(2, Math.max(1, Number(media.dpr) || DPR));
+  state.dpr = dpr;
+  if (canvas.width !== Math.round(size * dpr)) {
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
   }
 
   if (state.clearTimer) {
@@ -261,7 +277,11 @@ export function syncFabEq(canvas, root, media = {}) {
   state.root = root || state.root;
 
   const playing = !!media.playing;
-  const visible = media.visible !== false;
+  // 手机端 FAB 被 CSS 隐藏后组件仍会收到 hass 更新；这里以真实盒尺寸判定，
+  // 避免隐藏的 300px 画布继续逐帧做 shadowBlur 描边。
+  const domVisible =
+    typeof canvas.getClientRects === "function" ? canvas.getClientRects().length > 0 : true;
+  const visible = media.visible !== false && domVisible;
   const wasPlaying = state.playing;
   const position = Number(media.position);
   if (Number.isFinite(position) && position >= 0) {
@@ -288,6 +308,7 @@ export function syncFabEq(canvas, root, media = {}) {
   if (!state.raf) {
     setBeat(state.root, 1, 0, state.accent, state.target, state.applyShadow);
     state.since = performance.now();
+    state.lastPaint = 0;
     state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
   }
 }

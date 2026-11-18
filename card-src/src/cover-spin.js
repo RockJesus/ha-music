@@ -26,6 +26,13 @@ function start(element, state) {
       state.raf = null;
       return;
     }
+    // 手机端封面旋转降到 30fps，避免每帧都写 transform 触发样式重算。
+    const minGap = window.innerWidth <= 700 ? 32 : 0;
+    if (minGap && state.lastPaint && now - state.lastPaint < minGap) {
+      state.raf = window.requestAnimationFrame(tick);
+      return;
+    }
+    state.lastPaint = now;
     if (!state.last) state.last = now;
     const delta = Math.min(0.1, (now - state.last) / 1000);
     state.last = now;
@@ -70,7 +77,7 @@ export function syncCoverSpin(element, playing) {
   if (!element) return;
   let state = states.get(element);
   if (!state) {
-    state = { angle: 0, playing: false, raf: null, last: 0, resetTimer: null };
+    state = { angle: 0, playing: false, raf: null, last: 0, lastPaint: 0, resetTimer: null };
     states.set(element, state);
   }
   if (reducedMotion()) {

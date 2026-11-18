@@ -2615,15 +2615,18 @@ class HaMusicCard extends LitElement {
     const mainH = Math.round(main.clientHeight || 0);
     const mainW = Math.round(main.clientWidth || 0);
     if (mainH < 80 || mainW < 80) return;
-    const stack = card.clientWidth < 820;
+    const cardW = Math.round(card.clientWidth || 0);
     const cardH = Math.round(card.clientHeight || 0);
+    // 竖屏/近方形卡片统一走上中下堆叠。只看宽度会漏掉 820~1024 的平板竖屏：
+    // 封面按宽屏尺寸撑高主区，底部进度/控制/音量会被挤出卡片。
+    const stack = cardW < 820 || cardH > cardW * 1.15;
     let size;
     if (stack) {
       // 窄屏/竖屏：封面在上、信息在下。手机面板不再让封面吃掉大半屏，
-      // 宽度上限约 58%，高度按整卡高度的 30% 封顶，给标题/频谱/进度留空间。
+      // 宽度上限约 58%/66%，高度按整卡高度的 30% 封顶，给标题/频谱/进度留空间。
       const narrow = mainW < 560;
-      const widthRatio = narrow ? 0.58 : 0.68;
-      const heightBudget = cardH * (narrow ? 0.3 : 0.45);
+      const widthRatio = narrow ? 0.58 : 0.66;
+      const heightBudget = cardH * 0.3;
       size = Math.max(120, Math.min(mainW * widthRatio, heightBudget));
     } else {
       // 宽屏：封面不再吃满主区高度，预留 96px 给封面外圈音柱和底部频谱，

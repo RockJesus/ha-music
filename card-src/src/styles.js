@@ -2588,7 +2588,7 @@ export const cardStyles = css`
   }
 
   /* 宽屏：音量紧跟在播放控件之后，长度随卡片宽度自适应，不再独占一整行。 */
-  @container (min-width: 821px) {
+  @container (min-width: 680px) {
     .hm-card[data-panel="true"] .hm-controls {
       flex-wrap: nowrap;
       justify-content: flex-start;

@@ -3927,4 +3927,39 @@ export const cardStyles = css`
   .hm-card[data-panel="true"] .hm-controls {
     max-width: none;
   }
+
+  /* ---------- 窄屏/竖屏面板：封面与信息一起装进主区 ----------
+     主区吃剩余高度，封面按剩余高度收缩；否则封面占满主区后，歌手名与
+     规格行会被 .hm-main 的 overflow 裁掉，又被频谱画布压住。
+     用 hm-narrow-panel 显式类（JS 在 _fitPanel 里加）而不是容器查询，
+     避免被后置的面板规则盖回 height:100%。 */
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(10px, 3cqi, 18px);
+  }
+
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-cover-wrap {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+  }
+
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-cover {
+    width: min(86%, var(--hm-panel-cover, calc(100dvh - 460px)), 340px);
+    height: auto;
+    max-height: 100%;
+    margin: 0 auto;
+  }
+
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-info {
+    min-height: 0;
+    flex: 0 0 auto;
+  }
 `;

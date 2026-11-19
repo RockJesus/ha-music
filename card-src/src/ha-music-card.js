@@ -3314,18 +3314,31 @@ class HaMusicCard extends LitElement {
       // 上限从 460 放到 680，桌面/平板横屏才不会出现"一小坨内容 + 大片空白"。
       size = Math.max(120, Math.min(mainH - 40, mainW * 0.36, 680));
     }
-    this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
-    // 窄屏/竖屏面板：封面容器直接按封面尺寸收口，信息区不参与收缩。
-    // 只靠 CSS 时会被后置的 height:100% 盖回，导致标题/歌手/规格被主区 overflow 裁掉。
+    // 窄屏/竖屏面板：信息区先按真实高度预留，再定封面。
+    // 只靠 CSS 会被后置的 height:100% 盖回，标题/歌手/规格被 .hm-main 的
+    // overflow 裁掉；只按固定 infoBudget 又会在 375×667 这类矮屏留不够。
     const wrap = this.renderRoot?.querySelector?.(".hm-cover-wrap");
     const info = this.renderRoot?.querySelector?.(".hm-info");
+    const ringPad = 10;
+    if (stack && !shortLandscape && info) {
+      const infoH = Math.round(info.offsetHeight || 0);
+      const rowGap = Math.round(parseFloat(getComputedStyle(main).rowGap) || 0);
+      const available = mainH - infoH - rowGap - 2;
+      if (available > 90) {
+        size = Math.min(size, Math.max(84, available - ringPad));
+      }
+    }
+    this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
     if (stack && !shortLandscape) {
-      if (wrap) wrap.style.height = `${Math.round(size)}px`;
+      // 环形音柱跟随实际封面尺寸，窄屏压到 10px 外扩，避免被容器裁掉。
+      this.style.setProperty("--hm-cover-size", `${Math.round(size)}px`);
+      if (wrap) wrap.style.height = `${Math.round(size) + ringPad}px`;
       if (info) {
         info.style.flex = "0 0 auto";
         info.style.minHeight = "0";
       }
     } else if (wrap) {
+      this.style.setProperty("--hm-cover-size", `${this._coverPx(this._layoutKey())}px`);
       wrap.style.removeProperty("height");
       if (info) {
         info.style.removeProperty("flex");

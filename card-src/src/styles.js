@@ -389,8 +389,8 @@ export const cardStyles = css`
     left: 50%;
     top: 50%;
     z-index: 1;
-    width: calc(var(--hm-cover-size, 168px) + 48px);
-    height: calc(var(--hm-cover-size, 168px) + 48px);
+    width: calc(var(--hm-cover-size, 168px) + var(--hm-ring-pad, 48px));
+    height: calc(var(--hm-cover-size, 168px) + var(--hm-ring-pad, 48px));
     translate: -50% -50%;
     pointer-events: none;
     opacity: 0;
@@ -486,9 +486,11 @@ export const cardStyles = css`
   }
 
   .hm-kicker {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: block;
+    max-width: 100%;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
     min-height: 14px;
     font-size: 10.5px;
     font-weight: 650;
@@ -3943,6 +3945,10 @@ export const cardStyles = css`
     gap: clamp(10px, 3cqi, 18px);
   }
 
+  .hm-card.hm-narrow-panel[data-panel="true"] {
+    --hm-ring-pad: 10px;
+  }
+
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-cover-wrap {
     width: 100%;
     height: auto;
@@ -3959,8 +3965,17 @@ export const cardStyles = css`
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-info {
+    width: min(92%, 560px);
     min-height: 0;
     flex: 0 0 auto;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-meta {
+    width: 100%;
+    align-items: center;
+    text-align: center;
   }
 
   /* 矮屏竖排面板：优先保住标题/歌手/规格，隐藏标签与当前歌词行。 */

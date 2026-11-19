@@ -136,7 +136,7 @@ export function pickLrclibResult(results, media = {}) {
     if (wantArtist && itemArtist) {
       if (itemArtist === wantArtist) score += 45;
       else if (itemArtist.includes(wantArtist) || wantArtist.includes(itemArtist)) score += 32;
-      else score -= 8;
+      else score -= 80;
     }
     const itemDuration = Number(item.duration) || 0;
     if (wantDuration && itemDuration) {
@@ -154,6 +154,6 @@ export function pickLrclibResult(results, media = {}) {
   }
 
   // 歌名完全对不上时宁可不用，避免把另一首歌的歌词投到当前曲目上。
-  if (best && wantTitle && bestScore < 40) return null;
+  if (best && wantTitle && bestScore < 120) return null;
   return best;
 }

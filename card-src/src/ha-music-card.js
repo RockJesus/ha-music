@@ -762,8 +762,13 @@ class HaMusicCard extends LitElement {
     const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
     const cleanTitle = this._cleanLyricsQuery(rawTitle);
     const cleanArtist = this._cleanLyricsQuery(rawArtist);
+    // 多歌手用 “/”“&” 串起来时整串搜索几乎必然匹配不上，取第一位歌手再试一次。
+    const firstArtist = String(cleanArtist)
+      .split(/\s*[/&、,，]\s*|\s+feat\.?\s+|\s+ft\.?\s+/i)[0]
+      .trim();
     const list = [
       { title: cleanTitle || rawTitle, artist: cleanArtist },
+      { title: cleanTitle || rawTitle, artist: firstArtist },
       { title: cleanTitle || rawTitle, artist: "" },
       { title: rawTitle, artist: rawArtist },
     ];
@@ -798,15 +803,37 @@ class HaMusicCard extends LitElement {
         url.searchParams.set("artist", query.artist || "");
         const lyricSource = this._lyricsSource();
         if (lyricSource !== "auto") url.searchParams.set("source", lyricSource);
-        const response = await fetch(url.toString(), {
-          signal,
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          credentials: "same-origin",
-        });
+        // 后端卡死不能拖垮整条链，单次请求 10s 就放弃、交给下一级歌词源。
+        const local = new AbortController();
+        const onAbort = () => local.abort();
+        if (signal) {
+          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+          signal.addEventListener("abort", onAbort, { once: true });
+        }
+        const timer = setTimeout(() => local.abort(), 10000);
+        let response;
+        try {
+          response = await fetch(url.toString(), {
+            signal: local.signal,
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            credentials: "same-origin",
+          });
+        } catch (fetchError) {
+          if (fetchError?.name === "AbortError") {
+            if (signal?.aborted) throw fetchError;
+            lastError = new Error("歌词后端超时");
+            if (attempt < 2) continue;
+            break;
+          }
+          throw fetchError;
+        } finally {
+          clearTimeout(timer);
+          if (signal) signal.removeEventListener("abort", onAbort);
+        }
         if (response.status === 401 && attempt < 2) {
           await this._refreshLyricsToken();
           await new Promise((resolve) => setTimeout(resolve, 500));
@@ -919,6 +946,9 @@ class HaMusicCard extends LitElement {
     searches.push({
       q: [rawTitle, cleanArtist || rawArtist].filter(Boolean).join(" "),
     });
+    // 最后再退到「只按歌名」搜一次：多歌手/翻译名场景里歌手串常常匹配不上，
+    // 由 pickLrclibResult 的歌名投票把关，仍能挡掉明显的别歌。
+    if (cleanTitle) searches.push({ q: cleanTitle });
     let lastError = null;
     for (const params of searches) {
       try {
@@ -1005,6 +1035,100 @@ class HaMusicCard extends LitElement {
       return null;
     }
     return parsed;
+  }
+
+  // 可选的第四条通道：用户自己的歌词接口（HA 里的 REST 端点或任意在线服务）。
+  // 支持 {title}/{artist} 占位符；返回 JSON 里取 lyrics / lrc / data 任一字段。
+  _lyricsCustomUrl() {
+    const value = this._config?.lyrics_api;
+    return typeof value === "string" && value.trim() ? value.trim() : "";
+  }
+
+  async _fetchJsonWithTimeout(url, signal, ms = 8000) {
+    const local = new AbortController();
+    const onAbort = () => local.abort();
+    if (signal) {
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    const timer = setTimeout(() => local.abort(), ms);
+    try {
+      const response = await fetch(url, {
+        signal: local.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        if (signal?.aborted) throw error;
+        return null; // 单次超时：交给下一级
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onAbort);
+    }
+  }
+
+  async _requestCustomLyrics(query, signal) {
+    const template = this._lyricsCustomUrl();
+    if (!template) return null;
+    const build = (tpl) => {
+      if (/\{(title|artist)\}/.test(tpl)) {
+        return tpl
+          .replace(/\{title\}/g, encodeURIComponent(query.title || ""))
+          .replace(/\{artist\}/g, encodeURIComponent(query.artist || ""));
+      }
+      const url = new URL(tpl, window.location.origin);
+      url.searchParams.set("title", query.title || "");
+      if (query.artist) url.searchParams.set("artist", query.artist);
+      return url.toString();
+    };
+    const data = await this._fetchJsonWithTimeout(build(template), signal, 8000);
+    const raw = data?.lyrics || data?.lrc || data?.data;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+    const parsed = parseLyrics(raw);
+    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) return null;
+    return { parsed, source: "自定义接口" };
+  }
+
+  // 酷狗歌词是公开接口，LRCLIB 没收录的中文歌命中率明显更高。
+  async _requestKugouLyrics(media, query, signal) {
+    const title = query?.title || "";
+    if (!title) return null;
+    const keyword = [title, query?.artist || ""].filter(Boolean).join(" - ");
+    const duration = Math.round((Number(media?.duration) || 0) * 1000);
+    const searchUrl =
+      "https://lyrics.kugou.com/search?ver=1&man=yes&client=pc" +
+      `&keyword=${encodeURIComponent(keyword)}` +
+      (duration ? `&duration=${duration}` : "") +
+      "&hash=";
+    const search = await this._fetchJsonWithTimeout(searchUrl, signal, 8000);
+    const candidates = Array.isArray(search?.candidates) ? search.candidates : [];
+    for (const item of candidates.slice(0, 2)) {
+      if (!item?.id || !item?.accesskey) continue;
+      const downloadUrl =
+        "https://lyrics.kugou.com/download?ver=1&client=pc" +
+        `&id=${encodeURIComponent(item.id)}` +
+        `&accesskey=${encodeURIComponent(item.accesskey)}` +
+        "&fmt=lrc&charset=utf8";
+      const data = await this._fetchJsonWithTimeout(downloadUrl, signal, 8000);
+      const base64 = data?.content;
+      if (typeof base64 !== "string" || !base64.trim()) continue;
+      let text = "";
+      try {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        text = new TextDecoder("utf-8").decode(bytes);
+      } catch {
+        continue;
+      }
+      const parsed = parseLyrics(text);
+      if (!parsed.lines.length && !parsed.plain.length) continue;
+      return { parsed, source: "酷狗" };
+    }
+    return null;
   }
 
   _lyricsKeyFor(media) {
@@ -1138,62 +1262,78 @@ class HaMusicCard extends LitElement {
       const backendMissing =
         this._lyricsBackendMissingAt &&
         Date.now() - this._lyricsBackendMissingAt < 10 * 60 * 1000;
+      // 逐级兜底：后端(QQ/网易云) → 自定义接口 → LRCLIB → 酷狗 → Lyrics.ovh。
+      // 每一级都独立超时、失败只记录不阻断；先同步歌词后纯文本，尽量拿到能滚动的版。
+      const queries = this._lyricsQueries(media);
+      const lrQuery = queries[0];
+      const tried = [];
+      const accept = (result) => {
+        if (controller.signal.aborted || key !== this._lyricsKey) return false;
+        if (!result) return false;
+        this._setLyrics(key, result.parsed, result.source);
+        return true;
+      };
+
       if (source !== "lrclib" && !backendMissing) {
-        for (const query of this._lyricsQueries(media)) {
+        searched: for (const query of queries) {
           if (controller.signal.aborted || key !== this._lyricsKey) return;
           try {
             const result = await this._requestNeteaseLyrics(query, controller.signal);
-            if (controller.signal.aborted || key !== this._lyricsKey) return;
-            if (result) {
-              this._setLyrics(key, result.parsed, result.source);
-              return;
-            }
-            if (this._lyricsBackendMissingAt) break;
+            if (accept(result)) return;
+            if (this._lyricsBackendMissingAt) break searched;
           } catch (error) {
             if (error?.name === "AbortError") throw error;
             lastError = error;
           }
         }
+        tried.push("后端");
       }
 
-      // QQ/网易云后端不可用（例如 netease_lyrics 集成缺失）时回退到 LRCLIB。
-      // 只跑一次：LRCLIB 内部已带清洗标题/原始标题/歌手三种检索策略。
-      const lrQuery = this._lyricsQueries(media)[0];
+      if (this._lyricsCustomUrl()) {
+        try {
+          if (accept(await this._requestCustomLyrics(lrQuery, controller.signal))) return;
+        } catch (error) {
+          if (error?.name === "AbortError") throw error;
+          lastError = error;
+        }
+        tried.push("自定义接口");
+      }
+
       if (lrQuery) {
         try {
-          const result = await this._requestLrclibLyrics(media, lrQuery, controller.signal);
-          if (controller.signal.aborted || key !== this._lyricsKey) return;
-          if (result) {
-            this._setLyrics(key, result.parsed, result.source);
-            return;
-          }
+          if (accept(await this._requestLrclibLyrics(media, lrQuery, controller.signal))) return;
         } catch (error) {
           if (error?.name === "AbortError") throw error;
           lastError = error;
         }
+        tried.push("LRCLIB");
       }
 
-      // LRCLIB 没有收录时，再用 Lyrics.ovh 的纯文本歌词兜底；自动模式才启用。
       if (source === "auto" || source === "") {
         try {
-          const result = await this._requestLyricsOvh(media, lrQuery, controller.signal);
-          if (controller.signal.aborted || key !== this._lyricsKey) return;
-          if (result) {
-            this._setLyrics(key, result.parsed, result.source);
-            return;
-          }
+          if (accept(await this._requestKugouLyrics(media, lrQuery, controller.signal))) return;
         } catch (error) {
           if (error?.name === "AbortError") throw error;
           lastError = error;
         }
+        tried.push("酷狗");
+
+        try {
+          if (accept(await this._requestLyricsOvh(media, lrQuery, controller.signal))) return;
+        } catch (error) {
+          if (error?.name === "AbortError") throw error;
+          lastError = error;
+        }
+        tried.push("Lyrics.ovh");
       }
+
       if (key !== this._lyricsKey) return;
       this._lyrics = {
         status: lastError ? "error" : "none",
         lines: [],
         plain: [],
         instrumental: false,
-        source: "歌词接口",
+        source: lastError ? "歌词接口" : `已试 ${tried.join("/") || "无来源"}`,
       };
       if (lastError) this._scheduleLyricsRetry(key);
       this.requestUpdate();

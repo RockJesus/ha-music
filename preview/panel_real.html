@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>HA Music · music view replay</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #05060a; }
+      hui-panel-view { display: block; position: fixed; inset: 0; }
+      ha-music { display: block; height: 100%; }
+    </style>
+    <script type="module" src="../ha-music.js?v=real7"></script>
+  </head>
+  <body>
+    <hui-panel-view id="view"></hui-panel-view>
+    <script type="module">
+      const FEATURES = 8320575;
+      const art = "art/cover-cyber-720.jpg";
+      function st(id, name, title, artist, album, state, extra = {}) {
+        return [id, {
+          entity_id: id,
+          state,
+          attributes: Object.assign({
+            friendly_name: name,
+            media_title: title,
+            media_artist: artist,
+            media_album_name: album,
+            entity_picture: art,
+            media_duration: 183,
+            media_position: 70,
+            media_position_updated_at: new Date(Date.now() - 2000).toISOString(),
+            volume_level: 0.46,
+            is_volume_muted: false,
+            mass_player_type: "player",
+            supported_features: FEATURES,
+            source: "QQ音乐",
+            source_list: ["QQ音乐", "本地媒体"],
+            sound_mode: "Music",
+            sound_mode_list: ["Music", "Night"],
+          }, extra),
+        }];
+      }
+      const states = Object.fromEntries([
+        st("media_player.mapc", "MApc", "The Cello Song (巴赫：大提琴组曲) (Live)", "Johann Sebastian Bach/The Piano Guys/Steven Sharp Nelson", "The Cello Song", "playing"),
+        st("media_player.rockjesuspc", "ROCKJESUSPC", "MOVING ON", "JP THE WAVY", "MOVING ON", "idle"),
+        st("media_player.hass", "Home Assistant", "Light Ones", "Sarah", "Light Ones", "paused"),
+      ]);
+
+      const queue = {
+        response: {
+          "media_player.mapc": {
+            queue_id: "q",
+            items: 363,
+            current_index: 1,
+            current_item: { media_item: { media_type: "track", name: "The Cello Song" , stream_details: { provider: "qqmusic", content_type: "flac", sample_rate: 192000, bit_depth: 24, bit_rate: 0 } } },
+          },
+        },
+      };
+
+      const hass = {
+        language: "zh-Hans",
+        states,
+        services: { music_assistant: { play_media: {} } },
+        panels: { "b93b5321_music_assistant": { url_path: "b93b5321_music_assistant", title: "Music Assistant" } },
+        hassUrl: (p) => p,
+        callService: async () => ({ context: { id: "p" } }),
+        callWS: async (msg) => (msg?.domain === "music_assistant" && msg?.service === "get_queue" ? queue : { response: {} }),
+        connection: {
+          sendMessagePromise: async (msg) =>
+            msg?.domain === "music_assistant" && msg?.service === "get_queue" ? queue : { title: "root", children: [] },
+        },
+      };
+
+      const card = document.createElement("ha-music");
+      card.hass = hass;
+      card.setConfig({
+        type: "custom:ha-music",
+        theme: "cyber",
+        entities: ["media_player.mapc", "media_player.rockjesuspc", "media_player.hass"],
+        show_group: true,
+      });
+      document.getElementById("view").appendChild(card);
+      window.__card = card;
+      const mm = document.createElement("div");
+      mm.id = "mm";
+      mm.style.display = "none";
+      document.body.appendChild(mm);
+      setTimeout(() => {
+        const root = card.shadowRoot || card.renderRoot;
+        const r = (el) => (el ? `${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}` : "-");
+        mm.textContent = JSON.stringify({
+          card: r(root?.querySelector(".hm-card")),
+          spec: root?.querySelector(".hm-spec")?.textContent?.trim() || "",
+          specBox: r(root?.querySelector(".hm-spec")),
+          specObj: JSON.stringify(card._audioSpec || null),
+          isMa: card._isMaPlayer ? card._isMaPlayer() : "-",
+          eid: card._eid ? card._eid() : "-",
+          layout: root?.querySelector(".hm-card")?.getAttribute("data-layout"),
+          shape: root?.querySelector(".hm-card")?.getAttribute("data-shape"),
+          micro: root?.querySelector(".hm-card")?.getAttribute("data-micro"),
+          thumb: root?.querySelector(".hm-card")?.getAttribute("data-thumb"),
+          specAttr: root?.querySelector(".hm-card")?.getAttribute("data-spec"),
+          title: root?.querySelector(".hm-title")?.textContent?.trim() || "",
+        });
+      }, 1200);
+    </script>
+  </body>
+</html>

@@ -3291,6 +3291,8 @@ class HaMusicCard extends LitElement {
     card.classList.toggle("hm-panel-stack", panelStack);
     // 窄屏/竖屏面板：用显式类接管封面与信息区高度分配，避免依赖容器查询。
     card.classList.toggle("hm-narrow-panel", stack && !shortLandscape);
+    // 手机/窄屏：信息区不再按 48% 上限收缩，改成整行宽度并水平居中。
+    card.classList.toggle("hm-panel-compact", stack && !shortLandscape && mainW < 560);
     // 矮屏竖排（如 375×667）：高度不足以同时放下封面、标题、歌手、规格，
     // 隐藏次要信息（标签、当前歌词行），保证主信息完整可见。
     card.classList.toggle("hm-panel-tight", stack && !shortLandscape && cardH < 760);

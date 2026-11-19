@@ -3966,6 +3966,7 @@ export const cardStyles = css`
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-info {
     width: min(92%, 560px);
+    max-width: min(92%, 560px);
     min-height: 0;
     flex: 0 0 auto;
     align-items: center;
@@ -3974,7 +3975,7 @@ export const cardStyles = css`
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-meta {
     width: 100%;
-    align-items: center;
+    align-items: stretch;
     text-align: center;
   }
 

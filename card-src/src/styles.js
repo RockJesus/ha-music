@@ -3480,6 +3480,22 @@ export const cardStyles = css`
     }
   }
 
+  /* 卡片选择器预览：iOS WebView 里多层 backdrop-filter + 大半径 blur 容易把
+     GPU 拖死（表现为“点卡片 App 直接崩”）。预览态一律降级为纯色/渐变。 */
+  .hm-card[data-thumb="lg"] *,
+  .hm-card[data-thumb="md"] *,
+  .hm-card[data-thumb="sm"] * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .hm-card[data-thumb="lg"] .hm-bg-art,
+  .hm-card[data-thumb="md"] .hm-bg-art,
+  .hm-card[data-thumb="sm"] .hm-bg-art {
+    filter: none !important;
+    opacity: 0 !important;
+  }
+
   /* 缩略预览不要走正常卡片的“窄卡片单列”规则，否则小预览会被竖向堆叠撑破 */
   @container (max-width: 380px) {
     .hm-card[data-thumb="sm"] .hm-main {

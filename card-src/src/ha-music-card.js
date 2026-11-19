@@ -4449,6 +4449,9 @@ class HaMusicCard extends LitElement {
   }
 
   _ensureAudioSpectrum() {
+    // 卡片选择器预览里不接 Web Audio：iOS 对同时存在的 AudioContext 数量有硬限，
+    // 预览反复实例化会有崩溃/无声道风险。
+    if (this._isPreviewContext()) return null;
     const url = this._spectrumResolvedUrl;
     if (!url || this._audioFailedUrl === url) {
       return null;
@@ -4773,14 +4776,22 @@ class HaMusicCard extends LitElement {
       this._isMobileUi() ? 1.5 : 2,
       Math.max(1, Number(window.devicePixelRatio) || 1)
     );
-    const pixelWidth = Math.round(width * dpr);
-    const pixelHeight = Math.round(height * dpr);
+    // 预览/极小卡片不再要求高分辨率，避免 iOS WebView 为一块 4000px 宽的画布
+    // 分配内存；同时给像素宽高一个上限。
+    const pixelWidth = Math.min(4096, Math.round(width * dpr));
+    const pixelHeight = Math.min(1024, Math.round(height * dpr));
     if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
     if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-    canvas.style.width = "100%";
-    canvas.style.height = `${height}px`;
+    if (canvas.style.width !== "100%") canvas.style.width = "100%";
+    const cssHeight = `${height}px`;
+    if (canvas.style.height !== cssHeight) canvas.style.height = cssHeight;
     this._spectrumCanvas = canvas;
-    const nextCtx = canvas.getContext("2d");
+    let nextCtx = null;
+    try {
+      nextCtx = canvas.getContext("2d");
+    } catch {
+      nextCtx = null;
+    }
     if (nextCtx !== this._spectrumCtx) this._spectrumGrad = null;
     this._spectrumCtx = nextCtx;
     this._spectrumCssW = width;
@@ -4875,11 +4886,13 @@ class HaMusicCard extends LitElement {
   _observeSpectrumResize() {
     if (typeof ResizeObserver === "undefined") return;
     const canvas = this._spectrumCanvas;
-    const host = canvas?.parentElement;
-    if (!host) return;
-    if (this._spectrumResizeObserved === host) return;
+    if (!canvas?.parentElement) return;
+    // 观察卡片本体而不是 canvas 的父容器：回调里会写 canvas 的 style，
+    // 若观察父容器，iOS Safari 可能出现 ResizeObserver 回写死循环，把 App 拖崩。
+    const target = this;
+    if (this._spectrumResizeObserved === target) return;
     this._spectrumResizeObserver?.disconnect();
-    this._spectrumResizeObserved = host;
+    this._spectrumResizeObserved = target;
     this._spectrumResizeObserver = new ResizeObserver(() => {
       if (this._spectrumResizeRaf) return;
       this._spectrumResizeRaf = requestAnimationFrame(() => {
@@ -4888,7 +4901,7 @@ class HaMusicCard extends LitElement {
         if (!this._spectrumPlaying()) this._applySpectrumIdle();
       });
     });
-    this._spectrumResizeObserver.observe(host);
+    this._spectrumResizeObserver.observe(target);
   }
 
   _applySpectrumIdle() {

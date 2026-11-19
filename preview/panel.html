@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>HA Music · Panel</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #05060a; }
+      /* 模拟 HA 面板视图：只有一个卡片，容器铺满视口 */
+      hui-panel-view {
+        display: block;
+        position: fixed;
+        inset: 0;
+        padding: 0;
+      }
+      ha-music { display: block; height: 100%; }
+    </style>
+    <script type="module" src="../ha-music.js?v=panel"></script>
+  </head>
+  <body>
+    <hui-panel-view id="view"></hui-panel-view>
+    <script type="module">
+      const params = new URLSearchParams(location.search);
+      const ART = {
+        aurora: "art/cover-aurora-720.jpg",
+        cyber: "art/cover-cyber-720.jpg",
+        liquid: "art/cover-liquid-720.jpg",
+      };
+      const FEATURES =
+        1 + 2 + 4 + 8 + 16 + 32 + 128 + 256 + 512 + 2048 + 16384 + 32768 + 65536 + 131072 + 262144 + 524288;
+
+      function player(o) {
+        return [
+          o.id,
+          {
+            entity_id: o.id,
+            state: o.state,
+            attributes: {
+              friendly_name: o.name,
+              media_title: o.title,
+              media_artist: o.artist,
+              media_album_name: "Midnight Signals",
+              entity_picture: o.art,
+              media_duration: 257,
+              media_position: 83,
+              media_position_updated_at: new Date(Date.now() - 2000).toISOString(),
+              volume_level: 0.42,
+              is_volume_muted: false,
+              shuffle: true,
+              repeat: "all",
+              mass_player_type: "player",
+              source: "Spotify",
+              source_list: ["Spotify", "本地媒体", "AirPlay", "TTS"],
+              sound_mode: "Music",
+              sound_mode_list: ["Music", "Night", "Speech"],
+              supported_features: FEATURES,
+              group_members: ["media_player.living", "media_player.study"],
+              app_name: "Spotify",
+              media_track: 3,
+            },
+          },
+        ];
+      }
+
+      const states = Object.fromEntries([
+        player({ id: "media_player.living", name: "客厅 · Living Room", title: "Neon River", artist: "AURORA LAB", art: ART.aurora, state: params.get("state") || "playing" }),
+        player({ id: "media_player.study", name: "书房 · Studio", title: "Chrome Horizon", artist: "NEON DISTRICT", art: ART.cyber, state: "paused" }),
+        player({ id: "media_player.bedroom", name: "卧室 · Bedroom", title: "Glass Bloom", artist: "LILA K.", art: ART.liquid, state: "idle" }),
+      ]);
+
+      const hass = {
+        language: params.get("lang") || "zh-Hans",
+        states,
+        services: { music_assistant: { play_media: {} } },
+        panels: {
+          b93b5321_music_assistant: { url_path: "b93b5321_music_assistant", title: "Music Assistant", component_name: "app" },
+        },
+        hassUrl: (p) => p,
+        callService: async () => ({ context: { id: "preview" } }),
+        connection: { sendMessagePromise: async () => ({ title: "root", children: [] }) },
+      };
+
+      const card = document.createElement("ha-music");
+      card.hass = hass;
+      card.setConfig({
+        entity: "media_player.living",
+        entities: ["media_player.living", "media_player.study", "media_player.bedroom"],
+        theme: params.get("theme") || "aurora",
+        layout: params.get("layout") || "full",
+        cover: params.get("cover") || "ambient",
+        visualizer: params.get("vis") || "bars",
+      });
+      document.getElementById("view").appendChild(card);
+      window.__panel = { card, hass };
+      const mm = document.createElement("div");
+      mm.id = "mm";
+      mm.style.display = "none";
+      document.body.appendChild(mm);
+      setTimeout(() => {
+        const root = card.shadowRoot || card.renderRoot;
+        const cardEl = root?.querySelector(".hm-card");
+        const main = root?.querySelector(".hm-main");
+        const cover = root?.querySelector(".hm-cover");
+        const info = root?.querySelector(".hm-info");
+        const r = (el) => (el ? `${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}` : "-");
+        const p = (el) => (el ? `${Math.round(el.getBoundingClientRect().left)},${Math.round(el.getBoundingClientRect().top)}` : "-");
+        const body = root?.querySelector(".hm-body");
+        const cs = (el, prop) => (el ? getComputedStyle(el)[prop] : "-");
+        const wrap = main?.querySelector(".hm-cover-wrap");
+        const vis = root?.querySelector(".hm-vis");
+        mm.textContent = JSON.stringify({
+          card: r(cardEl),
+          main: r(main),
+          mainTop: p(main),
+          kids: main ? [...main.children].map((c) => `${c.className}:${r(c)}@${p(c)}`) : [],
+          allWraps: root ? [...root.querySelectorAll(".hm-cover-wrap")].map((w) => `${r(w)}@${p(w)}`).length : 0,
+          wraps: root ? [...root.querySelectorAll(".hm-cover-wrap")].map((w) => `${r(w)}@${p(w)}`) : [],
+          cover: r(cover),
+          coverTop: p(cover),
+          info: r(info),
+          infoTop: p(info),
+          vis: r(vis),
+          visTop: p(vis),
+          panelVar: getComputedStyle(card).getPropertyValue("--hm-panel-cover"),
+          classes: cardEl?.className,
+        });
+      }, 800);
+    </script>
+  </body>
+</html>

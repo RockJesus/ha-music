@@ -2962,20 +2962,23 @@ class HaMusicCard extends LitElement {
     const shortLandscape =
       cardW >= 700 && cardW <= 821 && cardH <= 820 && cardW >= cardH * 1.02;
     card.classList.toggle("hm-short-landscape", shortLandscape);
+    // 820~1024 的平板竖屏：面板里也改竖排，否则封面按面板放大后信息列被挤到没有宽度。
+    const panelStack = stack && !shortLandscape && cardW >= 821;
+    card.classList.toggle("hm-panel-stack", panelStack);
     let size;
     if (shortLandscape) {
       size = Math.max(120, Math.min(mainH - 96, mainW * 0.30, 460));
     } else if (stack) {
-      // 窄屏/竖屏：封面在上、信息在下。手机面板不再让封面吃掉大半屏，
-      // 宽度上限约 58%/66%，高度按整卡高度的 28% 封顶，给标题/频谱/进度留空间。
+      // 窄屏/竖屏：封面在上、信息在下。面板视图要铺满区域，封面按整卡高度放大，
+      // 但必须给下面的标题/标签留出空间，否则标题会被频谱盖住。
       const narrow = mainW < 560;
-      const widthRatio = narrow ? 0.58 : 0.66;
-      const heightBudget = cardH * 0.28;
-      size = Math.max(120, Math.min(mainW * widthRatio, heightBudget));
+      const widthRatio = narrow ? 0.66 : 0.78;
+      const heightBudget = cardH * (narrow ? 0.34 : 0.42);
+      size = Math.max(120, Math.min(mainW * widthRatio, heightBudget, mainH * 0.62, 620, mainH - 40));
     } else {
-      // 宽屏：封面不再吃满主区高度，预留 96px 给封面外圈音柱和底部频谱，
-      // 同时收窄到主区宽度的 30%，避免大封面视觉上压住下面的音柱。
-      size = Math.max(120, Math.min(mainH - 96, mainW * 0.30, 460));
+      // 宽屏：面板视图里封面跟着主区高度走，只留给外圈音柱一点余量；
+      // 上限从 460 放到 680，桌面/平板横屏才不会出现"一小坨内容 + 大片空白"。
+      size = Math.max(120, Math.min(mainH - 40, mainW * 0.36, 680));
     }
     this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
   }

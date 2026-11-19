@@ -2747,6 +2747,71 @@ export const cardStyles = css`
     }
   }
 
+  /* 面板视图要真「占满」：没有歌词分栏时整组水平居中，别把封面和标题堆在左上角。 */
+  .hm-card[data-panel="true"]:not(.hm-short-landscape):not(.hm-panel-stack) .hm-main[data-side-lyrics="false"] {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(24px, 3.4cqi, 72px);
+    overflow: hidden;
+  }
+
+  .hm-card[data-panel="true"]:not(.hm-short-landscape):not(.hm-panel-stack) .hm-main[data-side-lyrics="false"] .hm-cover-wrap {
+    flex: 0 0 auto;
+    width: calc(var(--hm-panel-cover, 420px) + 96px);
+    height: 100%;
+  }
+
+  .hm-card[data-panel="true"]:not(.hm-short-landscape):not(.hm-panel-stack) .hm-main[data-side-lyrics="false"] .hm-cover {
+    width: var(--hm-panel-cover, 420px);
+    height: var(--hm-panel-cover, 420px);
+    max-height: 100%;
+  }
+
+  .hm-card[data-panel="true"]:not(.hm-short-landscape):not(.hm-panel-stack) .hm-main[data-side-lyrics="false"] .hm-info {
+    flex: 0 1 auto;
+    max-width: min(48%, 760px);
+    min-width: 0;
+  }
+
+  /* 平板竖屏（宽度 >820 但明显更高）：面板里也竖排，封面按整卡高度放大并整体居中。 */
+  .hm-card.hm-panel-stack[data-panel="true"] .hm-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(16px, 3cqi, 28px);
+    overflow: hidden;
+  }
+
+  .hm-card.hm-panel-stack[data-panel="true"] .hm-cover-wrap {
+    width: 100%;
+    height: auto;
+    flex: 0 0 auto;
+  }
+
+  .hm-card.hm-panel-stack[data-panel="true"] .hm-cover {
+    width: min(92%, var(--hm-panel-cover, 420px));
+    height: auto;
+    max-height: none;
+    margin: 0 auto;
+  }
+
+  .hm-card.hm-panel-stack[data-panel="true"] .hm-info {
+    width: min(92%, 760px);
+    min-width: 0;
+  }
+
+  .hm-card.hm-panel-stack[data-panel="true"] .hm-meta {
+    align-items: center;
+    text-align: center;
+  }
+
+  .hm-card.hm-panel-stack[data-panel="true"] .hm-tags {
+    justify-content: center;
+  }
+
   @container (max-width: 620px) {
     .hm-card[data-panel="true"] .hm-body {
       padding: 12px 14px;
@@ -3842,5 +3907,17 @@ export const cardStyles = css`
   .hm-card[data-shape="banner"] .hm-title {
     font-size: clamp(18px, 2.2cqi, 30px);
     -webkit-line-clamp: 1;
+  }
+
+  /* ---------- 面板视图：整块内容铺满卡片 ----------
+     full/wide 形态的 .hm-body 有 1180/1480 的 max-width，面板视图（一个卡片占满整个
+     视口）里这条上限会让内容缩成中间一条、左右留出大片空白，这里统一解除。 */
+  .hm-card[data-panel="true"] .hm-body {
+    max-width: none;
+  }
+
+  .hm-card[data-panel="true"] .hm-top,
+  .hm-card[data-panel="true"] .hm-controls {
+    max-width: none;
   }
 `;

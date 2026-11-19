@@ -136,7 +136,7 @@ export function pickLrclibResult(results, media = {}) {
     if (wantArtist && itemArtist) {
       if (itemArtist === wantArtist) score += 45;
       else if (itemArtist.includes(wantArtist) || wantArtist.includes(itemArtist)) score += 32;
-      else score -= 80;
+      else score -= 200;
     }
     const itemDuration = Number(item.duration) || 0;
     if (wantDuration && itemDuration) {

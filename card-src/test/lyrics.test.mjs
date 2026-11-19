@@ -81,4 +81,12 @@ test("pickLrclibResult 按歌名/歌手/时长挑同步歌词，拒绝无关曲�
   });
   assert.equal(best.trackName, "7 Years");
   assert.equal(pickLrclibResult(results, { title: "Blinding Lights", artist: "The Weeknd", duration: 200 }), null);
+  // 同名异曲（歌名、时长相同但歌手不同）必须放弃，不能把别人的歌词贴上来。
+  assert.equal(
+    pickLrclibResult(
+      [{ trackName: "True", artistName: "Spandau Ballet", duration: 376, syncedLyrics: "[00:01]wrong" }],
+      { title: "True", artist: "Anthony Mea", duration: 376 }
+    ),
+    null
+  );
 });

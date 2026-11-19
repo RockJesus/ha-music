@@ -3310,7 +3310,7 @@ class HaMusicCard extends LitElement {
       const widthRatio = narrow ? 0.66 : 0.78;
       const heightBudget = cardH * (narrow ? 0.34 : 0.42);
       // 窄屏竖排时信息区（标题/歌手/规格）要固定占位，封面只能用剩下的高度。
-      const infoBudget = narrow ? 140 : 96;
+      const infoBudget = narrow ? 120 : 96;
       size = Math.max(
         120,
         Math.min(mainW * widthRatio, heightBudget, mainH * 0.62, 620, mainH - infoBudget),

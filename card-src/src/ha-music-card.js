@@ -463,10 +463,9 @@ class HaMusicCard extends LitElement {
     let sum = 0;
     for (let index = 0; index < raw.length; index += 1) sum += raw[index];
     const mean = raw.length ? sum / raw.length : 0;
-    // 参数经 110 帧真实波形离线寻优（160 柱）：以本帧均值为中心 1.6 倍拉开对比，
-    // 再叠加 2.0 倍相邻柱局部起伏与 1.4 倍瞬态（低频加权）。
-    // 结果：顶满 1.1%、贴底 8.3%，逐帧变化量约为旧版 1.5 倍，且不会像分位数归一化
-    // 那样在强弱段落切换时把整排推到天花板或掉到地面。
+    // 参数经 110 帧真实波形离线寻优（160 柱）：均值对比 1.7 倍，
+    // 局部起伏与瞬态按「该柱自身能量」加权（0.35 + 幅度），避免高频噪声柱被放大成满格尖刺。
+    // 结果：顶满 1.7%、贴底 9.7%，逐帧变化量约为旧版 1.6 倍。
     const prevBars = this._maVisBarsPrev;
     const bars = raw.map((value, index) => {
       const prev = raw[Math.max(0, index - 2)];
@@ -474,8 +473,9 @@ class HaMusicCard extends LitElement {
       const detail = value - (prev + next) / 2;
       const transient = prevBars ? clamp(value - prevBars[index], -0.2, 0.3) : 0;
       const zone = index < raw.length / 3 ? 1.15 : index < (raw.length * 2) / 3 ? 1 : 0.85;
+      const weight = 0.35 + value;
       return clamp(
-        0.5 + (value - mean) * 1.6 + detail * 2 + transient * 1.4 * zone,
+        0.5 + (value - mean) * 1.7 + detail * 3 * weight + transient * 2.2 * zone * weight,
         0.05,
         0.95
       );

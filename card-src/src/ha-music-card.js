@@ -2162,6 +2162,18 @@ class HaMusicCard extends LitElement {
       const result = await hass.callWS(payload);
       return result?.response ?? null;
     }
+    // 第三条兜底：直接用前端会话的访问令牌走 REST（`?return_response` 与 WS 等价）
+    const token = hass?.auth?.data?.access_token;
+    if (token && typeof fetch === "function") {
+      const res = await fetch(`/api/services/${domain}/${service}?return_response`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(data || {}),
+      });
+      if (!res.ok) throw new Error(`REST ${res.status}`);
+      const json = await res.json();
+      return json?.response ?? json ?? null;
+    }
     throw new Error("Service response unavailable");
   }
 
@@ -2214,8 +2226,9 @@ class HaMusicCard extends LitElement {
         this._audioSpec = { codec, sampleRate, bitDepth, bitRate, channels };
         this._audioSpecKey = key;
       }
-    } catch {
+    } catch (err) {
       this._audioSpec = null;
+      this._specError = String(err?.message || err || "");
     }
     this.requestUpdate();
   }
@@ -4063,7 +4076,11 @@ class HaMusicCard extends LitElement {
                     <span class="hm-spec-full">${this._audioSpecText()}</span>
                     <span class="hm-spec-short">${this._audioSpecText(true)}</span>
                   </div>`
-                : nothing}
+                : this._config?.debug
+                  ? html`<div class="hm-spec">
+                      ${`规格未读取 · spec=${this._audioSpec ? "set" : "null"} · ma=${this._isMaPlayer() ? "y" : "n"} · ${this._specError || this._callWsError || "no-error"}`}
+                    </div>`
+                  : nothing}
               ${showSource || showSoundMode || showGroup
                 ? html`<div class="hm-tags">
                     ${showSource

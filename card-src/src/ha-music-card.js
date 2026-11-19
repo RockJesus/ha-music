@@ -3334,6 +3334,7 @@ class HaMusicCard extends LitElement {
     if (stack && !shortLandscape) {
       // 环形音柱跟随实际封面尺寸，窄屏压到 10px 外扩，避免被容器裁掉。
       this.style.setProperty("--hm-cover-size", `${Math.round(size)}px`);
+      this.style.setProperty("--hm-ring-pad", `${ringPad}px`);
       if (wrap) wrap.style.height = `${Math.round(size) + ringPad}px`;
       if (info) {
         info.style.flex = "0 0 auto";
@@ -3341,6 +3342,7 @@ class HaMusicCard extends LitElement {
       }
     } else if (wrap) {
       this.style.setProperty("--hm-cover-size", `${this._coverPx(this._layoutKey())}px`);
+      this.style.removeProperty("--hm-ring-pad");
       wrap.style.removeProperty("height");
       if (info) {
         info.style.removeProperty("flex");

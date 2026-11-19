@@ -2767,6 +2767,7 @@ export const cardStyles = css`
 
   .hm-card[data-panel="true"]:not(.hm-short-landscape):not(.hm-panel-stack) .hm-main[data-side-lyrics="false"] .hm-info {
     flex: 0 1 auto;
+    width: min(48%, 760px);
     max-width: min(48%, 760px);
     min-width: 0;
   }
@@ -3965,12 +3966,17 @@ export const cardStyles = css`
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-info {
-    width: min(92%, 560px);
+    width: 100%;
     max-width: min(92%, 560px);
     min-height: 0;
     flex: 0 0 auto;
     align-items: center;
     text-align: center;
+  }
+
+  .hm-card.hm-narrow-panel.hm-panel-compact[data-panel="true"] .hm-info {
+    width: min(92%, 560px);
+    max-width: min(92%, 560px);
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-meta {

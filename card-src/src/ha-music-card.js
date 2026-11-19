@@ -2214,7 +2214,11 @@ class HaMusicCard extends LitElement {
         entity_id: entityId,
       });
       const queue = this._pickQueueResponse(response);
-      const details = queue?.current_item?.media_item?.stream_details || null;
+      const current = queue?.current_item || null;
+      // MA 的 stream_details 挂在 current_item 上（与 media_item 平级），
+      // 早期误读成 current_item.media_item.stream_details，导致规格一直为空。
+      const details =
+        current?.stream_details || current?.media_item?.stream_details || null;
       const sampleRate = Number(details?.sample_rate) || 0;
       const bitDepth = Number(details?.bit_depth) || 0;
       const bitRate = Number(details?.bit_rate) || 0;

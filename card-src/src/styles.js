@@ -2498,7 +2498,7 @@ export const cardStyles = css`
     font: inherit;
     font-size: clamp(14px, 2.5cqi, 21px);
     line-height: 1.38;
-    text-align: left;
+    text-align: center;
     cursor: pointer;
     transition:
       color 0.25s ease,
@@ -2514,28 +2514,31 @@ export const cardStyles = css`
   .hm-lyrics-line[data-active="true"] {
     color: #fff;
     font-weight: 650;
-    background: linear-gradient(
-      90deg,
-      rgba(var(--hm-a1-rgb), 0.18),
-      rgba(var(--hm-a2-rgb), 0.06) 62%,
+    background: radial-gradient(
+      120% 140% at 50% 50%,
+      rgba(var(--hm-a1-rgb), 0.2),
+      rgba(var(--hm-a2-rgb), 0.07) 62%,
       transparent
     );
-    box-shadow: inset 3px 0 0 var(--hm-a1);
-    transform: translateX(2px);
+    box-shadow: 0 0 0 1px rgba(var(--hm-a1-rgb), 0.22);
   }
 
+  /* 进度条改成居中向两侧展开，跟居中的文字对齐 */
   .hm-lyrics-line[data-active="true"]::after {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
+    top: 0;
+    bottom: 0;
+    left: 50%;
     z-index: 0;
-    width: var(--hm-line-progress, 0%);
+    width: calc(var(--hm-line-progress, 0%) * 0.5);
     border-radius: inherit;
     background: linear-gradient(
       90deg,
-      rgba(var(--hm-a1-rgb), 0.3),
-      rgba(var(--hm-a2-rgb), 0.16)
+      rgba(var(--hm-a2-rgb), 0.16),
+      rgba(var(--hm-a1-rgb), 0.28)
     );
+    transform: translateX(-50%);
     pointer-events: none;
     transition: width 0.36s linear;
   }
@@ -3147,10 +3150,13 @@ export const cardStyles = css`
 
   /* 窄屏/竖屏面板：封面在上、信息在下，整体居中；不再让主区独占全部剩余高度 */
   @container (max-width: 820px) {
+    /* 窄屏面板里封面和信息必须一起装进主区：主区吃剩余高度，
+       封面用剩余空间收缩，否则封面把歌手/规格顶出主区被 overflow 裁掉。 */
     .hm-card[data-panel="true"] .hm-main {
       display: flex;
       flex-direction: column;
-      flex: 0 0 auto;
+      flex: 1 1 auto;
+      min-height: 0;
       justify-content: center;
       align-items: center;
       gap: clamp(10px, 3cqi, 18px);
@@ -3158,18 +3164,27 @@ export const cardStyles = css`
 
     .hm-card[data-panel="true"] .hm-vis {
       height: clamp(36px, 8vh, 76px);
+      flex: 0 0 auto;
     }
 
     .hm-card[data-panel="true"] .hm-cover-wrap {
       width: 100%;
       height: auto;
-      flex: 0 0 auto;
+      min-height: 0;
+      flex: 0 1 auto;
+      overflow: hidden;
     }
 
     .hm-card[data-panel="true"] .hm-cover {
-      width: min(88%, var(--hm-panel-cover, calc(100dvh - 440px)));
-      max-height: none;
+      width: min(86%, var(--hm-panel-cover, calc(100dvh - 460px)), 340px);
+      height: auto;
+      max-height: 100%;
       margin: 0 auto;
+    }
+
+    .hm-card[data-panel="true"] .hm-info {
+      min-height: 0;
+      flex: 0 0 auto;
     }
 
     .hm-card[data-panel="true"] .hm-meta {

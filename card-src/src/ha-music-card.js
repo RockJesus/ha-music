@@ -2497,7 +2497,7 @@ class HaMusicCard extends LitElement {
     const spec = this._audioSpec;
     if (!spec) return "";
     const parts = [];
-    if (spec.codec) parts.push(spec.codec.toUpperCase());
+    if (spec.codec) parts.push(this._codecLabel(spec.codec));
     if (compact) {
       if (spec.bitDepth && spec.sampleRate) {
         parts.push(`${spec.bitDepth}/${Math.round(spec.sampleRate / 1000)}k`);
@@ -2510,16 +2510,42 @@ class HaMusicCard extends LitElement {
         const khz = spec.sampleRate / 1000;
         parts.push(`${Number.isInteger(khz) ? khz : khz.toFixed(1)} kHz`);
       }
-      if (spec.channels > 2) parts.push(`${spec.channels}ch`);
+      if (spec.channels === 2) parts.push("立体声");
+      else if (spec.channels > 2) parts.push(`${spec.channels}ch`);
+      // MA 的 bit_rate 单位是 kbps（如 320、1411），不是 bps；
+      // 早先按 bps 除以 1000，320 就显示成 0 kb/s。
       if (spec.bitRate > 0) {
         parts.push(
-          spec.bitRate >= 1000000
-            ? `${(spec.bitRate / 1000000).toFixed(1)} Mb/s`
-            : `${Math.round(spec.bitRate / 1000)} kb/s`
+          spec.bitRate >= 1000
+            ? `${(spec.bitRate / 1000).toFixed(1)} Mb/s`
+            : `${Math.round(spec.bitRate)} kb/s`
         );
       }
     }
     return parts.join(" · ");
+  }
+
+  // MA 的 content_type 是容器/编码标识，直接大写会显示成 MPEG，
+  // 而 MA 自己界面把 mpeg 标成 MP3，这里按常见取值映射成更准确的名字。
+  _codecLabel(codec) {
+    const raw = String(codec || "").trim().toLowerCase();
+    const map = {
+      mpeg: "MP3",
+      mp3: "MP3",
+      mp4a: "AAC",
+      m4a: "AAC",
+      aac: "AAC",
+      flac: "FLAC",
+      alac: "ALAC",
+      opus: "Opus",
+      vorbis: "Vorbis",
+      ogg: "Vorbis",
+      pcm: "PCM",
+      wav: "WAV",
+      alac_ima4: "ALAC",
+      wma: "WMA",
+    };
+    return map[raw] || raw.toUpperCase();
   }
 
   async _fetchMaQueueDetails() {

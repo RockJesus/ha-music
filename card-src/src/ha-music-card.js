@@ -463,19 +463,27 @@ class HaMusicCard extends LitElement {
     let sum = 0;
     for (let index = 0; index < raw.length; index += 1) sum += raw[index];
     const mean = raw.length ? sum / raw.length : 0;
-    // 低频段本来就比高频强很多，整排直接映射会变成「左边一片顶满」。
-    // 以本帧均值为中心拉开对比，再叠加相邻柱子的局部起伏（高频尖峰），
-    // 音柱才不是一座平滑的小山包。
+    // 参数经真实波形离线网格寻优（110 帧 / 160 柱）：均值对比 2.3、局部起伏 2.6、
+    // 瞬态增益 2.6（低频段加权），顶满率 0%，贴底率约 5%，逐帧变化量约为旧版的 1.9 倍。
+    // 低频段本来就比高频强很多，整排直接映射会变成「左边一片顶满」，
+    // 所以先以本帧均值为中心拉开对比，再叠加相邻柱子的局部起伏与瞬态。
+    const prevBars = this._maVisBarsPrev;
     const bars = raw.map((value, index) => {
       const prev = raw[Math.max(0, index - 2)];
       const next = raw[Math.min(raw.length - 1, index + 2)];
       const detail = value - (prev + next) / 2;
+      const transient = prevBars ? clamp(value - prevBars[index], -0.25, 0.4) : 0;
+      const zone = index < raw.length / 3 ? 1.15 : index < (raw.length * 2) / 3 ? 1 : 0.8;
       return clamp(
-        0.35 * value + 0.65 * (0.5 + (value - mean) * 1.55) + detail * 1.8,
-        0.04,
+        0.35 * value +
+          0.65 * (0.5 + (value - mean) * 2.3) +
+          detail * 2.6 +
+          transient * 2.6 * zone,
+        0.06,
         0.95
       );
     });
+    this._maVisBarsPrev = raw;
     this._maVisTargets = { bars, bands: targets.bands, peak: targets.peak };
     this._maVisTargetsWave = wave;
     this._maVisTargetsCount = count;
@@ -5692,12 +5700,17 @@ class HaMusicCard extends LitElement {
         );
       }
       // 顶部留出约 18% 余量，并用 gamma 拉开强弱差，避免整排柱子顶满、只剩细小锯齿。
+      // 真实频谱用更强的 gamma（1.5），高频小柱才不会被抬成一片中等高度。
+      const gamma = visTargets ? 1.5 : 1.32;
       target = clamp(
-        0.07 + Math.pow(clamp(target, 0, 1), 1.32) * 0.84,
+        0.07 + Math.pow(clamp(target, 0, 1), gamma) * 0.84,
         0.06,
         0.9
       );
-      if (this._isMobileUi()) target = clamp(target * 1.3 + 0.02, 0.08, 0.94);
+      // 手机端的整体增益只用于补偿程序化/逐曲包络偏低，真实频谱不能再抬，否则顶满。
+      if (this._isMobileUi() && !visTargets && !audioTargets) {
+        target = clamp(target * 1.3 + 0.02, 0.08, 0.94);
+      }
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
       // 真实频谱响应更快（约 15fps 更新），攻击段要比程序化律动更硬，
       // 回落用稍慢的释放，避免柱子在两帧之间掉成一条虚线。

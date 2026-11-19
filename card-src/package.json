@@ -1,7 +1,7 @@
 {
   "name": "ha-music-card-src",
   "private": true,
-  "version": "2.9.2",
+  "version": "2.9.3",
   "type": "module",
   "description": "Source for the HA Music Lovelace card",
   "scripts": {
@@ -15,6 +15,7 @@
     "esbuild": "^0.24.2"
   }
 }
+
 
 
 

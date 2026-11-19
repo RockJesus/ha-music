@@ -1193,6 +1193,38 @@ class HaMusicCard extends LitElement {
     return null;
   }
 
+  // 有些源会把「歌名/歌手/横幅串」当成歌词吐回来（整段同一行、带 |→ ←| 装饰），
+  // 这类结果宁可按没有处理，也不能把垃圾行铺到卡片上。
+  _lyricsSuspect(parsed, media) {
+    if (!parsed) return true;
+    const norm = (value) =>
+      String(value || "")
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, "");
+    const texts = [
+      ...(parsed.lines || []).map((line) => line.text),
+      ...(parsed.plain || []),
+    ].filter((text) => String(text || "").trim());
+    if (!texts.length) return !parsed.instrumental;
+    const titleKey = norm(media?.title);
+    const artistKey = norm(media?.artist);
+    const albumKey = normalizeLoose(media?.album);
+    const uniq = new Set(texts.map(norm));
+    if (texts.length >= 2 && uniq.size <= 1) return true; // 整段就是同一行循环
+    if (uniq.size <= 2 && texts.some((text) => /[→←]/.test(String(text)))) return true; // 装饰性横幅
+    const sameAsMeta = texts.filter((text) => {
+      const key = norm(text);
+      return key && (key === titleKey || key === artistKey || key === albumKey);
+    }).length;
+    if (sameAsMeta / texts.length > 0.6) return true; // 只是把歌名/歌手重复几遍
+    const noContent = texts.every((text) => !norm(text));
+    return noContent;
+
+    function normalizeLoose(value) {
+      return norm(value);
+    }
+  }
+
   _lyricsKeyFor(media) {
     return [
       this._cleanLyricsQuery(Array.isArray(media.title) ? media.title[0] : media.title),
@@ -1332,6 +1364,10 @@ class HaMusicCard extends LitElement {
       const accept = (result) => {
         if (controller.signal.aborted || key !== this._lyricsKey) return false;
         if (!result) return false;
+        if (this._lyricsSuspect(result.parsed, media)) {
+          tried.push("脏数据");
+          return false;
+        }
         this._setLyrics(key, result.parsed, result.source);
         return true;
       };
@@ -3878,21 +3914,9 @@ class HaMusicCard extends LitElement {
     if (lyrics.status === "loading") {
       // 歌词匹配期间不显示「正在匹配歌词」占位框，避免侧边歌词/完整面板出现空框。
       body = nothing;
-    } else if (lyrics.status === "none") {
-      body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
-    } else if (lyrics.status === "error") {
-      body = html`<div class="hm-lyrics-empty hm-lyrics-error">
-        <span>${t("lyricsError")}</span>
-        <button
-          class="hm-lyrics-retry"
-          @click=${(event) => {
-            event.stopPropagation();
-            this._retryLyrics();
-          }}
-        >
-          ${t("lyricsRetry")}
-        </button>
-      </div>`;
+    } else if (lyrics.status === "none" || lyrics.status === "error") {
+      // 全部歌词源都失败时，整块歌词区直接不出现，不留占位文案、不铺任何行。
+      return nothing;
     } else if (lyrics.instrumental) {
       body = html`<div class="hm-lyrics-empty">${t("lyricsInstrumental")}</div>`;
     } else if (timed) {
@@ -3916,7 +3940,8 @@ class HaMusicCard extends LitElement {
         (line) => html`<div class="hm-lyrics-line" data-static="true">${line}</div>`
       );
     } else {
-      body = html`<div class="hm-lyrics-empty">${t("lyricsNone")}</div>`;
+      // 空结果（既无时间轴也无纯文本）同样不显示任何占位内容。
+      return nothing;
     }
 
     return html`<section class="hm-lyrics ${inline ? "hm-lyrics-inline" : ""}" data-status=${lyrics.status}>

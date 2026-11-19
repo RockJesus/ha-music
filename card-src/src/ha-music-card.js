@@ -459,10 +459,19 @@ class HaMusicCard extends LitElement {
       return this._maVisTargets;
     }
     const targets = waveTargets(wave, count, rate, pulse);
-    this._maVisTargets = targets;
+    const raw = targets.bars;
+    let sum = 0;
+    for (let index = 0; index < raw.length; index += 1) sum += raw[index];
+    const mean = raw.length ? sum / raw.length : 0;
+    // 低频段本来就比高频强很多，整排直接映射会变成「左边一片顶满」。
+    // 以本帧均值为中心拉开对比，再留一部分原始绝对值，避免安静段落被放大成噪音。
+    const bars = raw.map((value) =>
+      clamp(0.35 * value + 0.65 * (0.5 + (value - mean) * 1.55), 0.04, 0.95)
+    );
+    this._maVisTargets = { bars, bands: targets.bands, peak: targets.peak };
     this._maVisTargetsWave = wave;
     this._maVisTargetsCount = count;
-    return targets;
+    return this._maVisTargets;
   }
 
   connectedCallback() {

@@ -614,8 +614,22 @@ class HaMusicEditor extends LitElement {
             </select>
             <span class="hint">
               ${this._zh
-                ? "自动：QQ/网易云后端可用时优先，后端缺失或未匹配时自动回退 LRCLIB 同步歌词，最后用 Lyrics.ovh 纯文本兜底。"
-                : "Auto: prefer the QQ/NetEase backend when available, then LRCLIB synced lyrics, then Lyrics.ovh plain-text fallback."}
+                ? "自动：QQ/网易云后端可用时优先，随后依次回退 自定义接口 → LRCLIB → 酷狗 → Lyrics.ovh；每一级独立超时，单源失败不影响其它源。"
+                : "Auto: QQ/NetEase backend first, then custom endpoint → LRCLIB → Kugou → Lyrics.ovh; each source has its own timeout and a failure never blocks the rest."}
+            </span>
+          </label>
+          <label class="field">
+            <span class="label">${this._zh ? "自定义歌词接口（可选）" : "Custom lyrics endpoint (optional)"}</span>
+            <input
+              type="text"
+              .value=${config.lyrics_api || ""}
+              placeholder="https://example.com/lyrics?title={title}&artist={artist}"
+              @change=${(e) => this._update({ lyrics_api: e.target.value.trim() || undefined })}
+            />
+            <span class="hint">
+              ${this._zh
+                ? "支持 {title}/{artist} 占位符（留空则自动追加 ?title=&artist=）；返回 JSON 里读 lyrics / lrc / data 字段。"
+                : "Supports {title}/{artist} placeholders (otherwise ?title=&artist= is appended); reads lyrics / lrc / data from the JSON."}
             </span>
           </label>
           ${this._switch(

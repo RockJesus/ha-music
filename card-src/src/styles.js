@@ -2896,11 +2896,18 @@ export const cardStyles = css`
 
   /* 宽屏：音量紧跟在播放控件之后，长度随卡片宽度自适应，不再独占一整行。 */
   @container (min-width: 680px) {
+    /* 宽屏：播放控件与音量作为一组，整排在卡片里水平居中。 */
     .hm-card[data-panel="true"] .hm-controls {
       flex-wrap: nowrap;
-      justify-content: flex-start;
+      justify-content: center;
       align-items: center;
       gap: clamp(10px, 2.2cqi, 24px);
+    }
+
+    .hm-card[data-panel="true"] .hm-controls .hm-transport,
+    .hm-card[data-panel="true"] .hm-controls .hm-volume {
+      margin-left: 0;
+      margin-right: 0;
     }
 
     .hm-card[data-panel="true"] .hm-volume {

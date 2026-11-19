@@ -305,7 +305,7 @@ class HaMusicCard extends LitElement {
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
     // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
-    if (trackChanged || !prior) this._loadAudioSpec(trackKey);
+    if (trackChanged || !prior || !this._audioSpec) this._loadAudioSpec(trackKey);
     this._syncArt(readMedia(state), entityId);
     // 封面旋转跟播放状态走：不依赖 Lit 是否真的重绘（重绘失败或签名未变时也能纠正）。
     this._safeEffect("cover-spin", () => this._syncCoverSpinEffect());
@@ -2141,15 +2141,28 @@ class HaMusicCard extends LitElement {
 
   async _serviceResponse(domain, service, data) {
     const hass = this._hass;
-    if (!hass?.callWS) throw new Error("Service response unavailable");
-    const result = await hass.callWS({
+    const payload = {
       type: "call_service",
       domain,
       service,
       service_data: data,
       return_response: true,
-    });
-    return result?.response ?? null;
+    };
+    // 优先用底层 WS 连接（HA 各版本都保证存在），callWS 只作兜底；
+    // 之前只走 callWS，一旦该上下文没有这个封装就会静默失败，规格永远出不来。
+    if (hass?.connection?.sendMessagePromise) {
+      try {
+        const result = await hass.connection.sendMessagePromise(payload);
+        if (result?.response !== undefined) return result.response;
+      } catch (err) {
+        this._callWsError = String(err?.message || err || "");
+      }
+    }
+    if (hass?.callWS) {
+      const result = await hass.callWS(payload);
+      return result?.response ?? null;
+    }
+    throw new Error("Service response unavailable");
   }
 
   async _fetchMassQueueItems() {
@@ -2176,11 +2189,14 @@ class HaMusicCard extends LitElement {
     if (!hass || !entityId) return;
     if (this._config?.show_spec === false) return;
     if (!this._isMaPlayer(entityId)) return;
-    if (trackKey && trackKey === this._audioSpecKey) return;
+    const key = trackKey || "";
+    const sameTrack = Boolean(key) && key === this._audioSpecKey;
+    // 同一首且已经拿到规格就不再查；没拿到（首次请求失败/WS 还没就绪）要继续重试，
+    // 否则卡片会一直停在「没有规格」的状态，直到换歌才恢复。
+    if (sameTrack && this._audioSpec) return;
     const now = Date.now();
-    if (now - this._audioSpecAt < 2000) return;
+    if (now - this._audioSpecAt < (sameTrack ? 5000 : 1000)) return;
     this._audioSpecAt = now;
-    this._audioSpecKey = trackKey || "";
     try {
       const response = await this._serviceResponse("music_assistant", "get_queue", {
         entity_id: entityId,
@@ -2196,6 +2212,7 @@ class HaMusicCard extends LitElement {
         this._audioSpec = null;
       } else {
         this._audioSpec = { codec, sampleRate, bitDepth, bitRate, channels };
+        this._audioSpecKey = key;
       }
     } catch {
       this._audioSpec = null;
@@ -3861,6 +3878,7 @@ class HaMusicCard extends LitElement {
         data-tight=${this._tight() ? "true" : "false"}
         data-short=${this._short() ? "true" : "false"}
         data-micro=${this._micro() ? "true" : "false"}
+        data-spec=${this._audioSpec ? "ok" : this._callWsError ? "err" : "none"}
         style=${styleMap(this._styleVars())}
         @click=${this._onCardClick}
       >

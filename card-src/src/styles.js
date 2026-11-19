@@ -291,19 +291,11 @@ export const cardStyles = css`
     max-width: 100%;
     aspect-ratio: 1 / 1;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 50%;
     overflow: hidden;
-    background:
-      linear-gradient(
-        150deg,
-        rgba(var(--hm-a2-rgb), 0.55),
-        rgba(var(--hm-a1-rgb), 0.26) 60%,
-        rgba(10, 12, 20, 0.9)
-      );
-    box-shadow:
-      0 18px 38px -14px rgba(0, 0, 0, 0.9),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    background: rgba(9, 11, 18, 0.92);
+    box-shadow: 0 18px 38px -14px rgba(0, 0, 0, 0.9);
     cursor: pointer;
     touch-action: pan-y;
     user-select: none;

@@ -1062,7 +1062,7 @@ class HaMusicCard extends LitElement {
       visible: true,
       position: this._seekPreview ?? media.position,
       size,
-      innerRadius: width / 2 + 3,
+      innerRadius: width / 2 + 8,
       lineWidth:
         width >= 300
           ? Math.max(1.8, Math.min(2.6, width / 210))

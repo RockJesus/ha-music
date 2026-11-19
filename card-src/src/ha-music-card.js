@@ -3300,7 +3300,12 @@ class HaMusicCard extends LitElement {
       const narrow = mainW < 560;
       const widthRatio = narrow ? 0.66 : 0.78;
       const heightBudget = cardH * (narrow ? 0.34 : 0.42);
-      size = Math.max(120, Math.min(mainW * widthRatio, heightBudget, mainH * 0.62, 620, mainH - 40));
+      // 窄屏竖排时信息区（标题/歌手/规格）要固定占位，封面只能用剩下的高度。
+      const infoBudget = narrow ? 140 : 96;
+      size = Math.max(
+        120,
+        Math.min(mainW * widthRatio, heightBudget, mainH * 0.62, 620, mainH - infoBudget),
+      );
     } else {
       // 宽屏：面板视图里封面跟着主区高度走，只留给外圈音柱一点余量；
       // 上限从 460 放到 680，桌面/平板横屏才不会出现"一小坨内容 + 大片空白"。

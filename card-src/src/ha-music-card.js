@@ -382,6 +382,14 @@ class HaMusicCard extends LitElement {
     if (this._hass) this._sig = this._computeSig(this._hass);
     this._syncTimer();
     this.requestUpdate();
+    // 首次 hass 可能早于 setConfig 到达（此时还没实体，规格会被跳过），
+    // 配置就绪后补一次音频规格读取，保证歌名/歌手下面的编码・采样率默认就有。
+    if (this._hass) {
+      const state = this._state(this._eid());
+      this._audioSpecKey = "";
+      this._audioSpecAt = 0;
+      this._loadAudioSpec(this._trackKey(state));
+    }
   }
 
   connectedCallback() {

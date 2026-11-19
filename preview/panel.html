@@ -77,6 +77,34 @@
         },
         hassUrl: (p) => p,
         callService: async () => ({ context: { id: "preview" } }),
+        callWS: async (msg) => {
+          if (msg?.domain === "music_assistant" && msg?.service === "get_queue") {
+            return {
+              response: {
+                "media_player.living": {
+                  queue_id: "q1",
+                  items: 12,
+                  current_index: 1,
+                  current_item: {
+                    media_item: {
+                      media_type: "track",
+                      name: "Neon River",
+                      artists: [{ name: "AURORA LAB" }],
+                      stream_details: {
+                        provider: "qqmusic",
+                        content_type: "flac",
+                        sample_rate: 96000,
+                        bit_depth: 24,
+                        bit_rate: 0,
+                      },
+                    },
+                  },
+                },
+              },
+            };
+          }
+          return { response: {} };
+        },
         connection: { sendMessagePromise: async () => ({ title: "root", children: [] }) },
       };
 
@@ -96,7 +124,16 @@
       mm.id = "mm";
       mm.style.display = "none";
       document.body.appendChild(mm);
-      setTimeout(() => {
+      setTimeout(async () => {
+        let probe = "-";
+        try {
+          const r = await card._serviceResponse("music_assistant", "get_queue", { entity_id: "media_player.living" });
+          probe = JSON.stringify(r).slice(0, 300);
+        } catch (e) {
+          probe = "ERR " + e.message;
+        }
+        const mmEl = document.getElementById("mm");
+        mmEl.dataset.probe = probe;
         const root = card.shadowRoot || card.renderRoot;
         const cardEl = root?.querySelector(".hm-card");
         const main = root?.querySelector(".hm-main");
@@ -121,6 +158,14 @@
           infoTop: p(info),
           vis: r(vis),
           visTop: p(vis),
+          spec: root?.querySelector(".hm-spec")?.textContent?.trim() || "",
+          specBox: r(root?.querySelector(".hm-spec")),
+          specTop: p(root?.querySelector(".hm-spec")),
+          title: root?.querySelector(".hm-title")?.textContent?.trim() || "",
+          specObj: JSON.stringify(card._audioSpec || null),
+          specText: card._audioSpecText ? card._audioSpecText() : "-",
+          isMa: card._isMaPlayer ? card._isMaPlayer() : "-",
+          eid: card._eid ? card._eid() : "-",
           panelVar: getComputedStyle(card).getPropertyValue("--hm-panel-cover"),
           classes: cardEl?.className,
         });

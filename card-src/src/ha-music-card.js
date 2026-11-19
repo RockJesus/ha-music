@@ -3307,6 +3307,23 @@ class HaMusicCard extends LitElement {
       size = Math.max(120, Math.min(mainH - 40, mainW * 0.36, 680));
     }
     this.style.setProperty("--hm-panel-cover", `${Math.round(size)}px`);
+    // 窄屏/竖屏面板：封面容器直接按封面尺寸收口，信息区不参与收缩。
+    // 只靠 CSS 时会被后置的 height:100% 盖回，导致标题/歌手/规格被主区 overflow 裁掉。
+    const wrap = this.renderRoot?.querySelector?.(".hm-cover-wrap");
+    const info = this.renderRoot?.querySelector?.(".hm-info");
+    if (stack && !shortLandscape) {
+      if (wrap) wrap.style.height = `${Math.round(size)}px`;
+      if (info) {
+        info.style.flex = "0 0 auto";
+        info.style.minHeight = "0";
+      }
+    } else if (wrap) {
+      wrap.style.removeProperty("height");
+      if (info) {
+        info.style.removeProperty("flex");
+        info.style.removeProperty("min-height");
+      }
+    }
   }
 
   /**

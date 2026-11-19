@@ -708,21 +708,28 @@ class HaMusicCard extends LitElement {
     try {
       localStorage.removeItem("ha-music-lyrics-cache-v3");
       localStorage.removeItem("ha-music-lyrics-cache-v4");
+      localStorage.removeItem("ha-music-lyrics-cache-v5"); // 旧缓存可能含垃圾行，整代丢弃
       const list = JSON.parse(
-        localStorage.getItem("ha-music-lyrics-cache-v5") || "[]"
+        localStorage.getItem("ha-music-lyrics-cache-v6") || "[]"
       );
       if (!Array.isArray(list)) return cache;
       for (const item of list) {
         if (!Array.isArray(item) || item.length !== 2) continue;
         const [key, value] = item;
         if (typeof key !== "string" || !value || value.status !== "ready") continue;
-        cache.set(key, {
+        const entry = {
           status: "ready",
           lines: Array.isArray(value.lines) ? value.lines : [],
           plain: Array.isArray(value.plain) ? value.plain : [],
           instrumental: Boolean(value.instrumental),
           source: String(value.source || "歌词接口"),
-        });
+        };
+        // 回读缓存也要过一遍脏数据判定，历史里的垃圾行不能再被翻出来。
+        const parts = key.split("|");
+        if (this._lyricsSuspect(entry, { title: parts[0] || "", artist: parts[1] || "" })) {
+          continue;
+        }
+        cache.set(key, entry);
       }
     } catch (error) {
       return cache;
@@ -733,7 +740,7 @@ class HaMusicCard extends LitElement {
   _saveLyricsCache() {
     try {
       const list = [...this._lyricsCache.entries()].slice(-24);
-      localStorage.setItem("ha-music-lyrics-cache-v5", JSON.stringify(list));
+      localStorage.setItem("ha-music-lyrics-cache-v6", JSON.stringify(list));
     } catch (error) {
       /* 忽略配额或隐私模式错误 */
     }

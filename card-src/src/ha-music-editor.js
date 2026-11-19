@@ -531,6 +531,36 @@ class HaMusicEditor extends LitElement {
               : "Playlist JSON may contain tracks/audios arrays; the card matches the current QQ mid, title and artist to choose its url. If no match, it falls back to the single audio URL, then to procedural motion. Audio sources must allow CORS."}
           </div>
           <label class="field">
+            <span class="label">
+              ${this._zh ? "MA 实时频谱地址（可选）" : "MA realtime spectrum URL (optional)"}
+            </span>
+            <input
+              type="text"
+              .value=${config.ma_vis_url || ""}
+              placeholder="http://ma-host:8095"
+              @change=${(e) =>
+                this._update({ ma_vis_url: e.target.value.trim() || undefined })}
+            />
+          </label>
+          <label class="field">
+            <span class="label">
+              ${this._zh ? "MA 长期访问令牌（可选）" : "MA long-lived token (optional)"}
+            </span>
+            <input
+              type="password"
+              autocomplete="off"
+              .value=${config.ma_vis_token || ""}
+              placeholder="••••"
+              @change=${(e) =>
+                this._update({ ma_vis_token: e.target.value.trim() || undefined })}
+            />
+            <span class="hint">
+              ${this._zh
+                ? "在 Music Assistant 里启用 MilkDrop Visualizer 插件，然后到 设置 → 用户 → 长期访问令牌 生成一个填到这里。令牌只保存在这张卡片的配置里，卡片代码不会上传或记录它；两项都填了音柱才会切到真实频谱。"
+                : "Enable the MilkDrop Visualizer plugin in Music Assistant, then create a long-lived token under Settings → Users. The token is stored only in this card's config; the card never uploads or logs it. Filling both fields switches the bars to the real spectrum."}
+            </span>
+          </label>
+          <label class="field">
             <span class="label">${this._zh ? "标题（留空用实体名称）" : "Title (optional)"}</span>
             <input
               type="text"

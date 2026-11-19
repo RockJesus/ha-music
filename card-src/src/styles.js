@@ -652,6 +652,31 @@ export const cardStyles = css`
     height: 100%;
   }
 
+  /* 缩略预览的静态柱条：纯 CSS，不占画布内存 */
+  .hm-spectrum-flat {
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        rgba(var(--hm-a1-rgb), 0.62) 0 2px,
+        transparent 2px 5px
+      );
+    background-size: 100% 100%;
+    border-radius: 3px;
+    opacity: 0.5;
+    -webkit-mask-image: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.95) 0%,
+      rgba(0, 0, 0, 0.55) 55%,
+      rgba(0, 0, 0, 0.25) 100%
+    );
+    mask-image: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.95) 0%,
+      rgba(0, 0, 0, 0.55) 55%,
+      rgba(0, 0, 0, 0.25) 100%
+    );
+  }
+
   .hm-wave-wrap {
     height: 100%;
     width: 100%;
@@ -3492,8 +3517,7 @@ export const cardStyles = css`
   .hm-card[data-thumb="lg"] .hm-bg-art,
   .hm-card[data-thumb="md"] .hm-bg-art,
   .hm-card[data-thumb="sm"] .hm-bg-art {
-    filter: none !important;
-    opacity: 0 !important;
+    display: none !important;
   }
 
   /* 缩略预览不要走正常卡片的“窄卡片单列”规则，否则小预览会被竖向堆叠撑破 */

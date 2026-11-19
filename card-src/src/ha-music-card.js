@@ -1027,6 +1027,9 @@ class HaMusicCard extends LitElement {
   }
 
   _syncCoverEq() {
+    // 选择器缩略图/编辑预览只做静态展示：不创建、不刷新封面频谱画布，
+    // 一张 1200px 画布在 DPR 2-3 下就是几十 MB，是缩略图内存的大头。
+    if (this._thumbMode()) return;
     const canvas = this.renderRoot?.querySelector?.(".hm-cover-eq");
     const cover = this.renderRoot?.querySelector?.(".hm-cover");
     if (!canvas || !cover) return;
@@ -2835,6 +2838,13 @@ class HaMusicCard extends LitElement {
   updated() {
     const card = this.renderRoot?.querySelector?.(".hm-card");
     if (!card) return;
+    // 缩略预览：清掉任何残留的背景大图，避免整张封面被解码后常驻内存。
+    if (this._thumbMode()) {
+      card.querySelectorAll(".hm-bg-art").forEach((layer) => {
+        if (layer.style.backgroundImage) layer.style.backgroundImage = "";
+        layer.classList.remove("on");
+      });
+    }
     const media = this._readMedia();
     const entityId = this._eid();
     this._safeEffect("art", () => {
@@ -3263,6 +3273,17 @@ class HaMusicCard extends LitElement {
   _crossFadeArt(card, url) {
     const layers = card.querySelectorAll(".hm-bg-art");
     if (!layers.length) return;
+    // 缩略预览里背景层被 CSS 隐藏，仍然会把封面图整张解码一遍（大图占用可观），
+    // 直接不加载背景图，只保留纯渐变。
+    if (this._thumbMode()) {
+      this._artLoading = "";
+      this._artApplied = "";
+      layers.forEach((layer) => {
+        layer.classList.remove("on");
+        layer.style.backgroundImage = "";
+      });
+      return;
+    }
     if (!url) {
       this._artLoading = "";
       this._artApplied = "";
@@ -3283,6 +3304,15 @@ class HaMusicCard extends LitElement {
     image.decoding = "async";
     image.onload = () => {
       if (this._artLoading !== url || this._artUrl !== url) return;
+      // 进入缩略预览后仍在途的加载：直接丢弃，别把整张大图挂到背景层。
+      if (this._thumbMode()) {
+        this._artLoading = "";
+        layers.forEach((layer) => {
+          layer.classList.remove("on");
+          layer.style.backgroundImage = "";
+        });
+        return;
+      }
       this._artLoading = "";
       this._artApplied = url;
       next.style.backgroundImage = `url("${url}")`;
@@ -3937,7 +3967,9 @@ class HaMusicCard extends LitElement {
             ? this._renderLyrics(media, position)
             : html`<section class="hm-main" data-side-lyrics=${sideLyrics ? "true" : "false"}>
             <div class="hm-cover-wrap">
-              <canvas class="hm-cover-eq" aria-hidden="true"></canvas>
+              ${this._thumbMode()
+                ? nothing
+                : html`<canvas class="hm-cover-eq" aria-hidden="true"></canvas>`}
               <button
                 class="hm-cover"
                 data-playing=${playing ? "true" : "false"}
@@ -4305,6 +4337,10 @@ class HaMusicCard extends LitElement {
           ></span>`;
         })}
       </div>`;
+    }
+    // 缩略预览只用静态渐变条：不创建 canvas、不跑 rAF，内存与合成层都归零。
+    if (this._thumbMode()) {
+      return html`<div class="hm-spectrum hm-spectrum-flat" aria-hidden="true"></div>`;
     }
     // 频谱统一画在一张 canvas 上：宽屏约 300 根细柱也不会生成几百个
     // 独立合成层，避免逐根写 --h 触发整卡样式重算。
@@ -4757,6 +4793,7 @@ class HaMusicCard extends LitElement {
   }
 
   _syncSpectrumCanvas() {
+    if (this._thumbMode()) return false;
     const canvas = this.renderRoot?.querySelector?.(".hm-spectrum");
     if (!canvas) {
       this._spectrumCanvas = null;

@@ -2053,6 +2053,16 @@ class HaMusicCard extends LitElement {
     return "";
   }
 
+  // 卡片上只保留「链接到 MA 完整界面」这一个入口：播放队列/媒体库/搜索/设置
+  // 都在 MA 面板里，卡片不再维护一套缩水版。没有 MA 面板时才回退到卡内列表。
+  _onAssistantButton() {
+    if (this._maUrl()) {
+      this._openAssistant();
+      return;
+    }
+    this._openPlaylists();
+  }
+
   _openAssistant() {
     if (this._drawer?.open) this._closeDrawer();
     const url = this._maUrl();
@@ -3876,9 +3886,9 @@ class HaMusicCard extends LitElement {
               ${maShow
                 ? html`<button
                     class="hm-icon-btn hm-ma"
-                    aria-label=${maPlayer ? t("playlists") : t("openAssistant")}
-                    title=${maPlayer ? t("playlists") : t("openAssistant")}
-                    @click=${() => this._openPlaylists()}
+                    aria-label=${t("openAssistant")}
+                    title=${t("openAssistant")}
+                    @click=${() => this._onAssistantButton()}
                   >
                     ${icon("ma", 16)}
                   </button>`

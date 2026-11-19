@@ -38,7 +38,7 @@
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`；首次加载或有播放器刚开始播放时，会自动跟到正在播放的那台，多台同时播放则优先最近更新的一台。手动点选播放器后不会被立刻抢回，避免影响操作。
 - **触屏优先**：`pointer: coarse` 下按钮/滑杆/列表自动放大到 40–48px，抽屉滚动不穿透页面，点按有按压反馈；窄屏自动把音量条换到下一行，避免大按钮把卡片撑破。
-- **Music Assistant 歌单**：开启「MA 歌单入口」后顶栏按钮始终显示；当前播放器是 MA 播放器时列出 MA 播放列表，点击任意歌单即通过 `music_assistant.play_media` 开播；普通播放器点击会直接打开 MA 面板，不再只弹提示或发出无效请求；抽屉右上角仍可跳转 MA 面板。
+- **Music Assistant 入口**：开启「MA 入口」后顶栏按钮始终显示，点击直接打开 Music Assistant 面板——播放队列、媒体库、搜索、歌单、设置等全部功能都在 MA 里完成，卡片不再做缩水版；只有在没有检测到 MA 面板时，才回退为卡内歌单列表（通过 `music_assistant.play_media` 开播）。
 - **能力自适应**：按 `supported_features` 位掩码显示按钮，不出现无效控件。
 - **可视化编辑器**：UI 内直接改布局、主题、背景、频谱、标题、强调色、音量实体与显示开关。
 - **无 CDN 依赖**：单文件 ESM，内联全部依赖与图标，离线可用。
@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.7.0`
+   - URL：`/local/ha-music.js?v=2.7.1`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -193,7 +193,7 @@ show_volume: false
 
 ### Music Assistant
 
-- 顶栏歌单按钮列出 MA 播放列表（走 `media_player/browse_media` 的 `Playlists` 目录），点击后调用 `music_assistant.play_media`（`media_type: playlist`、`enqueue: play`）直接开播。
+- 顶栏 MA 按钮直接跳转 MA 面板（完整功能）；未检测到 MA 面板时回退为卡内歌单列表（走 `media_player/browse_media` 的 `Playlists` 目录），点击后调用 `music_assistant.play_media`（`media_type: playlist`、`enqueue: play`）直接开播。
 - 没有 MA 服务时自动回退 `media_player.play_media`，因此普通播放器的歌单也能用。
 - 抽屉右上角的跳转图标打开 MA 面板：默认自动读取 HA 面板路径（加载项 ingress 的前缀因实例而异，如 `/b93b5321_music_assistant`），也可用 `music_assistant` 指定相对路径或 `https://` 地址。
 - 完整队列优先经 HA Supervisor Ingress 直连 MA 的 `player_queues/items`，支持 3000+ 首并在抽屉内精确切歌；没有 MA 加载项、当前用户不是管理员或 Ingress 不可用时，回退到 `music_assistant.get_queue` 的当前/下一首与 `mass_queue`（若已安装）。

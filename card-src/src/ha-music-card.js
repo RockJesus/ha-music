@@ -41,7 +41,6 @@ import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockP
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
 import { lyricIndex, lyricProgress, parseLyrics, pickLrclibResult } from "./lyrics.js";
-import { MaVisualizer, normalizeMaVisUrl, waveTargets } from "./ma-visualizer.js";
 
 const LYRICS_API = "/api/netease_lyrics/lyrics";
 const LRCLIB_API = "https://lrclib.net/api";
@@ -262,19 +261,6 @@ class HaMusicCard extends LitElement {
     this._maAnalysisFailedKey = "";
     this._maAnalysisFailedAt = 0;
     this._maAnalysisAt = 0;
-    // MA 实时频谱（MilkDrop Visualizer 中继）：波形 / 强拍 / 连接状态。
-    // 令牌来自卡片配置，只在内存里用，不落任何日志与仓库。
-    this._maVis = null;
-    this._maVisUrl = "";
-    this._maVisKey = "";
-    this._maVisState = "idle";
-    this._maVisWave = null;
-    this._maVisAt = 0;
-    this._maVisBeatAt = 0;
-    this._maVisDownbeatAt = 0;
-    this._maVisTargets = null;
-    this._maVisTargetsWave = null;
-    this._maVisSampleRate = 0;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -392,7 +378,6 @@ class HaMusicCard extends LitElement {
       this._resetLyrics();
     }
     if (this._config.show_lyrics === false) this._lyricsOpen = false;
-    this._syncMaVisualizerConfig(config);
     this._sig = "";
     if (this._hass) this._sig = this._computeSig(this._hass);
     this._syncTimer();
@@ -407,90 +392,9 @@ class HaMusicCard extends LitElement {
     }
   }
 
-  // 卡片配置里的 MA 地址/令牌变化时重建连接；令牌只用于首帧 auth，不进日志。
-  _syncMaVisualizerConfig(config = this._config || {}) {
-    const rawUrl = String(config.ma_vis_url || config.ma_url || "").trim();
-    const token = String(config.ma_vis_token || config.ma_token || "").trim();
-    const url = token && rawUrl ? normalizeMaVisUrl(rawUrl) : "";
-    const key = url ? `${url}#${token.length}:${token.slice(-6)}` : "";
-    if (key === this._maVisKey) return;
-    this._maVisKey = key;
-    this._maVis?.close();
-    this._maVis = null;
-    this._maVisUrl = url;
-    this._maVisWave = null;
-    this._maVisAt = 0;
-    this._maVisTargets = null;
-    this._maVisTargetsWave = null;
-    this._maVisState = url ? "connecting" : "off";
-    if (!url) return;
-    this._maVis = new MaVisualizer({
-      url,
-      token,
-      onWave: (wave) => this._onMaVisWave(wave),
-      onBeat: (downbeat) => this._onMaVisBeat(downbeat),
-      onState: (state) => {
-        this._maVisState = state;
-      },
-    });
-    this._maVis.connect();
-  }
-
-  _onMaVisWave(wave) {
-    this._maVisWave = wave;
-    this._maVisAt = Date.now();
-  }
-
-  _onMaVisBeat(downbeat) {
-    this._maVisBeatAt = Date.now();
-    if (downbeat) this._maVisDownbeatAt = Date.now();
-  }
-
-  // 实时频谱可用时优先用真实波形，超过 2.2 秒没有新帧就判定掉线，
-  // 让音柱自然衰减，不卡在最后一帧的柱子上。
-  _maVisTargetsFor(count, sampleRate) {
-    const wave = this._maVisWave;
-    if (!wave || !this._maVisAt) return null;
-    if (Date.now() - this._maVisAt > 2200) return null;
-    const rate = sampleRate || this._maVisSampleRate || 48000;
-    const beatAge = this._maVisBeatAt ? Date.now() - this._maVisBeatAt : 9999;
-    const pulse = beatAge < 600 ? Math.exp(-beatAge / 260) : 0;
-    if (this._maVisTargets && this._maVisTargetsWave === wave && this._maVisTargetsCount === count) {
-      return this._maVisTargets;
-    }
-    const targets = waveTargets(wave, count, rate, pulse);
-    const raw = targets.bars;
-    let sum = 0;
-    for (let index = 0; index < raw.length; index += 1) sum += raw[index];
-    const mean = raw.length ? sum / raw.length : 0;
-    // 参数经 110 帧真实波形离线寻优（160 柱）：均值对比 1.7 倍，
-    // 局部起伏与瞬态按「该柱自身能量」加权（0.35 + 幅度），避免高频噪声柱被放大成满格尖刺。
-    // 结果：顶满 1.7%、贴底 9.7%，逐帧变化量约为旧版 1.6 倍。
-    const prevBars = this._maVisBarsPrev;
-    const bars = raw.map((value, index) => {
-      const prev = raw[Math.max(0, index - 2)];
-      const next = raw[Math.min(raw.length - 1, index + 2)];
-      const detail = value - (prev + next) / 2;
-      const transient = prevBars ? clamp(value - prevBars[index], -0.2, 0.3) : 0;
-      const zone = index < raw.length / 3 ? 1.15 : index < (raw.length * 2) / 3 ? 1 : 0.85;
-      const weight = 0.35 + value;
-      return clamp(
-        0.5 + (value - mean) * 1.7 + detail * 3 * weight + transient * 2.2 * zone * weight,
-        0.05,
-        0.95
-      );
-    });
-    this._maVisBarsPrev = raw;
-    this._maVisTargets = { bars, bands: targets.bands, peak: targets.peak };
-    this._maVisTargetsWave = wave;
-    this._maVisTargetsCount = count;
-    return this._maVisTargets;
-  }
-
   connectedCallback() {
     super.connectedCallback();
     this._thumbPreview = this._isThumbnailPreview();
-    this._syncMaVisualizerConfig(this._config || {});
     this._onKeyDown = (event) => {
       if (event.key !== "Escape") return;
       if (this._drawer.open) this._closeDrawer();
@@ -554,13 +458,6 @@ class HaMusicCard extends LitElement {
     super.disconnectedCallback();
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
-    // 页面卸载/卡片被移除时断开中继，避免后台空跑一个 WebSocket；
-    // 清掉连接指纹，重新挂载时会按同一份配置重建。
-    this._maVis?.close();
-    this._maVis = null;
-    this._maVisKey = "";
-    this._maVisWave = null;
-    this._maVisAt = 0;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
     this._seekSettleTimer = null;
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
@@ -5606,9 +5503,6 @@ class HaMusicCard extends LitElement {
     if (key !== this._spectrumKey) {
       this._spectrumKey = key;
       this._spectrumLevels = new Array(this._spectrumCount).fill(0.12);
-      this._maVisLo = null;
-      this._maVisHi = null;
-      this._maVisBarsPrev = null;
       this._syncSpectrumTrack(media);
     }
     this._ensureMaAnalysis(media, key);
@@ -5622,12 +5516,9 @@ class HaMusicCard extends LitElement {
     const audioTargets = shaped?.bars || null;
     const maShaped = audioTargets ? null : this._maSpectrumShaped(count, media);
     const maTargets = maShaped?.bars || null;
-    // 最高优先级：MA 中继推来的真实 PCM 波形（服务端解码，和播放头对齐）。
-    // 它比浏览器 WebAudio 更真，也比逐曲 RMS 包络更实时。
-    const visTargets = this._maVisTargetsFor(count, this._audioSpec?.sampleRate || 0);
     // 平滑三段能量，避免频谱跳变时整片音柱闪断。没有浏览器音频时，
     // 用 MA 真实音轨 RMS 波形派生的低/中/高频包络继续驱动三频段分区。
-    const liveBands = visTargets?.bands || audioRead?.bands || maShaped?.bands || null;
+    const liveBands = audioRead?.bands || maShaped?.bands || null;
     if (liveBands) {
       this._bandLevels.live = true;
       for (let band = 0; band < this._bandLevels.length; band += 1) {
@@ -5657,19 +5548,13 @@ class HaMusicCard extends LitElement {
     }
     for (let index = 0; index < count; index += 1) {
       let target;
-      if (visTargets || audioTargets || maTargets) {
-        const source = visTargets || { bars: audioTargets || maTargets, bands: null };
+      if (audioTargets || maTargets) {
+        const source = { bars: audioTargets || maTargets, bands: null };
         target = source.bars[index];
-        if (!visTargets) {
-          const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
-          const drive = this._bandLevels[zone] || 0;
-          // 左/中/右三块用低频/中频/高频能量做增益，保留逐柱细节，避免整段被推到天花板。
-          target = clamp(target * (0.58 + drive * 0.48), 0.03, 1);
-        } else {
-          // 真实频谱每根柱子已经是独立频段的能量，只需要压一下动态范围，
-          // 不再乘以区域能量，否则高频段会被低频包络整体拉平。
-          target = clamp(target * 1.02 + (this._bandLevels[index < count / 3 ? 0 : 1] || 0) * 0.06, 0.02, 1);
-        }
+        const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
+        const drive = this._bandLevels[zone] || 0;
+        // 左/中/右三块用低频/中频/高频能量做增益，保留逐柱细节，避免整段被推到天花板。
+        target = clamp(target * (0.58 + drive * 0.48), 0.03, 1);
       } else {
         const band = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const seed = hashString(`${frame.seed}#${index}`);
@@ -5700,22 +5585,17 @@ class HaMusicCard extends LitElement {
         );
       }
       // 顶部留出约 18% 余量，并用 gamma 拉开强弱差，避免整排柱子顶满、只剩细小锯齿。
-      // 真实频谱用略强的 gamma（1.36），高频小柱才不会被抬成一片中等高度。
-      const gamma = visTargets ? 1.36 : 1.32;
       target = clamp(
-        0.07 + Math.pow(clamp(target, 0, 1), gamma) * 0.84,
+        0.07 + Math.pow(clamp(target, 0, 1), 1.32) * 0.84,
         0.06,
         0.9
       );
-      // 手机端的整体增益只用于补偿程序化/逐曲包络偏低，真实频谱不能再抬，否则顶满。
-      if (this._isMobileUi() && !visTargets && !audioTargets) {
-        target = clamp(target * 1.3 + 0.02, 0.08, 0.94);
-      }
+      if (this._isMobileUi()) target = clamp(target * 1.3 + 0.02, 0.08, 0.94);
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
       // 真实频谱响应更快（约 15fps 更新），攻击段要比程序化律动更硬，
       // 回落用稍慢的释放，避免柱子在两帧之间掉成一条虚线。
-      const realTargets = visTargets || audioTargets || maTargets;
-      const attack = target > current ? (visTargets ? 0.9 : realTargets ? 0.72 : 0.52) : visTargets ? 0.3 : realTargets ? 0.22 : 0.24;
+      const realTargets = audioTargets || maTargets;
+      const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;
       const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
       levels[index] = next;
     }

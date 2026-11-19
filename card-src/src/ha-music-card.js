@@ -3289,6 +3289,8 @@ class HaMusicCard extends LitElement {
     // 820~1024 的平板竖屏：面板里也改竖排，否则封面按面板放大后信息列被挤到没有宽度。
     const panelStack = stack && !shortLandscape && cardW >= 821;
     card.classList.toggle("hm-panel-stack", panelStack);
+    // 窄屏/竖屏面板：用显式类接管封面与信息区高度分配，避免依赖容器查询。
+    card.classList.toggle("hm-narrow-panel", stack && !shortLandscape);
     let size;
     if (shortLandscape) {
       size = Math.max(120, Math.min(mainH - 96, mainW * 0.30, 460));

@@ -99,6 +99,19 @@ function dbToLevel(db, tiltDb) {
   return Math.max(0, Math.min(0.94, (db + tiltDb + 88) / 80));
 }
 
+// 单个频点的功率（在相邻 bin 之间线性插值）。
+// 1024 点 FFT 在 44.1kHz 下 bin 间隔约 43Hz，低频段一根柱子可能只覆盖一个 bin；
+// 直接取整会让左侧十几根柱子读出同一个值，插值后每根柱子才有自己的起伏。
+function powerAt(mag, sampleRate, freq) {
+  const nyquist = sampleRate / 2;
+  const pos = (freq / nyquist) * BIN_COUNT;
+  const k = Math.max(1, Math.min(BIN_COUNT - 2, Math.floor(pos)));
+  const frac = Math.max(0, Math.min(1, pos - k));
+  const a = mag[k] * mag[k];
+  const b = mag[k + 1] * mag[k + 1];
+  return a + (b - a) * frac;
+}
+
 // 波形 → 与柱子数量对齐的频段能量 + 三频段包络
 export function waveTargets(wave, count, sampleRate, pulse = 0) {
   const rate = sampleRate >= 8000 ? sampleRate : 48000;
@@ -111,14 +124,14 @@ export function waveTargets(wave, count, sampleRate, pulse = 0) {
   let peak = 0;
   for (let i = 0; i < bins; i += 1) {
     const ratioLo = i / bins;
-    const ratioHi = (i + 1) / bins;
     const f0 = fMin * Math.pow(fMax / fMin, ratioLo);
-    const f1 = fMin * Math.pow(fMax / fMin, ratioHi);
+    const f1 = fMin * Math.pow(fMax / fMin, (i + 1) / bins);
+    const center = Math.sqrt(f0 * f1);
     // 越靠高频补得越多，同时稍微压住低频，避免低频那半边永远顶满。
+    const db = 10 * Math.log10(powerAt(mag, rate, center) + 1e-12);
     const level = Math.min(
       0.94,
-      dbToLevel(bandDb(mag, rate, f0, f1), ratioLo * 14 - 3) +
-        pulse * (i < bins / 3 ? 0.12 : 0.03)
+      dbToLevel(db, ratioLo * 14 - 3) + pulse * (i < bins / 3 ? 0.12 : 0.03)
     );
     bars[i] = level;
     if (level > peak) peak = level;

@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.9.5";
+export const CARD_VERSION = "2.9.6";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -275,6 +275,7 @@ export function mediaClassLabel(mediaClass, language) {
   if (!item) return mediaClass;
   return isChinese(language) ? item.zh : item.en;
 }
+
 
 
 

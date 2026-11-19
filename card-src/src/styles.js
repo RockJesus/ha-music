@@ -3962,4 +3962,14 @@ export const cardStyles = css`
     min-height: 0;
     flex: 0 0 auto;
   }
+
+  /* 矮屏竖排面板：优先保住标题/歌手/规格，隐藏标签与当前歌词行。 */
+  .hm-card.hm-narrow-panel[data-panel="true"].hm-panel-tight .hm-tags,
+  .hm-card.hm-narrow-panel[data-panel="true"].hm-panel-tight .hm-now-lyric {
+    display: none;
+  }
+
+  .hm-card.hm-narrow-panel[data-panel="true"].hm-panel-tight .hm-title {
+    font-size: clamp(18px, 5.4cqi, 26px);
+  }
 `;

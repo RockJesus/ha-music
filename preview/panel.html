@@ -105,7 +105,30 @@
           }
           return { response: {} };
         },
-        connection: { sendMessagePromise: async () => ({ title: "root", children: [] }) },
+        connection: {
+          sendMessagePromise: async (msg) => {
+            if (msg?.domain === "music_assistant" && msg?.service === "get_queue") {
+              return {
+                response: {
+                  "media_player.living": {
+                    current_item: {
+                      media_item: {
+                        stream_details: {
+                          provider: "qqmusic",
+                          content_type: "flac",
+                          sample_rate: 192000,
+                          bit_depth: 24,
+                          bit_rate: 0,
+                        },
+                      },
+                    },
+                  },
+                },
+              };
+            }
+            return { title: "root", children: [] };
+          },
+        },
       };
 
       const card = document.createElement("ha-music");

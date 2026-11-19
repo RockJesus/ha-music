@@ -3974,7 +3974,7 @@ export const cardStyles = css`
     text-align: center;
   }
 
-  .hm-card.hm-narrow-panel.hm-panel-compact[data-panel="true"] .hm-info {
+  .hm-card.hm-narrow-panel.hm-panel-compact[data-panel="true"] .hm-main[data-side-lyrics] .hm-info {
     width: min(92%, 560px);
     max-width: min(92%, 560px);
   }

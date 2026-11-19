@@ -1094,10 +1094,62 @@ class HaMusicCard extends LitElement {
     return { parsed, source: "自定义接口" };
   }
 
-  // 酷狗歌词是公开接口，LRCLIB 没收录的中文歌命中率明显更高。
-  async _requestKugouLyrics(media, query, signal) {
+  // 本地歌词文件：/local/community/ha-music/lyrics/ 或 /local/lyrics/ 下放
+  // 「歌名.lrc」「歌名 - 歌手.lrc」即可离线命中，同源请求不受 CORS 限制。
+  async _requestLocalLyrics(media, query, signal) {
     const title = query?.title || "";
     if (!title) return null;
+    const artist = query?.artist || "";
+    const names = [`${title} - ${artist}`, title, artist ? `${title}-${artist}` : ""]
+      .filter(Boolean)
+      .map((base) => base.replace(/[/\\:*?"<>|]/g, "_"));
+    const dirs = ["/local/community/ha-music/lyrics/", "/local/lyrics/"];
+    for (const dir of dirs) {
+      for (const name of names) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        let text = null;
+        try {
+          const response = await fetch(`${dir}${encodeURIComponent(name)}.lrc`, {
+            signal,
+            headers: { Accept: "text/plain" },
+          });
+          if (response.status === 404) continue;
+          if (!response.ok) continue;
+          text = await response.text();
+        } catch (error) {
+          if (error?.name === "AbortError") throw error;
+          continue;
+        }
+        const parsed = parseLyrics(text || "");
+        if (!parsed.lines.length && !parsed.plain.length) continue;
+        return { parsed, source: "本地歌词" };
+      }
+    }
+    return null;
+  }
+
+  // 酷狗歌词是公开接口，LRCLIB 没收录的中文歌命中率明显更高；
+  // 但它只给自家域名的 CORS 白名单，浏览器里通常被拦，所以失败一次就记住、一天内不再试。
+  _kugouUsable() {
+    try {
+      const at = Number(localStorage.getItem("hm_kugou_blocked_at") || 0);
+      return !at || Date.now() - at > 24 * 60 * 60 * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  _markKugouBlocked() {
+    try {
+      localStorage.setItem("hm_kugou_blocked_at", String(Date.now()));
+    } catch {
+      /* 隐私模式下忽略 */
+    }
+  }
+
+  async _requestKugouLyrics(media, query, signal) {
+    const title = query?.title || "";
+    if (!title || !this._kugouUsable()) return null;
     const keyword = [title, query?.artist || ""].filter(Boolean).join(" - ");
     const duration = Math.round((Number(media?.duration) || 0) * 1000);
     const searchUrl =
@@ -1105,7 +1157,14 @@ class HaMusicCard extends LitElement {
       `&keyword=${encodeURIComponent(keyword)}` +
       (duration ? `&duration=${duration}` : "") +
       "&hash=";
-    const search = await this._fetchJsonWithTimeout(searchUrl, signal, 8000);
+    let search = null;
+    try {
+      search = await this._fetchJsonWithTimeout(searchUrl, signal, 8000);
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      this._markKugouBlocked(); // CORS/网络被拦：本机浏览器直接用不了，别再逐首重试
+      return null;
+    }
     const candidates = Array.isArray(search?.candidates) ? search.candidates : [];
     for (const item of candidates.slice(0, 2)) {
       if (!item?.id || !item?.accesskey) continue;
@@ -1114,7 +1173,10 @@ class HaMusicCard extends LitElement {
         `&id=${encodeURIComponent(item.id)}` +
         `&accesskey=${encodeURIComponent(item.accesskey)}` +
         "&fmt=lrc&charset=utf8";
-      const data = await this._fetchJsonWithTimeout(downloadUrl, signal, 8000);
+      const data = await this._fetchJsonWithTimeout(downloadUrl, signal, 8000).catch((error) => {
+        if (error?.name === "AbortError") throw error;
+        return null;
+      });
       const base64 = data?.content;
       if (typeof base64 !== "string" || !base64.trim()) continue;
       let text = "";
@@ -1287,6 +1349,17 @@ class HaMusicCard extends LitElement {
           }
         }
         tried.push("后端");
+      }
+
+      // 本地歌词文件优先：同源、离线可用，用户自己放的文件不应被在线源抢先。
+      if (lrQuery) {
+        try {
+          if (accept(await this._requestLocalLyrics(media, lrQuery, controller.signal))) return;
+        } catch (error) {
+          if (error?.name === "AbortError") throw error;
+          lastError = error;
+        }
+        tried.push("本地");
       }
 
       if (this._lyricsCustomUrl()) {

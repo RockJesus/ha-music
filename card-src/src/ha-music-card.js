@@ -460,27 +460,29 @@ class HaMusicCard extends LitElement {
     }
     const targets = waveTargets(wave, count, rate, pulse);
     const raw = targets.bars;
-    let sum = 0;
-    for (let index = 0; index < raw.length; index += 1) sum += raw[index];
-    const mean = raw.length ? sum / raw.length : 0;
-    // 参数经真实波形离线网格寻优（110 帧 / 160 柱）：均值对比 2.3、局部起伏 2.6、
-    // 瞬态增益 2.6（低频段加权），顶满率 0%，贴底率约 5%，逐帧变化量约为旧版的 1.9 倍。
-    // 低频段本来就比高频强很多，整排直接映射会变成「左边一片顶满」，
-    // 所以先以本帧均值为中心拉开对比，再叠加相邻柱子的局部起伏与瞬态。
+    // 分位数归一化：用 p10/p90 求出本帧动态范围并做慢速跟随，
+    // 既不会像「绝对值映射」那样让低频整片顶满，也不会像「均值归一化」那样
+    // 在响度起伏时把整排一起推上/拉下。参数经 110 帧真实波形离线寻优：
+    // 0.7 动态范围 + 2.0 局部起伏 + 1.4 瞬态（低频加权），顶满 0%、p95 约 0.80。
+    const sorted = raw.slice().sort((a, b) => a - b);
+    const pick = (q) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * q)))];
+    const p10 = pick(0.1);
+    const p90 = pick(0.9);
+    this._maVisLo = this._maVisLo == null ? p10 : this._maVisLo + (p10 - this._maVisLo) * 0.12;
+    this._maVisHi = this._maVisHi == null ? p90 : this._maVisHi + (p90 - this._maVisHi) * 0.12;
+    const center = (this._maVisLo + this._maVisHi) / 2;
+    const span = Math.max(0.18, this._maVisHi - this._maVisLo);
     const prevBars = this._maVisBarsPrev;
     const bars = raw.map((value, index) => {
       const prev = raw[Math.max(0, index - 2)];
       const next = raw[Math.min(raw.length - 1, index + 2)];
       const detail = value - (prev + next) / 2;
-      const transient = prevBars ? clamp(value - prevBars[index], -0.25, 0.4) : 0;
-      const zone = index < raw.length / 3 ? 1.15 : index < (raw.length * 2) / 3 ? 1 : 0.8;
+      const transient = prevBars ? clamp(value - prevBars[index], -0.2, 0.3) : 0;
+      const zone = index < raw.length / 3 ? 1.15 : index < (raw.length * 2) / 3 ? 1 : 0.85;
       return clamp(
-        0.35 * value +
-          0.65 * (0.5 + (value - mean) * 2.3) +
-          detail * 2.6 +
-          transient * 2.6 * zone,
-        0.06,
-        0.95
+        0.5 + ((value - center) / span) * 0.7 + detail * 2 + transient * 1.4 * zone,
+        0.04,
+        0.96
       );
     });
     this._maVisBarsPrev = raw;
@@ -5609,6 +5611,9 @@ class HaMusicCard extends LitElement {
     if (key !== this._spectrumKey) {
       this._spectrumKey = key;
       this._spectrumLevels = new Array(this._spectrumCount).fill(0.12);
+      this._maVisLo = null;
+      this._maVisHi = null;
+      this._maVisBarsPrev = null;
       this._syncSpectrumTrack(media);
     }
     this._ensureMaAnalysis(media, key);
@@ -5700,8 +5705,8 @@ class HaMusicCard extends LitElement {
         );
       }
       // 顶部留出约 18% 余量，并用 gamma 拉开强弱差，避免整排柱子顶满、只剩细小锯齿。
-      // 真实频谱用更强的 gamma（1.5），高频小柱才不会被抬成一片中等高度。
-      const gamma = visTargets ? 1.5 : 1.32;
+      // 真实频谱用略强的 gamma（1.36），高频小柱才不会被抬成一片中等高度。
+      const gamma = visTargets ? 1.36 : 1.32;
       target = clamp(
         0.07 + Math.pow(clamp(target, 0, 1), gamma) * 0.84,
         0.06,

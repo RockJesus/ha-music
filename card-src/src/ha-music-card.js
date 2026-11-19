@@ -464,10 +464,18 @@ class HaMusicCard extends LitElement {
     for (let index = 0; index < raw.length; index += 1) sum += raw[index];
     const mean = raw.length ? sum / raw.length : 0;
     // 低频段本来就比高频强很多，整排直接映射会变成「左边一片顶满」。
-    // 以本帧均值为中心拉开对比，再留一部分原始绝对值，避免安静段落被放大成噪音。
-    const bars = raw.map((value) =>
-      clamp(0.35 * value + 0.65 * (0.5 + (value - mean) * 1.55), 0.04, 0.95)
-    );
+    // 以本帧均值为中心拉开对比，再叠加相邻柱子的局部起伏（高频尖峰），
+    // 音柱才不是一座平滑的小山包。
+    const bars = raw.map((value, index) => {
+      const prev = raw[Math.max(0, index - 2)];
+      const next = raw[Math.min(raw.length - 1, index + 2)];
+      const detail = value - (prev + next) / 2;
+      return clamp(
+        0.35 * value + 0.65 * (0.5 + (value - mean) * 1.55) + detail * 1.8,
+        0.04,
+        0.95
+      );
+    });
     this._maVisTargets = { bars, bands: targets.bands, peak: targets.peak };
     this._maVisTargetsWave = wave;
     this._maVisTargetsCount = count;

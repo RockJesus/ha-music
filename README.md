@@ -19,12 +19,12 @@
 - **宽高双维自适应**：除宽度外同时检测卡片可用高度，矮格子自动降到 mini 单行、低矮中等格子用 compact，避免封面/标题/控制条被裁切。
 - **元素不互相遮盖**：封面尺寸随可用高度计算，控制区强制单行、不再让音量换行；紧凑矮卡片自动隐藏频谱和封面光晕，保证标题、进度、控制条各占独立区域。
 - **卡片选择器缩略预览**：兼容旧 `hui-card-preview` 与 HA 2026.6 的 `hui-suggestion-card` / `hui-card[preview]`，在预览容器内使用独立的参考图 UI——圆角方形封面、大标题、频谱、进度条和完整控制条；按预览尺寸分 lg / md / sm 三档。
-- **真实能量律动**：柱状频谱优先读取 Home Assistant `ha_music_analysis.get_track_analysis` 桥接服务返回的 Music Assistant 1800 点 RMS 能量波形，按当前播放进度取约 2.8 秒窗口映射为 36 根柱，并结合 BPM / 节拍相位与能量上升沿做低频 kick 注入；暂停自动降到低幅。没有桥接服务时自动回退到逐帧程序化律动。频谱是真实能量起伏，不是频段拆分后的 FFT 频谱。
+- **真实频谱**：卡片通过 Home Assistant WebSocket 订阅 `ha_music_studio/subscribe`，直接显示后端从 Music Assistant PCM 波形计算出的 48 段实时 FFT 频谱；约 30fps 推送，暂停自动归零。卡片不做 FFT，也不读取任何音频分析服务。
 - **封面手势**：单击封面播放/暂停；左滑封面切下一首，右滑切上一首；滑动带跟手回弹与方向动效，单击带按压缩放反馈。
 - **触控友好控件**：播放/上一首/下一首/随机/循环按钮与音量条整体加大，音量滑轨加粗到 13px、触屏 16px，音量图标和滑块拇指同步放大；窄屏和手机面板自动把控制区拆成「按钮 + 音量」两行，避免手指误触或被裁切。
 - **全局歌词悬浮窗**：默认开启，默认停在顶栏内；只显示当前播放歌曲的一句歌词，透明背景、无胶囊外框，歌词文字使用当前主题渐变；长按可拖动并跨页面记住位置。默认自动跟随当前正在播放的播放器，即使当前页面没有 `ha-music` 卡片，也能自动匹配歌词。
-- **自动歌词**：优先复用 `knoop7/lyrics-card` 的 `netease_lyrics` 同源接口 `/api/netease_lyrics/lyrics`（按 QQ 音乐、网易云顺序搜索，可选）；后端集成未安装、未加载或返回 404 时，自动回退到 LRCLIB 在线同步歌词，最后用 Lyrics.ovh 纯文本歌词兜底，无需额外配置。支持 LRC 时间轴同步高亮与点击歌词跳转，卡片显示当前一句，点顶栏「歌词」按钮进入滚动歌词面板；纯文本歌词同样支持。编辑器「歌词源」可选 `自动（QQ/网易云 → LRCLIB → Lyrics.ovh）`、`QQ 音乐`、`网易云音乐`、`LRCLIB（在线同步歌词）`，默认自动；也可整体关闭歌词。
-- **歌词补强**：当前句跟随播放进度做逐行卡拉OK填充；歌词面板内置 ±0.5 秒时间偏移，歌词提前/滞后可即时校准；常用歌词缓存到浏览器本地，切歌/重载后优先复用。前端按参考项目清洗 `(Live)`、`[Remix]`、括号说明与分隔符，再依次尝试「清洗歌名 + 歌手」「清洗歌名」「原始歌名 + 歌手」；LRCLIB 额外按歌名、歌手、时长投票挑选最可信的版本，避免现场版/翻唱带偏时间轴；接口请求带 HA 访问令牌，401 自动刷新令牌并重试。
+- **后端歌词**：歌词由 `ha_music_studio` 集成从 Music Assistant 原生 `metadata/get_track_lyrics` 获取并解析 LRC，按播放进度计算当前行索引和行内进度，再通过 `ha_music_studio/subscribe_lyrics` 推送给卡片。卡片只渲染后端返回的行、索引与进度，不访问网易云、QQ、酷狗、LRCLIB 或 Lyrics.ovh，也不在浏览器缓存歌词。支持点击歌词跳转和 ±0.5 秒偏移校准；纯文本歌词按静态列表显示。
+- **歌词同步**：当前句高亮与逐行填充完全使用后端下发的 `index` / `progress`；歌词面板内置 ±0.5 秒时间偏移，调整后重新订阅由后端重算索引。切歌时后端先推送 `loading`，取到歌词后再推送 `ready` 或 `none`，卡片不自行匹配歌名。
 - **三档自适应布局**：`full` 完整、`compact` 紧凑、`mini` 迷你单行；默认 `adaptive` 按卡片宽度自动切换（< 430px 进入 compact）。
 - **封面驱动配色**：从当前封面提取主色，混入次色与背景氛围光；跨域或取色失败时回退到主题色。
 - **面板单屏铺满**：面板视图按可用高度约束圆形封面，自动压缩主区，频谱、进度和控制条保持在单屏内，不产生纵向溢出；面板中卡片四角保留与普通卡片一致的圆角，不再是无圆角的直角铺满。
@@ -73,7 +73,7 @@
 
 ### 前置：歌词后端（可选）
 
-卡片不依赖歌词后端即可使用：自动模式会先尝试 `knoop7/lyrics-card` 的 `netease_lyrics` 接口，未安装时自动回退 LRCLIB，再用 Lyrics.ovh 纯文本歌词兜底。若希望优先使用 QQ 音乐 / 网易云音乐歌词，可在 HACS 中安装 **Lyrics** 集成（`knoop7/lyrics-card`，类别选 Integration）；不安装也不影响自动歌词与全局悬浮歌词。
+频谱和歌词都依赖 **HA Music Studio** 集成（`https://github.com/RockJesus/ha-music-studio`，类别选 Integration）。安装并重启 Home Assistant 后，在「设置 → 设备与服务」添加 **HA Music Studio**。未安装时卡片仍可播放和控制，但不会显示实时频谱和后端歌词。
 
 ### HACS（推荐）
 
@@ -87,7 +87,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.7.1`
+   - URL：`/local/ha-music.js?v=2.12.9`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -126,17 +126,14 @@ entity: media_player.living_room
 | `max_queue` | number | `60` | 原生播放器/MA 兜底队列最多展示条数；MA 完整队列显示全部 |
 | `music_assistant` | `true` \| `false` \| string | 自动 | 歌单入口：不填时检测到 MA 服务/播放器即显示；`false` 隐藏；字符串同时作为抽屉内「打开 MA」按钮的面板地址（留空自动读 HA 面板路径） |
 
-### MA 真实能量波形
+### 实时频谱与后端歌词
 
-卡片不再要求填写歌曲音频直链或歌单。接入 Home Assistant 的 `ha_music_analysis` 桥接服务后，卡片会在播放时自动调用 `ha_music_analysis.get_track_analysis`，读取当前曲目的 Music Assistant 分析结果：
+卡片启动后按 `entity_id` 订阅两条 Home Assistant WebSocket：
 
-- `waveform`：1800 点 0–1 RMS 能量波形，均匀覆盖整首曲目
-- `bpm` / `bpm_source`：节拍速度与来源
-- `energy` / `duration`：整体能量、曲目时长
+- `ha_music_studio/subscribe`：`ready` / `ma_text` / `debug` / `spectrum` / `error`；`spectrum` 包含 48 段 0–1 幅度，约 30fps。
+- `ha_music_studio/subscribe_lyrics`：`lyrics`，包含 `status`、`lines`、`plain`、`synced`、`track_id`、`position`、`duration`、`index`、`progress`、`offset`。
 
-频谱柱按当前 `media_position` 在波形上滑动取窗，因此会跟随真实播放进度起伏，而不是固定动画；暂停后柱高自动回落。桥接服务不可用、当前曲目没有分析结果或实体不是 MA 播放器时，卡片自动回退到程序化逐帧律动，不报错、不影响播放。
-
-> 这是能量轮廓 + 节拍相位，不是按频段拆分的实时 FFT 频谱。桥接服务 `ha_music_analysis` 需要单独安装到 HA；未安装时卡片使用内置律动。
+卡片只做渲染：频谱画柱，歌词按 `index` 高亮并按 `progress` 填充当前行；不会请求任何外部歌词接口。后端不可用时频谱和歌词区域保持空闲，播放控制不受影响。
 
 ### 全局迷你播放器
 

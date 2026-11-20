@@ -261,6 +261,16 @@ class HaMusicCard extends LitElement {
     this._maAnalysisFailedKey = "";
     this._maAnalysisFailedAt = 0;
     this._maAnalysisAt = 0;
+    // HA Music Studio：服务端 30fps 48 段真实频谱。
+    this._studioBands = null;
+    this._studioPeak = 0;
+    this._studioRms = 0;
+    this._studioFrames = 0;
+    this._studioAt = 0;
+    this._studioKey = "";
+    this._studioUnsub = null;
+    this._studioPending = false;
+    this._studioFailedAt = 0;
   }
 
   /* ---------------- 生命周期 ---------------- */
@@ -5025,6 +5035,105 @@ class HaMusicCard extends LitElement {
     }
   }
 
+  _studioAvailable() {
+    return Boolean(this._hass?.services?.ha_music_studio);
+  }
+
+  _studioSpectrumReady() {
+    return Boolean(
+      this._studioBands?.length &&
+        Date.now() - this._studioAt < 1600
+    );
+  }
+
+  _resampleStudioBands(count) {
+    const bands = this._studioBands;
+    if (!bands?.length) return null;
+    if (count === bands.length) return bands.slice();
+    const out = new Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const pos = count > 1 ? (index / (count - 1)) * (bands.length - 1) : 0;
+      const lo = Math.floor(pos);
+      const hi = Math.min(bands.length - 1, lo + 1);
+      const mix = pos - lo;
+      const a = Number(bands[lo]) || 0;
+      const b = Number(bands[hi]) || 0;
+      out[index] = a + (b - a) * mix;
+    }
+    return out;
+  }
+
+  _studioBandTriplet() {
+    const bands = this._studioBands;
+    if (!bands?.length) return null;
+    const third = bands.length / 3;
+    return [0, 1, 2].map((zone) => {
+      const from = Math.floor(zone * third);
+      const to = Math.max(from + 1, Math.round((zone + 1) * third));
+      let sum = 0;
+      let n = 0;
+      for (let index = from; index < Math.min(bands.length, to); index += 1) {
+        sum += Number(bands[index]) || 0;
+        n += 1;
+      }
+      return n ? sum / n : 0;
+    });
+  }
+
+  _ensureStudioSpectrum() {
+    if (!this._studioAvailable() || !this._eid()) return;
+    const key = this._eid();
+    if (this._studioKey === key && (this._studioUnsub || this._studioPending)) {
+      return;
+    }
+    if (this._studioFailedAt && Date.now() - this._studioFailedAt < 60 * 1000) {
+      return;
+    }
+    this._studioUnsub?.();
+    this._studioUnsub = null;
+    this._studioKey = key;
+    this._studioPending = true;
+    const connection = this._hass?.connection;
+    if (!connection?.subscribeMessage) {
+      this._studioPending = false;
+      return;
+    }
+    let request;
+    try {
+      request = connection.subscribeMessage(
+        (event) => {
+          if (!event || event.type !== "spectrum" || !Array.isArray(event.bands)) {
+            return;
+          }
+          this._studioBands = event.bands.map((value) => clamp(Number(value) || 0, 0, 1.6));
+          this._studioPeak = Number(event.peak) || 0;
+          this._studioRms = Number(event.rms) || 0;
+          this._studioFrames = Number(event.frames) || 0;
+          this._studioAt = Date.now();
+        },
+        { type: "ha_music_studio/subscribe", entity_id: key }
+      );
+    } catch {
+      this._studioPending = false;
+      this._studioFailedAt = Date.now();
+      return;
+    }
+    Promise.resolve(request)
+      .then((unsub) => {
+        if (this._studioKey !== key) {
+          unsub?.();
+          return;
+        }
+        this._studioUnsub = unsub;
+      })
+      .catch(() => {
+        this._studioFailedAt = Date.now();
+      })
+      .finally(() => {
+        if (this._studioKey === key) this._studioPending = false;
+      });
+  }
+
   _audioSpectrumReady() {
     return Boolean(
       this._audioEl &&
@@ -5553,6 +5662,7 @@ class HaMusicCard extends LitElement {
       this._spectrumLevels = new Array(this._spectrumCount).fill(0.12);
       this._syncSpectrumTrack(media);
     }
+    this._ensureStudioSpectrum();
     this._ensureMaAnalysis(media, key);
     const time = now / 1000;
     const levels = this._spectrumLevels;
@@ -5562,11 +5672,20 @@ class HaMusicCard extends LitElement {
     const audioRaw = audioRead?.levels || null;
     const shaped = audioRaw ? this._shapeAudioBars(audioRaw) : null;
     const audioTargets = shaped?.bars || null;
-    const maShaped = audioTargets ? null : this._maSpectrumShaped(count, media);
+    const studioReady = this._studioSpectrumReady();
+    const studioRaw = studioReady ? this._resampleStudioBands(count) : null;
+    const studioShaped = studioRaw ? this._shapeAudioBars(studioRaw) : null;
+    const studioTargets = studioShaped?.bars || null;
+    const maShaped =
+      audioTargets || studioTargets ? null : this._maSpectrumShaped(count, media);
     const maTargets = maShaped?.bars || null;
     // 平滑三段能量，避免频谱跳变时整片音柱闪断。没有浏览器音频时，
-    // 用 MA 真实音轨 RMS 波形派生的低/中/高频包络继续驱动三频段分区。
-    const liveBands = audioRead?.bands || maShaped?.bands || null;
+    // 用服务端真实 FFT 频谱（Studio）或 MA 音轨 RMS 包络驱动三频段分区。
+    const liveBands =
+      audioRead?.bands ||
+      (studioReady ? this._studioBandTriplet() : null) ||
+      maShaped?.bands ||
+      null;
     if (liveBands) {
       this._bandLevels.live = true;
       for (let band = 0; band < this._bandLevels.length; band += 1) {
@@ -5596,8 +5715,8 @@ class HaMusicCard extends LitElement {
     }
     for (let index = 0; index < count; index += 1) {
       let target;
-      if (audioTargets || maTargets) {
-        const source = { bars: audioTargets || maTargets, bands: null };
+      if (audioTargets || studioTargets || maTargets) {
+        const source = { bars: audioTargets || studioTargets || maTargets, bands: null };
         target = source.bars[index];
         const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const drive = this._bandLevels[zone] || 0;
@@ -5642,7 +5761,7 @@ class HaMusicCard extends LitElement {
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
       // 真实频谱响应更快（约 15fps 更新），攻击段要比程序化律动更硬，
       // 回落用稍慢的释放，避免柱子在两帧之间掉成一条虚线。
-      const realTargets = audioTargets || maTargets;
+      const realTargets = audioTargets || studioTargets || maTargets;
       const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;
       const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
       levels[index] = next;

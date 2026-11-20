@@ -40,10 +40,7 @@ import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallD
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
-import { lyricIndex, lyricProgress, parseLyrics, pickLrclibResult } from "./lyrics.js";
 
-const LYRICS_API = "/api/netease_lyrics/lyrics";
-const LRCLIB_API = "https://lrclib.net/api";
 const MOBILE_MEDIA =
   "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)";
 
@@ -208,10 +205,11 @@ class HaMusicCard extends LitElement {
     this._lyricsScrolled = -2;
     this._lyricsScrollObserver = null;
     this._lyricsScrollObserved = null;
-    this._lyricsAbort = null;
     this._lyricsOffset = this._loadLyricsOffset();
-    this._lyricsCache = this._loadLyricsCache();
-    this._lyricsBackendMissingAt = 0;
+    this._lyricsUnsub = null;
+    this._lyricsPending = false;
+    this._lyricsSubKey = "";
+    this._lyricsTrackId = "";
     this._coverPress = null;
     this._coverGesture = "";
     this._coverGestureTimer = null;
@@ -506,12 +504,7 @@ class HaMusicCard extends LitElement {
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
     this._fitPanelRaf = null;
     if (this._toastTimer) clearTimeout(this._toastTimer);
-    if (this._lyricsAbort) {
-      this._lyricsAbort.abort();
-      this._lyricsAbort = null;
-    }
-    if (this._lyricsRetryTimer) clearTimeout(this._lyricsRetryTimer);
-    this._lyricsRetryTimer = null;
+    this._teardownStudioLyrics();
   }
 
   /* ---------------- 状态推导 ---------------- */
@@ -661,11 +654,9 @@ class HaMusicCard extends LitElement {
   }
 
   _resetLyrics() {
-    if (this._lyricsAbort) {
-      this._lyricsAbort.abort();
-      this._lyricsAbort = null;
-    }
+    this._teardownStudioLyrics();
     this._lyricsKey = "";
+    this._lyricsTrackId = "";
     this._lyricsOpen = false;
     this._lyricsActive = -1;
     this._lyricsScrolled = -2;
@@ -701,562 +692,177 @@ class HaMusicCard extends LitElement {
     );
     this._saveLyricsOffset();
     this._lyricsScrolled = -2;
+    this._lyricsKey = "";
+    this._ensureStudioLyrics(true);
     this.requestUpdate();
-  }
-
-  _loadLyricsCache() {
-    const cache = new Map();
-    try {
-      localStorage.removeItem("ha-music-lyrics-cache-v3");
-      localStorage.removeItem("ha-music-lyrics-cache-v4");
-      localStorage.removeItem("ha-music-lyrics-cache-v5"); // 旧缓存可能含垃圾行，整代丢弃
-      const list = JSON.parse(
-        localStorage.getItem("ha-music-lyrics-cache-v6") || "[]"
-      );
-      if (!Array.isArray(list)) return cache;
-      for (const item of list) {
-        if (!Array.isArray(item) || item.length !== 2) continue;
-        const [key, value] = item;
-        if (typeof key !== "string" || !value || value.status !== "ready") continue;
-        const entry = {
-          status: "ready",
-          lines: Array.isArray(value.lines) ? value.lines : [],
-          plain: Array.isArray(value.plain) ? value.plain : [],
-          instrumental: Boolean(value.instrumental),
-          source: String(value.source || "歌词接口"),
-        };
-        // 回读缓存也要过一遍脏数据判定，历史里的垃圾行不能再被翻出来。
-        const parts = key.split("|");
-        if (this._lyricsSuspect(entry, { title: parts[0] || "", artist: parts[1] || "" })) {
-          continue;
-        }
-        cache.set(key, entry);
-      }
-    } catch (error) {
-      return cache;
-    }
-    return cache;
-  }
-
-  _saveLyricsCache() {
-    try {
-      const list = [...this._lyricsCache.entries()].slice(-24);
-      localStorage.setItem("ha-music-lyrics-cache-v6", JSON.stringify(list));
-    } catch (error) {
-      /* 忽略配额或隐私模式错误 */
-    }
   }
 
   _lyricsPosition(position) {
     return Math.max(0, (Number(position) || 0) + this._lyricsOffset);
   }
 
-  _cleanLyricsQuery(value) {
-    return String(value || "")
-      .replace(/\(.*?\)|\[.*?\]|（.*?）/g, "")
-      .replace(/[\s\-_～〜]+/g, " ")
-      .trim();
-  }
-
-  _lyricsSource() {
-    const source = this._config?.lyrics_source;
-    return source === "qq" || source === "wy" || source === "lrclib"
-      ? source
-      : "auto";
-  }
-
-  _lyricsQueries(media) {
-    const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
-    const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
-    const cleanTitle = this._cleanLyricsQuery(rawTitle);
-    const cleanArtist = this._cleanLyricsQuery(rawArtist);
-    // 多歌手用 “/”“&” 串起来时整串搜索几乎必然匹配不上，取第一位歌手再试一次。
-    const firstArtist = String(cleanArtist)
-      .split(/\s*[/&、,，]\s*|\s+feat\.?\s+|\s+ft\.?\s+/i)[0]
-      .trim();
-    const list = [
-      { title: cleanTitle || rawTitle, artist: cleanArtist },
-      { title: cleanTitle || rawTitle, artist: firstArtist },
-      { title: cleanTitle || rawTitle, artist: "" },
-      { title: rawTitle, artist: rawArtist },
-    ];
-    const seen = new Set();
-    return list.filter((item) => {
-      if (!item.title) return false;
-      const key = `${item.title}|${item.artist}`.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
-
-  async _refreshLyricsToken() {
-    const auth = this._hass?.auth;
-    if (typeof auth?.refreshAccessToken !== "function") return;
-    try {
-      await auth.refreshAccessToken();
-    } catch (error) {
-      /* 刷新失败时由下一次请求继续处理 */
+  _teardownStudioLyrics() {
+    const unsubscribe = this._lyricsUnsub;
+    this._lyricsUnsub = null;
+    this._lyricsPending = false;
+    this._lyricsSubKey = "";
+    if (typeof unsubscribe === "function") {
+      try {
+        unsubscribe();
+      } catch (error) {
+        /* 已断开的订阅忽略 */
+      }
+    } else if (unsubscribe && typeof unsubscribe.then === "function") {
+      unsubscribe.then((fn) => fn?.()).catch(() => {});
     }
   }
 
-  async _requestNeteaseLyrics(query, signal) {
-    let lastError = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        const token = this._hass?.auth?.data?.access_token;
-        if (!token) throw new Error("歌词接口未认证");
-        const url = new URL(LYRICS_API, window.location.origin);
-        url.searchParams.set("title", query.title);
-        url.searchParams.set("artist", query.artist || "");
-        const lyricSource = this._lyricsSource();
-        if (lyricSource !== "auto") url.searchParams.set("source", lyricSource);
-        // 后端卡死不能拖垮整条链，单次请求 10s 就放弃、交给下一级歌词源。
-        const local = new AbortController();
-        const onAbort = () => local.abort();
-        if (signal) {
-          if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-          signal.addEventListener("abort", onAbort, { once: true });
-        }
-        const timer = setTimeout(() => local.abort(), 10000);
-        let response;
+  _ensureStudioLyrics(force = false) {
+    if (!this._lyricsEnabled() || this._thumbMode()) return;
+    const connection = this._hass?.connection;
+    if (!connection || typeof connection.subscribeMessage !== "function") {
+      this._lyrics = {
+        status: "error",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      return;
+    }
+    const entityId = this._eid();
+    const subKey = `${entityId}|${this._lyricsOffset}`;
+    if (!force && subKey === this._lyricsSubKey && (this._lyricsUnsub || this._lyricsPending)) {
+      return;
+    }
+    if (this._lyricsSubKey && this._lyricsSubKey !== subKey) this._teardownStudioLyrics();
+    this._lyricsSubKey = subKey;
+    this._lyricsPending = true;
+    const handle = (unsubscribe) => {
+      this._lyricsPending = false;
+      if (this._lyricsSubKey !== subKey) {
         try {
-          response = await fetch(url.toString(), {
-            signal: local.signal,
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            credentials: "same-origin",
-          });
-        } catch (fetchError) {
-          if (fetchError?.name === "AbortError") {
-            if (signal?.aborted) throw fetchError;
-            lastError = new Error("歌词后端超时");
-            if (attempt < 2) continue;
-            break;
-          }
-          throw fetchError;
-        } finally {
-          clearTimeout(timer);
-          if (signal) signal.removeEventListener("abort", onAbort);
-        }
-        if (response.status === 401 && attempt < 2) {
-          await this._refreshLyricsToken();
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          continue;
-        }
-        // 后端集成缺失时接口是 404；不必对同一查询重复打三次。
-        if (response.status === 404) {
-          this._lyricsBackendMissingAt = Date.now();
-          return null;
-        }
-        if (!response.ok) {
-          lastError = new Error(`lyrics HTTP ${response.status}`);
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            continue;
-          }
-          break;
-        }
-        const data = await response.json();
-        const raw = data?.lyrics;
-        if (!raw || typeof raw !== "string") return null;
-        const parsed = parseLyrics(raw);
-        if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
-          return null;
-        }
-        const source =
-          data?.source === "qq"
-            ? "QQ音乐"
-            : data?.source === "netease"
-              ? "网易云"
-              : "歌词接口";
-        return { parsed, source };
-      } catch (error) {
-        if (error?.name === "AbortError") throw error;
-        lastError = error;
-        if (attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-      }
-    }
-    throw lastError || new Error("歌词接口请求失败");
-  }
-
-  async _lrclibJson(path, params, signal) {
-    const url = new URL(`${LRCLIB_API}/${path}`);
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && String(value).trim()) {
-        url.searchParams.set(key, String(value));
-      }
-    }
-    const local = new AbortController();
-    const onAbort = () => local.abort();
-    if (signal) {
-      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-    const timer = setTimeout(() => local.abort(), 8000);
-    try {
-      const response = await fetch(url.toString(), {
-        signal: local.signal,
-        mode: "cors",
-        headers: { Accept: "application/json" },
-      });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`lrclib HTTP ${response.status}`);
-      return response.json();
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        if (signal?.aborted) throw error;
-        return null; // 单次请求超时：让上层继续尝试下一个查询
-      }
-      throw error;
-    } finally {
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener("abort", onAbort);
-    }
-  }
-
-  // LRCLIB 是纯在线同步歌词源，不需要 HA 后端集成；后端缺失/归档时作为兜底。
-  async _requestLrclibLyrics(media, query, signal) {
-    const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
-    const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
-    const cleanTitle = this._cleanLyricsQuery(rawTitle) || rawTitle;
-    const cleanArtist = this._cleanLyricsQuery(rawArtist) || rawArtist;
-    const duration = Math.round(Number(media.duration) || 0);
-    const exact = [];
-    if (duration && cleanArtist) {
-      exact.push({
-        track_name: cleanTitle,
-        artist_name: cleanArtist,
-        ...(media.album ? { album_name: media.album } : {}),
-        duration,
-      });
-      if (rawArtist !== cleanArtist) {
-        exact.push({
-          track_name: rawTitle,
-          artist_name: rawArtist,
-          ...(media.album ? { album_name: media.album } : {}),
-          duration,
-        });
-      }
-    }
-    const searches = [];
-    if (query.title) {
-      searches.push({
-        track_name: query.title,
-        artist_name: query.artist || cleanArtist,
-      });
-    }
-    searches.push({
-      q: [rawTitle, cleanArtist || rawArtist].filter(Boolean).join(" "),
-    });
-    // 最后再退到「只按歌名」搜一次：多歌手/翻译名场景里歌手串常常匹配不上，
-    // 由 pickLrclibResult 的歌名投票把关，仍能挡掉明显的别歌。
-    if (cleanTitle) searches.push({ q: cleanTitle });
-    let lastError = null;
-    for (const params of searches) {
-      try {
-        const results = await this._lrclibJson("search", params, signal);
-        const match = pickLrclibResult(results, {
-          title: query.title || rawTitle,
-          artist: query.artist || rawArtist,
-          duration: media.duration,
-        });
-        if (!match) continue;
-        const parsed = this._lrclibParsed(match);
-        if (parsed) return { parsed, source: "LRCLIB" };
-      } catch (error) {
-        if (error?.name === "AbortError") throw error;
-        lastError = error;
-      }
-    }
-
-    // 精确接口返回单曲且命中率最高；放在搜索之后，避免 CORS/限流时阻塞首屏。
-    for (const params of exact) {
-      try {
-        const item = await this._lrclibJson("get", params, signal);
-        if (!item) continue;
-        const parsed = this._lrclibParsed(item);
-        if (parsed) return { parsed, source: "LRCLIB" };
-      } catch (error) {
-        if (error?.name === "AbortError") throw error;
-        lastError = error;
-      }
-    }
-    if (lastError) throw lastError;
-    return null;
-  }
-
-  async _requestLyricsOvh(media, query, signal) {
-    const rawTitle = Array.isArray(media.title) ? media.title[0] || "" : media.title || "";
-    const rawArtist = Array.isArray(media.artist) ? media.artist[0] || "" : media.artist || "";
-    const artist = this._cleanLyricsQuery(query?.artist || rawArtist) || rawArtist;
-    const title = this._cleanLyricsQuery(query?.title || rawTitle) || rawTitle;
-    if (!artist || !title) return null;
-    const local = new AbortController();
-    const onAbort = () => local.abort();
-    if (signal) {
-      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-    const timer = setTimeout(() => local.abort(), 8000);
-    try {
-      const response = await fetch(
-        `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`,
-        {
-          signal: local.signal,
-          mode: "cors",
-          headers: { Accept: "application/json" },
-        }
-      );
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`lyrics.ovh HTTP ${response.status}`);
-      const data = await response.json();
-      const parsed = parseLyrics(data?.lyrics || "");
-      if (!parsed.lines.length && !parsed.plain.length) return null;
-      return { parsed, source: "Lyrics.ovh" };
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        if (signal?.aborted) throw error;
-        return null;
-      }
-      throw error;
-    } finally {
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener("abort", onAbort);
-    }
-  }
-
-  _lrclibParsed(item) {
-    if (!item) return null;
-    if (item.instrumental && !item.syncedLyrics && !item.plainLyrics) {
-      return { lines: [], plain: [], instrumental: true };
-    }
-    const raw = item.syncedLyrics || item.plainLyrics;
-    if (typeof raw !== "string" || !raw.trim()) return null;
-    const parsed = parseLyrics(raw);
-    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) {
-      return null;
-    }
-    return parsed;
-  }
-
-  // 可选的第四条通道：用户自己的歌词接口（HA 里的 REST 端点或任意在线服务）。
-  // 支持 {title}/{artist} 占位符；返回 JSON 里取 lyrics / lrc / data 任一字段。
-  _lyricsCustomUrl() {
-    const value = this._config?.lyrics_api;
-    return typeof value === "string" && value.trim() ? value.trim() : "";
-  }
-
-  async _fetchJsonWithTimeout(url, signal, ms = 8000) {
-    const local = new AbortController();
-    const onAbort = () => local.abort();
-    if (signal) {
-      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-    const timer = setTimeout(() => local.abort(), ms);
-    try {
-      const response = await fetch(url, {
-        signal: local.signal,
-        headers: { Accept: "application/json" },
-      });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        if (signal?.aborted) throw error;
-        return null; // 单次超时：交给下一级
-      }
-      throw error;
-    } finally {
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener("abort", onAbort);
-    }
-  }
-
-  async _requestCustomLyrics(query, signal) {
-    const template = this._lyricsCustomUrl();
-    if (!template) return null;
-    const build = (tpl) => {
-      if (/\{(title|artist)\}/.test(tpl)) {
-        return tpl
-          .replace(/\{title\}/g, encodeURIComponent(query.title || ""))
-          .replace(/\{artist\}/g, encodeURIComponent(query.artist || ""));
-      }
-      const url = new URL(tpl, window.location.origin);
-      url.searchParams.set("title", query.title || "");
-      if (query.artist) url.searchParams.set("artist", query.artist);
-      return url.toString();
-    };
-    const data = await this._fetchJsonWithTimeout(build(template), signal, 8000);
-    const raw = data?.lyrics || data?.lrc || data?.data;
-    if (typeof raw !== "string" || !raw.trim()) return null;
-    const parsed = parseLyrics(raw);
-    if (!parsed.lines.length && !parsed.plain.length && !parsed.instrumental) return null;
-    return { parsed, source: "自定义接口" };
-  }
-
-  // 本地歌词文件：/local/community/ha-music/lyrics/ 或 /local/lyrics/ 下放
-  // 「歌名.lrc」「歌名 - 歌手.lrc」即可离线命中，同源请求不受 CORS 限制。
-  async _requestLocalLyrics(media, query, signal) {
-    const title = query?.title || "";
-    if (!title) return null;
-    const artist = query?.artist || "";
-    const names = [`${title} - ${artist}`, title, artist ? `${title}-${artist}` : ""]
-      .filter(Boolean)
-      .map((base) => base.replace(/[/\\:*?"<>|]/g, "_"));
-    const dirs = ["/local/community/ha-music/lyrics/", "/local/lyrics/"];
-    for (const dir of dirs) {
-      for (const name of names) {
-        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        let text = null;
-        try {
-          const response = await fetch(`${dir}${encodeURIComponent(name)}.lrc`, {
-            signal,
-            headers: { Accept: "text/plain" },
-          });
-          if (response.status === 404) continue;
-          if (!response.ok) continue;
-          text = await response.text();
+          unsubscribe?.();
         } catch (error) {
-          if (error?.name === "AbortError") throw error;
-          continue;
+          /* 切换实体后的旧订阅 */
         }
-        const parsed = parseLyrics(text || "");
-        if (!parsed.lines.length && !parsed.plain.length) continue;
-        return { parsed, source: "本地歌词" };
+        return;
       }
-    }
-    return null;
-  }
-
-  // 酷狗歌词是公开接口，LRCLIB 没收录的中文歌命中率明显更高；
-  // 但它只给自家域名的 CORS 白名单，浏览器里通常被拦，所以失败一次就记住、一天内不再试。
-  _kugouUsable() {
-    try {
-      const at = Number(localStorage.getItem("hm_kugou_blocked_at") || 0);
-      return !at || Date.now() - at > 24 * 60 * 60 * 1000;
-    } catch {
-      return true;
-    }
-  }
-
-  _markKugouBlocked() {
-    try {
-      localStorage.setItem("hm_kugou_blocked_at", String(Date.now()));
-    } catch {
-      /* 隐私模式下忽略 */
-    }
-  }
-
-  async _requestKugouLyrics(media, query, signal) {
-    const title = query?.title || "";
-    if (!title || !this._kugouUsable()) return null;
-    const keyword = [title, query?.artist || ""].filter(Boolean).join(" - ");
-    const duration = Math.round((Number(media?.duration) || 0) * 1000);
-    const searchUrl =
-      "https://lyrics.kugou.com/search?ver=1&man=yes&client=pc" +
-      `&keyword=${encodeURIComponent(keyword)}` +
-      (duration ? `&duration=${duration}` : "") +
-      "&hash=";
-    let search = null;
-    try {
-      search = await this._fetchJsonWithTimeout(searchUrl, signal, 8000);
-    } catch (error) {
-      if (error?.name === "AbortError") throw error;
-      this._markKugouBlocked(); // CORS/网络被拦：本机浏览器直接用不了，别再逐首重试
-      return null;
-    }
-    const candidates = Array.isArray(search?.candidates) ? search.candidates : [];
-    for (const item of candidates.slice(0, 2)) {
-      if (!item?.id || !item?.accesskey) continue;
-      const downloadUrl =
-        "https://lyrics.kugou.com/download?ver=1&client=pc" +
-        `&id=${encodeURIComponent(item.id)}` +
-        `&accesskey=${encodeURIComponent(item.accesskey)}` +
-        "&fmt=lrc&charset=utf8";
-      const data = await this._fetchJsonWithTimeout(downloadUrl, signal, 8000).catch((error) => {
-        if (error?.name === "AbortError") throw error;
-        return null;
-      });
-      const base64 = data?.content;
-      if (typeof base64 !== "string" || !base64.trim()) continue;
-      let text = "";
-      try {
-        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-        text = new TextDecoder("utf-8").decode(bytes);
-      } catch {
-        continue;
-      }
-      const parsed = parseLyrics(text);
-      if (!parsed.lines.length && !parsed.plain.length) continue;
-      return { parsed, source: "酷狗" };
-    }
-    return null;
-  }
-
-  // 有些源会把「歌名/歌手/横幅串」当成歌词吐回来（整段同一行、带 |→ ←| 装饰），
-  // 这类结果宁可按没有处理，也不能把垃圾行铺到卡片上。
-  _lyricsSuspect(parsed, media) {
-    if (!parsed) return true;
-    const norm = (value) =>
-      String(value || "")
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, "");
-    const texts = [
-      ...(parsed.lines || []).map((line) => line.text),
-      ...(parsed.plain || []),
-    ].filter((text) => String(text || "").trim());
-    if (!texts.length) return !parsed.instrumental;
-    const titleKey = norm(media?.title);
-    const artistKey = norm(media?.artist);
-    const albumKey = normalizeLoose(media?.album);
-    const uniq = new Set(texts.map(norm));
-    if (texts.length >= 2 && uniq.size <= 1) return true; // 整段就是同一行循环
-    if (uniq.size <= 2 && texts.some((text) => /[→←]/.test(String(text)))) return true; // 装饰性横幅
-    const sameAsMeta = texts.filter((text) => {
-      const key = norm(text);
-      return key && (key === titleKey || key === artistKey || key === albumKey);
-    }).length;
-    if (sameAsMeta / texts.length > 0.6) return true; // 只是把歌名/歌手重复几遍
-    const noContent = texts.every((text) => !norm(text));
-    return noContent;
-
-    function normalizeLoose(value) {
-      return norm(value);
-    }
-  }
-
-  _lyricsKeyFor(media) {
-    return [
-      this._cleanLyricsQuery(Array.isArray(media.title) ? media.title[0] : media.title),
-      this._cleanLyricsQuery(Array.isArray(media.artist) ? media.artist[0] : media.artist),
-      this._lyricsSource(),
-    ]
-      .join("|")
-      .toLowerCase();
-  }
-
-  _setLyrics(key, lyrics, source) {
-    if (key !== this._lyricsKey) return;
-    this._lyrics = {
-      status: "ready",
-      lines: lyrics.lines || [],
-      plain: lyrics.plain || [],
-      instrumental: Boolean(lyrics.instrumental),
-      source,
+      this._lyricsUnsub = unsubscribe;
     };
-    if (this._lyricsCache.size > 32) {
-      this._lyricsCache.delete(this._lyricsCache.keys().next().value);
+    const fail = (error) => {
+      this._lyricsPending = false;
+      if (this._lyricsSubKey !== subKey) return;
+      this._lyrics = {
+        status: "error",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      this.requestUpdate();
+    };
+    try {
+      Promise.resolve(
+        connection.subscribeMessage(
+          (event) => this._onStudioLyrics(event, subKey),
+          {
+            type: "ha_music_studio/subscribe_lyrics",
+            entity_id: entityId,
+            offset: this._lyricsOffset,
+          },
+          { resubscribe: true }
+        )
+      )
+        .then(handle)
+        .catch(fail);
+    } catch (error) {
+      fail(error);
     }
-    this._lyricsCache.set(key, this._lyrics);
-    this._saveLyricsCache();
+  }
+
+  _onStudioLyrics(event, subKey) {
+    if (!event || subKey !== this._lyricsSubKey || !this.isConnected) return;
+    if (event.type === "lyrics_error") {
+      this._lyrics = {
+        status: "error",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      this.requestUpdate();
+      return;
+    }
+    if (event.type !== "lyrics") return;
+    if (event.status === "idle") {
+      this._lyrics = {
+        status: "none",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      this._lyricsActive = -1;
+      this._lyricsScrolled = -2;
+      this.requestUpdate();
+      return;
+    }
+    if (event.status === "loading") {
+      this._lyrics = {
+        status: "loading",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      this._lyricsActive = -1;
+      this._lyricsScrolled = -2;
+      this.requestUpdate();
+      return;
+    }
+    if (event.status === "error") {
+      this._lyrics = {
+        status: "error",
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      this.requestUpdate();
+      return;
+    }
+    const lines = Array.isArray(event.lines)
+      ? event.lines.map((line) => ({
+          time: Number(line.time) || 0,
+          text: String(line.text || ""),
+        }))
+      : [];
+    const plain = Array.isArray(event.plain) ? event.plain.map((line) => String(line)) : [];
+    const ready = event.status === "ready" && (lines.length || plain.length);
+    if (event.track_id && event.track_id !== this._lyricsTrackId) {
+      this._lyricsTrackId = event.track_id;
+      this._lyricsScrolled = -2;
+      this._lyricsActive = -1;
+    }
+    this._lyrics = {
+      status: ready ? "ready" : "none",
+      lines,
+      plain,
+      instrumental: Boolean(event.instrumental),
+      source: "Music Assistant",
+      index: Number.isInteger(event.index) ? event.index : -1,
+      progress: Number(event.progress) || 0,
+    };
+    if (ready && Number.isInteger(event.index) && event.index >= 0) {
+      if (event.index !== this._lyricsActive) {
+        this._lyricsActive = event.index;
+        this._lyricsScrolled = event.index;
+        this._centerActiveLyric();
+      }
+    } else if (ready) {
+      this._lyricsActive = -1;
+    }
     this.requestUpdate();
   }
 
@@ -1321,181 +927,35 @@ class HaMusicCard extends LitElement {
   }
 
   _maybeLoadLyrics() {
-    if (!this._lyricsEnabled() || this._thumbMode()) return;
+    if (!this._lyricsEnabled() || this._thumbMode()) {
+      this._teardownStudioLyrics();
+      return;
+    }
     const media = this._readMedia();
     if (!media.title) {
+      this._teardownStudioLyrics();
+      this._lyricsKey = "";
+      this._lyricsTrackId = "";
       if (this._lyrics.status !== "idle") {
         this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
-        this._lyricsKey = "";
+        this._lyricsActive = -1;
+        this._lyricsScrolled = -2;
         this.requestUpdate();
       }
       return;
     }
-    const key = this._lyricsKeyFor(media);
-    if (key === this._lyricsKey) return;
-
-    if (this._lyricsAbort) {
-      this._lyricsAbort.abort();
-      this._lyricsAbort = null;
-    }
-    this._lyricsKey = key;
-
-    const cached = this._lyricsCache.get(key);
-    if (cached) {
-      this._lyrics = { ...cached };
-      this.requestUpdate();
-      return;
-    }
-
+    const entityId = this._eid();
+    if (this._lyricsKey === entityId && (this._lyricsUnsub || this._lyricsPending)) return;
+    this._lyricsKey = entityId;
     this._lyrics = {
       status: "loading",
       lines: [],
       plain: [],
       instrumental: false,
-      source: "歌词接口",
+      source: "Music Assistant",
     };
     this.requestUpdate();
-    this._fetchLyrics(media, key);
-  }
-
-  async _fetchLyrics(media, key) {
-    const controller = new AbortController();
-    this._lyricsAbort = controller;
-    const timer = setTimeout(() => controller.abort(), 35000);
-    let lastError = null;
-    try {
-      const source = this._lyricsSource();
-      const backendMissing =
-        this._lyricsBackendMissingAt &&
-        Date.now() - this._lyricsBackendMissingAt < 10 * 60 * 1000;
-      // 逐级兜底：后端(QQ/网易云) → 自定义接口 → LRCLIB → 酷狗 → Lyrics.ovh。
-      // 每一级都独立超时、失败只记录不阻断；先同步歌词后纯文本，尽量拿到能滚动的版。
-      const queries = this._lyricsQueries(media);
-      const lrQuery = queries[0];
-      const tried = [];
-      const accept = (result) => {
-        if (controller.signal.aborted || key !== this._lyricsKey) return false;
-        if (!result) return false;
-        if (this._lyricsSuspect(result.parsed, media)) {
-          tried.push("脏数据");
-          return false;
-        }
-        this._setLyrics(key, result.parsed, result.source);
-        return true;
-      };
-
-      if (source !== "lrclib" && !backendMissing) {
-        searched: for (const query of queries) {
-          if (controller.signal.aborted || key !== this._lyricsKey) return;
-          try {
-            const result = await this._requestNeteaseLyrics(query, controller.signal);
-            if (accept(result)) return;
-            if (this._lyricsBackendMissingAt) break searched;
-          } catch (error) {
-            if (error?.name === "AbortError") throw error;
-            lastError = error;
-          }
-        }
-        tried.push("后端");
-      }
-
-      // 本地歌词文件优先：同源、离线可用，用户自己放的文件不应被在线源抢先。
-      if (lrQuery) {
-        try {
-          if (accept(await this._requestLocalLyrics(media, lrQuery, controller.signal))) return;
-        } catch (error) {
-          if (error?.name === "AbortError") throw error;
-          lastError = error;
-        }
-        tried.push("本地");
-      }
-
-      if (this._lyricsCustomUrl()) {
-        try {
-          if (accept(await this._requestCustomLyrics(lrQuery, controller.signal))) return;
-        } catch (error) {
-          if (error?.name === "AbortError") throw error;
-          lastError = error;
-        }
-        tried.push("自定义接口");
-      }
-
-      if (lrQuery) {
-        try {
-          if (accept(await this._requestLrclibLyrics(media, lrQuery, controller.signal))) return;
-        } catch (error) {
-          if (error?.name === "AbortError") throw error;
-          lastError = error;
-        }
-        tried.push("LRCLIB");
-      }
-
-      if (source === "auto" || source === "") {
-        try {
-          if (accept(await this._requestKugouLyrics(media, lrQuery, controller.signal))) return;
-        } catch (error) {
-          if (error?.name === "AbortError") throw error;
-          lastError = error;
-        }
-        tried.push("酷狗");
-
-        try {
-          if (accept(await this._requestLyricsOvh(media, lrQuery, controller.signal))) return;
-        } catch (error) {
-          if (error?.name === "AbortError") throw error;
-          lastError = error;
-        }
-        tried.push("Lyrics.ovh");
-      }
-
-      if (key !== this._lyricsKey) return;
-      this._lyrics = {
-        status: lastError ? "error" : "none",
-        lines: [],
-        plain: [],
-        instrumental: false,
-        source: lastError ? "歌词接口" : `已试 ${tried.join("/") || "无来源"}`,
-      };
-      if (lastError) this._scheduleLyricsRetry(key);
-      this.requestUpdate();
-    } catch (error) {
-      if (key !== this._lyricsKey) return;
-      if (error?.name === "AbortError") {
-        this._lyrics = {
-          status: "error",
-          lines: [],
-          plain: [],
-          instrumental: false,
-          source: "歌词接口",
-        };
-        this._scheduleLyricsRetry(key);
-        this.requestUpdate();
-        return;
-      }
-      this._lyrics = {
-        status: "error",
-        lines: [],
-        plain: [],
-        instrumental: false,
-        source: "歌词接口",
-      };
-      this._scheduleLyricsRetry(key);
-      this.requestUpdate();
-    } finally {
-      clearTimeout(timer);
-      if (this._lyricsAbort === controller) this._lyricsAbort = null;
-    }
-  }
-
-  _scheduleLyricsRetry(key) {
-    if (this._lyricsRetryTimer) clearTimeout(this._lyricsRetryTimer);
-    this._lyricsRetryTimer = setTimeout(() => {
-      this._lyricsRetryTimer = null;
-      if (!this.isConnected || key !== this._lyricsKey) return;
-      if (this._lyrics.status !== "error") return;
-      this._lyricsKey = "";
-      this._maybeLoadLyrics();
-    }, 10000);
+    this._ensureStudioLyrics();
   }
 
   _sideLyricsVisible() {
@@ -1516,8 +976,7 @@ class HaMusicCard extends LitElement {
 
   _retryLyrics() {
     this._lyricsKey = "";
-    this._lyricsAbort?.abort();
-    this._lyricsAbort = null;
+    this._teardownStudioLyrics();
     this._lyricsOpen = true;
     this._maybeLoadLyrics();
     this.requestUpdate();
@@ -3975,9 +3434,9 @@ class HaMusicCard extends LitElement {
     const lyrics = this._lyrics;
     const timed = lyrics.lines.length > 0;
     const plain = lyrics.plain || [];
-    const lyricPosition = this._lyricsPosition(position);
+    const backendIndex = Number.isInteger(lyrics.index) ? lyrics.index : -1;
     const progress = timed
-      ? lyricProgress(lyrics.lines, lyricPosition, media.duration)
+      ? { index: backendIndex, progress: Number(lyrics.progress) || 0 }
       : { index: -1, progress: 0 };
     const active = timed ? Math.max(0, progress.index) : -1;
     const lineProgress = active >= 0 ? progress.progress : 0;
@@ -4192,10 +3651,11 @@ class HaMusicCard extends LitElement {
       this._sideLyricsVisible();
 
     const lyricLine =
-      this._lyrics.status === "ready" && this._lyrics.lines.length
-        ? this._lyrics.lines[
-            Math.max(0, lyricIndex(this._lyrics.lines, this._lyricsPosition(position)))
-          ]?.text || ""
+      this._lyrics.status === "ready" &&
+      this._lyrics.lines.length &&
+      Number.isInteger(this._lyrics.index) &&
+      this._lyrics.index >= 0
+        ? this._lyrics.lines[this._lyrics.index]?.text || ""
         : "";
     const coverUrl =
       state.state === "unavailable" || state.state === "unknown"

@@ -3,12 +3,6 @@
 import { resolveHass, normalizeTheme, findTopBarRect, findTopBarAddRect } from "./dock.js";
 import { THEMES, DEFAULT_THEME } from "./const.js";
 import { colorTriplet } from "./util.js";
-import { lyricIndex } from "./lyrics.js";
-import {
-  fetchGlobalLyrics,
-  globalTrackKey,
-  pickGlobalLyricsEntity,
-} from "./lyrics-service.js";
 
 const PREF_KEY = "haMusicLyricDock";
 const POS_KEY = "haMusicLyricDockPos";
@@ -17,6 +11,33 @@ const HOLD_MS = 360;
 function clamp(value, min, max) {
   if (max < min) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+function pickDockEntity(hass, preferred = "") {
+  const states = hass?.states || {};
+  let best = "";
+  let bestScore = -Infinity;
+  for (const [entityId, state] of Object.entries(states)) {
+    if (!entityId.startsWith("media_player.")) continue;
+    if (!state || ["unavailable", "unknown", "off"].includes(state.state)) continue;
+    const attrs = state.attributes || {};
+    const title = String(attrs.media_title || attrs.friendly_name || "");
+    let score = 0;
+    if (state.state === "playing") score += 100;
+    else if (state.state === "paused") score += 60;
+    else if (state.state === "buffering") score += 40;
+    if (entityId === preferred) score += 30;
+    if (title) score += 10;
+    if (score > bestScore) {
+      best = entityId;
+      bestScore = score;
+    }
+  }
+  if (best) return best;
+  if (preferred && states[preferred] && states[preferred].attributes?.media_title) {
+    return preferred;
+  }
+  return "";
 }
 
 // 与卡片歌词共用同一套播放时钟锚点。HA 的 media_position 可能落后于
@@ -277,11 +298,12 @@ class HaMusicLyric extends HTMLElement {
     this._lines = [];
     this._plain = [];
     this._linesKey = "";
-    this._requestKey = "";
-    this._requestController = null;
-    this._retryAt = 0;
+    this._lyricsUnsub = null;
+    this._lyricsPending = false;
+    this._lyricsSubKey = "";
+    this._lyricsIndex = -1;
+    this._lyricsProgress = 0;
     this._offset = 0;
-    this._clock = null;
     this._poll = null;
     this._press = null;
     this._pressTimer = null;
@@ -364,6 +386,7 @@ class HaMusicLyric extends HTMLElement {
     window.removeEventListener("resize", this._onResize);
     if (this._poll) clearInterval(this._poll);
     this._poll = null;
+    this._teardownLyrics();
   }
 
   _startPolling() {
@@ -386,17 +409,11 @@ class HaMusicLyric extends HTMLElement {
 
   _sync() {
     if (!this._pill) return;
-    if (this._status === "error" && this._retryAt && Date.now() >= this._retryAt) {
-      this._status = "idle";
-      this._linesKey = "";
-      this._requestKey = "";
-      this._retryAt = 0;
-    }
     const hass = resolveHass() || this._hass;
     if (hass?.states) this._hass = hass;
     const preferred = this._preferred || this._entity;
     if (this._auto) {
-      const active = pickGlobalLyricsEntity(hass, preferred);
+      const active = pickDockEntity(hass, preferred);
       if (active && active !== this._entity) this._selectEntity(active);
     }
     if (!this._entity) {
@@ -408,106 +425,126 @@ class HaMusicLyric extends HTMLElement {
       this._setText("");
       return;
     }
-    const attrs = state.attributes || {};
-    const key = globalTrackKey(this._entity, state);
-    if (
-      key !== this._linesKey &&
-      (this._status !== "loading" || key !== this._requestKey)
-    ) {
-      this._ensureLyrics(state, key);
-    }
-    const stamp = attrs.media_position_updated_at || "";
-    const base = Number(attrs.media_position) || 0;
-    const now = Date.now();
-    const anchor = stamp ? positionAnchor(stamp, now) : now;
-    if (
-      !this._clock ||
-      this._clock.key !== key ||
-      this._clock.state !== state.state ||
-      this._clock.stamp !== stamp
-    ) {
-      this._clock = { key, state: state.state, stamp, base, at: anchor };
-    }
-    let position = this._clock.base;
-    if (state.state === "playing") position += Math.max(0, now - this._clock.at) / 1000;
-    const duration = Number(attrs.media_duration) || 0;
-    if (duration > 0) position = Math.min(duration, Math.max(0, position));
-    position += this._offset;
-
+    this._ensureLyrics(state);
     let line = "";
-    if (this._linesKey && key === this._linesKey) {
-      if (this._lines.length) {
-        const index = lyricIndex(this._lines, position);
-        line = this._lines[Math.max(0, index)]?.text || "";
-      } else if (this._plain.length) {
-        // 纯文本歌词没有时间轴，至少显示首句，避免全局歌词窗空白。
-        line = this._plain[0] || "";
-      }
+    if (this._lyricsIndex >= 0 && this._lyricsIndex < this._lines.length) {
+      line = this._lines[this._lyricsIndex]?.text || "";
+    } else if (this._plain.length) {
+      line = this._plain[0] || "";
     }
     this._setText(line);
   }
 
   _selectEntity(entityId) {
     if (!entityId || entityId === this._entity) return;
-    this._abortRequest();
+    this._teardownLyrics();
     this._entity = entityId;
     this._lines = [];
     this._plain = [];
     this._linesKey = "";
-    this._requestKey = "";
     this._status = "idle";
-    this._clock = null;
+    this._lyricsIndex = -1;
   }
 
-  _abortRequest() {
-    if (this._requestController) this._requestController.abort();
-    this._requestController = null;
+  _teardownLyrics() {
+    const unsubscribe = this._lyricsUnsub;
+    this._lyricsUnsub = null;
+    this._lyricsPending = false;
+    this._lyricsSubKey = "";
+    if (typeof unsubscribe === "function") {
+      try {
+        unsubscribe();
+      } catch (error) {
+        /* 已断开的订阅忽略 */
+      }
+    } else if (unsubscribe && typeof unsubscribe.then === "function") {
+      unsubscribe.then((fn) => fn?.()).catch(() => {});
+    }
   }
 
-  _ensureLyrics(state, key) {
-    if (!state || this._requestKey === key && this._status === "loading") return;
-    this._abortRequest();
-    this._requestKey = key;
-    this._status = "loading";
-    this._lines = [];
-    this._plain = [];
-    this._linesKey = "";
-    const entityId = this._entity;
-    const controller = new AbortController();
-    this._requestController = controller;
-    fetchGlobalLyrics(state, {
-      hass: this._hass,
-      source: this._source,
-      signal: controller.signal,
-    })
-      .then((result) => {
-        if (controller.signal.aborted || this._entity !== entityId || this._requestKey !== key) {
-          return;
+  _ensureLyrics(state) {
+    if (!state || !this._entity) return;
+    const connection = this._hass?.connection;
+    if (!connection || typeof connection.subscribeMessage !== "function") {
+      this._status = "error";
+      return;
+    }
+    const subKey = `${this._entity}|${this._offset}`;
+    if (subKey === this._lyricsSubKey && (this._lyricsUnsub || this._lyricsPending)) return;
+    this._teardownLyrics();
+    this._lyricsSubKey = subKey;
+    this._lyricsPending = true;
+    const handle = (unsubscribe) => {
+      this._lyricsPending = false;
+      if (this._lyricsSubKey !== subKey) {
+        try {
+          unsubscribe?.();
+        } catch (error) {
+          /* 切换实体后的旧订阅 */
         }
-        // 卡片已经为同一首曲目提供了歌词时，不用全局兜底结果覆盖它。
-        if (this._linesKey === key && (this._lines.length || this._plain.length)) return;
-        this._lines = Array.isArray(result.lines) ? result.lines : [];
-        this._plain = Array.isArray(result.plain) ? result.plain : [];
-        this._linesKey = key;
-        this._status = result.status || "none";
-        this._source = result.source || this._source;
-        this._sync();
-      })
-      .catch(() => {
-        if (controller.signal.aborted || this._entity !== entityId || this._requestKey !== key) {
-          return;
-        }
-        this._lines = [];
-        this._plain = [];
-        // 失败不要锁死这首歌：清掉已解析键，过几秒由 500ms 轮询自动重试。
-        this._linesKey = "";
-        this._status = "error";
-        this._retryAt = Date.now() + 8000;
-        this._sync();
-      })
-      .finally(() => {
-        if (this._requestController === controller) this._requestController = null;
-      });
+        return;
+      }
+      this._lyricsUnsub = unsubscribe;
+    };
+    const fail = () => {
+      this._lyricsPending = false;
+      if (this._lyricsSubKey === subKey) this._status = "error";
+    };
+    try {
+      Promise.resolve(
+        connection.subscribeMessage(
+          (event) => this._onLyrics(event, subKey),
+          {
+            type: "ha_music_studio/subscribe_lyrics",
+            entity_id: this._entity,
+            offset: this._offset,
+          },
+          { resubscribe: true }
+        )
+      )
+        .then(handle)
+        .catch(fail);
+    } catch (error) {
+      fail();
+    }
+  }
+
+  _onLyrics(event, subKey) {
+    if (!event || subKey !== this._lyricsSubKey) return;
+    if (event.type === "lyrics_error") {
+      this._status = "error";
+      this._sync();
+      return;
+    }
+    if (event.type !== "lyrics") return;
+    if (event.status === "loading" || event.status === "idle") {
+      this._status = event.status === "loading" ? "loading" : "idle";
+      this._lines = [];
+      this._plain = [];
+      this._linesKey = "";
+      this._lyricsIndex = -1;
+      this._sync();
+      return;
+    }
+    if (event.status === "error") {
+      this._status = "error";
+      this._sync();
+      return;
+    }
+    this._lines = Array.isArray(event.lines)
+      ? event.lines.map((line) => ({
+          time: Number(line.time) || 0,
+          text: String(line.text || ""),
+        }))
+      : [];
+    this._plain = Array.isArray(event.plain) ? event.plain.map(String) : [];
+    this._status = event.status === "ready" && (this._lines.length || this._plain.length)
+      ? "ready"
+      : "none";
+    this._linesKey = String(event.track_id || "");
+    this._lyricsIndex = Number.isInteger(event.index) ? event.index : -1;
+    this._lyricsProgress = Number(event.progress) || 0;
+    this._sync();
   }
 
   _setText(text) {

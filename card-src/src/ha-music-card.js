@@ -252,15 +252,6 @@ class HaMusicCard extends LitElement {
     this._audioStartedAt = 0;
     this._audioGestureArmed = false;
     this._positionClock = null;
-    // Music Assistant 音频分析（wave_form RMS 能量包络 + BPM）。
-    // 通过 HA 侧 ha_music_analysis.get_track_analysis 服务取数；
-    // 服务不可用时退回原来的程序化律动，不影响卡片加载。
-    this._maAnalysis = null;
-    this._maAnalysisKey = "";
-    this._maAnalysisLoadingKey = "";
-    this._maAnalysisFailedKey = "";
-    this._maAnalysisFailedAt = 0;
-    this._maAnalysisAt = 0;
     // HA Music Studio：服务端 30fps 48 段真实频谱。
     this._studioBands = null;
     this._studioPeak = 0;
@@ -5447,185 +5438,6 @@ class HaMusicCard extends LitElement {
     this._drawSpectrum(levels, true);
   }
 
-  _maAnalysisAvailable() {
-    const services = this._hass?.services;
-    return Boolean(
-      services?.ha_music_analysis?.get_track_analysis ||
-        services?.["ha_music_analysis"]?.["get_track_analysis"]
-    );
-  }
-
-  _ensureMaAnalysis(media, key) {
-    if (!this._maAnalysisAvailable() || !key || !this._eid()) return;
-    if (this._maAnalysis?.key === key || this._maAnalysisLoadingKey === key) {
-      return;
-    }
-    if (
-      this._maAnalysisFailedKey === key &&
-      Date.now() - this._maAnalysisFailedAt < 60 * 1000
-    ) {
-      return;
-    }
-    this._maAnalysisLoadingKey = key;
-    const entityId = this._eid();
-    let request;
-    try {
-      request = this._hass.callService(
-        "ha_music_analysis",
-        "get_track_analysis",
-        { entity_id: entityId },
-        undefined,
-        false,
-        true
-      );
-    } catch {
-      this._maAnalysisLoadingKey = "";
-      this._maAnalysisFailedKey = key;
-      this._maAnalysisFailedAt = Date.now();
-      return;
-    }
-    Promise.resolve(request)
-      .then((response) => {
-        const payload =
-          response?.service_response ?? response?.response ?? response;
-        const record = payload?.[entityId] ?? payload;
-        const wave = Array.isArray(record?.waveform)
-          ? record.waveform
-          : Array.isArray(record)
-            ? record
-            : null;
-        if (!wave?.length) {
-          this._maAnalysisFailedKey = key;
-          this._maAnalysisFailedAt = Date.now();
-          return;
-        }
-        this._maAnalysis = {
-          key,
-          waveform: wave,
-          bpm: Number(record?.bpm) || 0,
-          energy: Number(record?.energy) || 0,
-          duration: Number(record?.duration) || Number(media.duration) || 0,
-          title: record?.title || "",
-          artist: record?.artist || "",
-          source: record?.bpm_source || "",
-        };
-        this._maAnalysisKey = key;
-        this._maAnalysisAt = Date.now();
-        this._maAnalysisFailedKey = "";
-        this._maAnalysisFailedAt = 0;
-        this._resetAudioShape();
-      })
-      .catch(() => {
-        this._maAnalysisFailedKey = key;
-        this._maAnalysisFailedAt = Date.now();
-      })
-      .finally(() => {
-        if (this._maAnalysisLoadingKey === key) {
-          this._maAnalysisLoadingKey = "";
-        }
-      });
-  }
-
-  _maSpectrumShaped(count, media) {
-    const data = this._maAnalysis;
-    if (!data || data.key !== this._spectrumKey || !data.waveform?.length) {
-      return null;
-    }
-    const wave = data.waveform;
-    const duration = data.duration || Number(media.duration) || 0;
-    const position = Number(media.position) || 0;
-    const ratio = duration > 0 ? clamp(position / duration, 0, 0.999) : 0;
-    const posIndex = ratio * (wave.length - 1);
-    const binsPerSecond =
-      duration > 0 ? wave.length / Math.max(1, duration) : wave.length / 180;
-    // MA 分析只给 RMS 波形，不是频域数据。按「当前播放点前后一小段」
-    // 统计三件事：慢能量≈低音、整体能量≈中音、相邻采样差值≈高音。
-    // 绝不能再把时间窗口一列一列摊开，那会变成一条横向跑马灯。
-    const windowSpan = clamp(
-      Math.round(binsPerSecond * 0.55),
-      6,
-      Math.min(wave.length, 96)
-    );
-    const from = Math.max(0, Math.round(posIndex - windowSpan / 2));
-    const to = Math.min(
-      wave.length - 1,
-      Math.max(from, Math.round(posIndex + windowSpan / 2))
-    );
-    const slowSpan = Math.max(4, Math.round((binsPerSecond || 60) * 1.2));
-    const slowStart = Math.max(0, Math.round(posIndex - slowSpan));
-    let winSum = 0;
-    let winN = 0;
-    let winDiff = 0;
-    let winDiffN = 0;
-    let slowSum = 0;
-    let slowCount = 0;
-    for (let index = from; index <= to; index += 1) {
-      const value = Number(wave[index]) || 0;
-      winSum += value;
-      winN += 1;
-      if (index > from) {
-        winDiff += Math.abs(value - (Number(wave[index - 1]) || 0));
-        winDiffN += 1;
-      }
-    }
-    for (let index = slowStart; index <= Math.round(posIndex); index += 1) {
-      slowSum += Number(wave[index]) || 0;
-      slowCount += 1;
-    }
-    const winRms = winN ? winSum / winN : 0;
-    const slowRms = slowCount ? slowSum / slowCount : winRms;
-    const diffAvg = winDiffN ? winDiff / winDiffN : 0;
-    const bpm = Number(data.bpm) || 0;
-    const period = bpm > 20 ? 60 / bpm : 0;
-    const beatPhase =
-      period > 0
-        ? ((((position % period) + period) % period) / period)
-        : 0;
-    const beatPulse = period > 0 ? Math.exp(-beatPhase * 4.6) : 0;
-    // 三段能量各自独立：左段只跟低频，中段跟主体能量，右段跟瞬态/高频纹理。
-    const lowBand = clamp(slowRms * 2.7 + beatPulse * 0.24 + 0.03, 0, 1);
-    const midBand = clamp(winRms * 1.95 + beatPulse * 0.07 + 0.03, 0, 1);
-    const highBand = clamp(
-      diffAvg * 11 + Math.max(0, winRms - slowRms) * 1.5 + 0.05,
-      0,
-      1
-    );
-    const zones = [
-      Math.max(0.2, lowBand),
-      Math.max(0.17, midBand),
-      Math.max(0.2, highBand),
-    ];
-    const zoneGain = [1.18, 1.0, 1.04];
-    const clock = performance.now() / 1000;
-    const raw = new Array(count);
-    const thirds = Math.max(1, count / 3);
-    for (let index = 0; index < count; index += 1) {
-      const zone = index < thirds ? 0 : index < thirds * 2 ? 1 : 2;
-      const local = (index - zone * thirds) / Math.max(1, thirds - 1);
-      // 每根柱子有固定纹理（不随时间横移），整段只随本频段能量一起起落。
-      const seed = hashString(`spec#${zone}#${index}`) % 1000;
-      // 每根柱子有自己的相位和速度：随本频段能量各自抖动，
-      // 但不会整排一起平移，所以不会出现跑马灯。
-      const phase = (seed / 1000) * Math.PI * 2;
-      const speed = 1.5 + (seed % 7) * 0.22;
-      const wobble = 0.58 + 0.42 * Math.sin(clock * speed + phase);
-      const grain = 0.46 + (seed / 1000) * 0.92;
-      const ridge = 0.78 + 0.22 * Math.sin(index * 2.7 + 0.6);
-      const taper = 1 - local * [0.06, 0.09, 0.12][zone];
-      const drive =
-        zones[zone] *
-        zoneGain[zone] *
-        (0.5 + wobble * 0.62) *
-        grain *
-        ridge *
-        taper;
-      const kick = beatPulse * Math.pow(1 - index / Math.max(1, count - 1), 2) * 0.3;
-      raw[index] = clamp(drive + kick, 0, 1.6);
-    }
-    const shaped = this._shapeAudioBars(raw);
-    return { ...shaped, bands: [lowBand, midBand, highBand] };
-  }
-
   _spectrumTick(now) {
     if (!this._spectrumCanvas || !this._spectrumCount) {
       this._stopSpectrum();
@@ -5663,7 +5475,6 @@ class HaMusicCard extends LitElement {
       this._syncSpectrumTrack(media);
     }
     this._ensureStudioSpectrum();
-    this._ensureMaAnalysis(media, key);
     const time = now / 1000;
     const levels = this._spectrumLevels;
     const count = this._spectrumCount;
@@ -5676,15 +5487,11 @@ class HaMusicCard extends LitElement {
     const studioRaw = studioReady ? this._resampleStudioBands(count) : null;
     const studioShaped = studioRaw ? this._shapeAudioBars(studioRaw) : null;
     const studioTargets = studioShaped?.bars || null;
-    const maShaped =
-      audioTargets || studioTargets ? null : this._maSpectrumShaped(count, media);
-    const maTargets = maShaped?.bars || null;
-    // 平滑三段能量，避免频谱跳变时整片音柱闪断。没有浏览器音频时，
-    // 用服务端真实 FFT 频谱（Studio）或 MA 音轨 RMS 包络驱动三频段分区。
+    // 后端只由 ha_music_studio 集成负责：卡片不再调用 ha_music_analysis，
+    // 也不在本地从 RMS 波形猜测频段。没有 Studio 时退回纯前端程序化律动。
     const liveBands =
       audioRead?.bands ||
       (studioReady ? this._studioBandTriplet() : null) ||
-      maShaped?.bands ||
       null;
     if (liveBands) {
       this._bandLevels.live = true;
@@ -5715,8 +5522,8 @@ class HaMusicCard extends LitElement {
     }
     for (let index = 0; index < count; index += 1) {
       let target;
-      if (audioTargets || studioTargets || maTargets) {
-        const source = { bars: audioTargets || studioTargets || maTargets, bands: null };
+      if (audioTargets || studioTargets) {
+        const source = { bars: audioTargets || studioTargets, bands: null };
         target = source.bars[index];
         const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const drive = this._bandLevels[zone] || 0;
@@ -5761,7 +5568,7 @@ class HaMusicCard extends LitElement {
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
       // 真实频谱响应更快（约 15fps 更新），攻击段要比程序化律动更硬，
       // 回落用稍慢的释放，避免柱子在两帧之间掉成一条虚线。
-      const realTargets = audioTargets || studioTargets || maTargets;
+      const realTargets = audioTargets || studioTargets;
       const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;
       const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
       levels[index] = next;

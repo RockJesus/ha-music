@@ -4,6 +4,7 @@ import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
 import { THEMES, DEFAULT_THEME } from "./const.js";
 import { colorTriplet, resolveArtUrl } from "./util.js";
+import { fallbackCover } from "./fallback-cover.js";
 
 const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
@@ -1753,7 +1754,14 @@ class HaMusicMini extends HTMLElement {
         this._disc.setAttribute("aria-expanded", expanded);
       }
     }
-    this._setArt(a.entity_picture);
+    this._setArt(
+      a.entity_picture ||
+        fallbackCover({
+          title: a.media_title,
+          artist: a.media_artist,
+          album: a.media_album_name,
+        })
+    );
     syncCoverSpin(this._art, playing);
     const duration = Number(a.media_duration || 0);
     const position = this._displayPosition(playing, a, duration);

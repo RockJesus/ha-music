@@ -38,7 +38,7 @@ import {
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { fallbackCover } from "./fallback-cover.js";
-import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
+import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes, DOCK_REMOVE_EVENT } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
@@ -434,6 +434,8 @@ class HaMusicCard extends LitElement {
     } else {
       this._mobileMq?.addListener?.(this._onMobileChange);
     }
+    this._onDockRemove = (event) => this._handleDockRemove(event.detail);
+    window.addEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = subscribeDockPref(() => {
       // 任意一张卡片的编辑器改动都会广播到这里；重装全局迷你播放器，
@@ -471,6 +473,7 @@ class HaMusicCard extends LitElement {
     document.removeEventListener("fullscreenchange", this._onFullscreenChange);
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
+    window.removeEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
     if (this._webEntityTimer) clearTimeout(this._webEntityTimer);
     this._webEntityTimer = null;
     this._webPlayer?.disconnect();
@@ -3606,6 +3609,59 @@ class HaMusicCard extends LitElement {
 
   _isMobileUi() {
     return this._mobileMq ? Boolean(this._mobileMq.matches) : isMobileUi();
+  }
+
+  _handleDockRemove(detail) {
+    const mode = detail?.mode;
+    if (!mode || !["top", "sidebar", "fab"].includes(mode)) return;
+    const pref = loadDockPref();
+    const modes = (pref ? pref.modes : normalizeDockModes(this._config?.dock)).filter(
+      (item) => item !== mode
+    );
+    const entities = { ...(pref ? pref.entities : normalizeDockEntities(this._config?.dock_entities)) };
+    const themes = { ...(pref ? pref.themes : normalizeDockThemes(this._config?.dock_themes)) };
+    delete entities[mode];
+    delete themes[mode];
+    const nextDock = modes.length ? modes : "none";
+    this._config = {
+      ...this._config,
+      dock: nextDock,
+      dock_entities: entities,
+      dock_themes: themes,
+      dock_edited: Date.now(),
+    };
+    this._dockOwner = false;
+    this.requestUpdate();
+    this._saveCardDock(nextDock, entities, themes).catch(() => {
+      /* 保存失败时仍保留当前会话内的删除效果 */
+    });
+  }
+
+  async _saveCardDock(dock, entities, themes) {
+    if (!this._hass?.callWS) throw new Error("not connected");
+    const urlPath = this._dashboardUrlPath();
+    const response = await this._hass.callWS({
+      type: "lovelace/config",
+      url_path: urlPath,
+    });
+    const locationInfo = this._cardsInView(response);
+    const view = locationInfo.config.views[locationInfo.viewIndex];
+    const cards = Array.isArray(view?.cards) ? view.cards : [];
+    let cardIndex = cards.findIndex((card) => card?.type === "custom:ha-music");
+    if (cardIndex < 0) throw new Error(translator(this._hass?.language)("cardConfigMissing"));
+    const replacement = {
+      ...cards[cardIndex],
+      dock,
+      dock_entities: entities,
+      dock_themes: themes,
+      dock_edited: Date.now(),
+    };
+    view.cards[cardIndex] = replacement;
+    await this._hass.callWS({
+      type: "lovelace/config/save",
+      url_path: urlPath,
+      config: locationInfo.config,
+    });
   }
 
   _installDock() {

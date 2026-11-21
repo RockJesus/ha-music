@@ -13,6 +13,7 @@ import {
   normalizeDockThemes,
   loadDockPref,
   saveDockPref,
+  subscribeDockPref,
 } from "./dock.js";
 
 function fireConfigChanged(node, config) {
@@ -203,6 +204,19 @@ class HaMusicEditor extends LitElement {
     this._config = {};
     this._lang = "en";
     this._pendingEntity = false;
+    this._unsubscribeDockPref = null;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._unsubscribeDockPref?.();
+    this._unsubscribeDockPref = subscribeDockPref(() => this.requestUpdate());
+  }
+
+  disconnectedCallback() {
+    this._unsubscribeDockPref?.();
+    this._unsubscribeDockPref = null;
+    super.disconnectedCallback();
   }
 
   setConfig(config) {

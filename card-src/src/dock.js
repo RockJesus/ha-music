@@ -10,6 +10,7 @@ const PREF_KEY = "haMusicMiniPlayer";
 const POS_KEY = "haMusicMiniPositions";
 const MODES = new Set(["top", "sidebar", "fab"]);
 export const DOCK_PREF_EVENT = "ha-music-dock-pref-changed";
+export const DOCK_REMOVE_EVENT = "ha-music-dock-remove";
 
 export function normalizeTheme(value) {
   return typeof value === "string" && THEMES[value] ? value : DEFAULT_THEME;
@@ -331,7 +332,7 @@ const STYLE = `
   :host {
     position: fixed;
     inset: 0;
-    z-index: 2147483000;
+    z-index: 2147483647;
     pointer-events: none;
     --hm-accent: #2ee6c5;
     --hm-accent-2: #7b5cff;
@@ -1143,6 +1144,7 @@ class HaMusicMini extends HTMLElement {
     this._boundsObserver = null;
     this._boundsRaf = null;
     this._boundsNodes = 0;
+    this._removeMenu = null;
     this._sync = this._sync.bind(this);
   }
 
@@ -1204,6 +1206,7 @@ class HaMusicMini extends HTMLElement {
     this.shadowRoot.removeEventListener("dragstart", this._onDragStart, true);
     window.removeEventListener("resize", this._onResize);
     window.removeEventListener("location-changed", this._onRoute);
+    this._closeRemoveMenu();
     if (this._boundsObserver) {
       this._boundsObserver.disconnect();
       this._boundsObserver = null;
@@ -1675,7 +1678,155 @@ class HaMusicMini extends HTMLElement {
   }
 
   _handleContextMenu(event) {
-    if (this._press || this._dragging) event.preventDefault();
+    event.preventDefault();
+    event.stopPropagation();
+    if (this._press || this._dragging) return;
+    this._showRemoveMenu();
+  }
+
+  _dockModeLabel() {
+    const zh = !this._hass?.language || String(this._hass.language).startsWith("zh");
+    const labels = zh
+      ? { top: "顶部", sidebar: "侧边栏", fab: "右下角" }
+      : { top: "top", sidebar: "sidebar", fab: "bottom-right" };
+    return labels[this._mode] || this._mode;
+  }
+
+  _showRemoveMenu() {
+    this._closeRemoveMenu();
+    const zh = !this._hass?.language || String(this._hass.language).startsWith("zh");
+    const dialog = document.createElement("dialog");
+    dialog.className = "ha-music-dock-dialog";
+    dialog.innerHTML = `
+      <style>
+        dialog.ha-music-dock-dialog {
+          position: fixed;
+          inset: 0;
+          margin: auto;
+          width: min(320px, calc(100vw - 32px));
+          height: max-content;
+          max-height: calc(100vh - 32px);
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #f6f8ff;
+          font-family: inherit;
+          font-size: 12px;
+          line-height: 1.5;
+          overflow: visible;
+        }
+        dialog.ha-music-dock-dialog::backdrop {
+          background: rgba(2, 6, 12, 0.6);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
+        }
+        dialog.ha-music-dock-dialog .confirm-card {
+          padding: 16px;
+          border: 1px solid rgba(46, 230, 197, 0.38);
+          border-radius: 16px;
+          background:
+            linear-gradient(135deg, rgba(46, 230, 197, 0.12), rgba(123, 92, 255, 0.1)),
+            rgba(5, 10, 18, 0.97);
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 22px -8px rgba(46, 230, 197, 0.5);
+        }
+        dialog.ha-music-dock-dialog .confirm-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+        dialog.ha-music-dock-dialog .confirm-desc { margin: 0 0 14px; color: rgba(230, 238, 255, 0.62); font-size: 11px; }
+        dialog.ha-music-dock-dialog .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        dialog.ha-music-dock-dialog button {
+          min-height: 30px;
+          padding: 0 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          background: rgba(255, 255, 255, 0.06);
+          color: rgba(246, 248, 255, 0.82);
+          font: inherit;
+          font-size: 11px;
+          cursor: pointer;
+        }
+        dialog.ha-music-dock-dialog button:hover { background: rgba(255, 255, 255, 0.12); }
+        dialog.ha-music-dock-dialog button.danger {
+          border-color: rgba(255, 79, 156, 0.6);
+          background: rgba(255, 79, 156, 0.16);
+          color: #ffd8ea;
+        }
+        dialog.ha-music-dock-dialog button.danger:hover { background: rgba(255, 79, 156, 0.26); }
+      </style>
+      <div class="confirm-card">
+        <div class="confirm-title"></div>
+        <div class="confirm-desc"></div>
+        <div class="confirm-actions">
+          <button type="button" data-menu-action="cancel"></button>
+          <button type="button" class="danger" data-menu-action="remove"></button>
+        </div>
+      </div>
+    `;
+    dialog.querySelector(".confirm-title").textContent = zh
+      ? `删除${this._dockModeLabel()}悬浮播放器？`
+      : `Remove this ${this._dockModeLabel()} floating player?`;
+    dialog.querySelector(".confirm-desc").textContent = zh
+      ? "删除后会同步取消卡片设置中对应位置的开关。"
+      : "The matching card setting will be turned off as well.";
+    const cancel = dialog.querySelector('[data-menu-action="cancel"]');
+    const remove = dialog.querySelector('[data-menu-action="remove"]');
+    cancel.textContent = zh ? "取消" : "Cancel";
+    remove.textContent = zh ? "删除" : "Remove";
+    cancel.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._closeRemoveMenu();
+    });
+    remove.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._removeSelf();
+    });
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      this._closeRemoveMenu();
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) this._closeRemoveMenu();
+    });
+    document.body.appendChild(dialog);
+    this._removeMenu = dialog;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }
+
+  _closeRemoveMenu() {
+    const menu = this._removeMenu;
+    this._removeMenu = null;
+    if (!menu) return;
+    if (typeof menu.close === "function" && menu.open) {
+      try {
+        menu.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    menu.remove();
+  }
+
+  _removeSelf() {
+    const mode = this._mode;
+    this._closeRemoveMenu();
+    const pref = loadDockPref() || { modes: [], entities: {}, themes: {} };
+    const modes = (pref.modes || []).filter((item) => item !== mode);
+    const entities = { ...(pref.entities || {}) };
+    const themes = { ...(pref.themes || {}) };
+    delete entities[mode];
+    delete themes[mode];
+    saveDockPref({ modes, entities, themes, updated: Date.now() });
+    try {
+      window.dispatchEvent(
+        new CustomEvent(DOCK_REMOVE_EVENT, {
+          detail: { mode, entity: this._entity },
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+    uninstallDock(mode);
   }
 
   _sync() {
@@ -1895,6 +2046,7 @@ class HaMusicMini extends HTMLElement {
   }
 
   _handleClick(event) {
+    if (this._removeMenu && (event.composedPath?.() || []).includes(this._removeMenu)) return;
     const button = event.target.closest?.("button[data-act]");
     if (button) {
       if (button.disabled) return;

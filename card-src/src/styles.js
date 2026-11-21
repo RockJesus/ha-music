@@ -1043,6 +1043,11 @@ export const cardStyles = css`
     cursor: pointer;
   }
 
+  .hm-player-btn[data-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
   .hm-player-btn[data-on="true"] {
     border-color: rgba(var(--hm-a1-rgb), 0.55);
     background: rgba(var(--hm-a1-rgb), 0.18);

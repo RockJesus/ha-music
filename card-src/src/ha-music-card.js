@@ -1614,6 +1614,18 @@ class HaMusicCard extends LitElement {
     this.requestUpdate();
   }
 
+  _playersForPanel() {
+    const leaderId = this._currentMaPlayer()?.player_id || "";
+    return [...this._maPlayers].sort((a, b) => {
+      const la = a.player_id === leaderId ? 1 : 0;
+      const lb = b.player_id === leaderId ? 1 : 0;
+      if (la !== lb) return lb - la;
+      const aa = a.available ? 1 : 0;
+      const ab = b.available ? 1 : 0;
+      return ab - aa;
+    });
+  }
+
   _currentMaPlayer() {
     const queueId = this._studioQueue();
     return (
@@ -4240,7 +4252,7 @@ class HaMusicCard extends LitElement {
               </div>
               <div class="hm-players-body">
                 ${this._maPlayers.length
-                  ? this._maPlayers.map((player) => {
+                  ? this._playersForPanel().map((player) => {
                       const current = this._currentMaPlayer();
                       const isLeader = current?.player_id === player.player_id;
                       const member = (current?.group_members || []).includes(player.player_id);
@@ -4259,7 +4271,15 @@ class HaMusicCard extends LitElement {
                         <div class="hm-player-actions">
                           ${isLeader
                             ? html`<span class="hm-player-badge">${t("groupLeader")}</span>`
-                            : html`<button class="hm-player-btn" @click=${() => this._selectMaPlayer(player)}>${t("selectDevice")}</button>`}
+                            : html`<button
+                                class="hm-player-btn"
+                                data-disabled=${!entityId || !player.available ? "true" : "false"}
+                                title=${!entityId ? t("deviceUnavailable") : ""}
+                                ?disabled=${!entityId || !player.available}
+                                @click=${() => this._selectMaPlayer(player)}
+                              >
+                                ${t("selectDevice")}
+                              </button>`}
                           ${!isLeader && entityId && player.can_group_with?.length !== 0
                             ? html`<button
                                 class="hm-player-btn"

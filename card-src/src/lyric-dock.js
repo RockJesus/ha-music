@@ -3,6 +3,7 @@
 import { resolveHass, normalizeTheme, findTopBarRect, findTopBarAddRect } from "./dock.js";
 import { THEMES, DEFAULT_THEME } from "./const.js";
 import { colorTriplet } from "./util.js";
+import { protocolMatches, protocolErrorText } from "./protocol.js";
 
 const PREF_KEY = "haMusicLyricDock";
 const POS_KEY = "haMusicLyricDockPos";
@@ -511,6 +512,15 @@ class HaMusicLyric extends HTMLElement {
 
   _onLyrics(event, subKey) {
     if (!event || subKey !== this._lyricsSubKey) return;
+    if (!protocolMatches(event)) {
+      this._lines = [];
+      this._plain = [protocolErrorText(this._hass?.language)];
+      this._linesKey = "";
+      this._status = "error";
+      this._lyricsIndex = -1;
+      this._sync();
+      return;
+    }
     if (event.type === "lyrics_error") {
       this._status = "error";
       this._sync();

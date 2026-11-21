@@ -12,6 +12,7 @@ import {
   translator,
   mediaClassLabel,
 } from "./const.js";
+import { PROTOCOL_VERSION, protocolMatches, protocolErrorText } from "./protocol.js";
 import {
   clamp,
   formatTime,
@@ -783,6 +784,21 @@ class HaMusicCard extends LitElement {
 
   _onStudioLyrics(event, subKey) {
     if (!event || subKey !== this._lyricsSubKey || !this.isConnected) return;
+    if (!protocolMatches(event)) {
+      this._lyrics = {
+        status: "error",
+        protocol: false,
+        message: protocolErrorText(this._hass?.language),
+        lines: [],
+        plain: [],
+        instrumental: false,
+        source: "Music Assistant",
+      };
+      this._lyricsActive = -1;
+      this._lyricsScrolled = -2;
+      this.requestUpdate();
+      return;
+    }
     if (event.type === "lyrics_error") {
       this._lyrics = {
         status: "error",
@@ -3452,7 +3468,11 @@ class HaMusicCard extends LitElement {
     const offsetLabel = `${this._lyricsOffset > 0 ? "+" : ""}${this._lyricsOffset.toFixed(1)}s`;
 
     let body = nothing;
-    if (lyrics.status === "loading") {
+    if (lyrics.protocol === false) {
+      body = html`<div class="hm-lyrics-empty">
+        ${lyrics.message || protocolErrorText(this._hass?.language)}
+      </div>`;
+    } else if (lyrics.status === "loading") {
       // 歌词匹配期间不显示「正在匹配歌词」占位框，避免侧边歌词/完整面板出现空框。
       body = nothing;
     } else if (lyrics.status === "none" || lyrics.status === "error") {
@@ -4556,6 +4576,18 @@ class HaMusicCard extends LitElement {
           if (!event || event.type !== "spectrum" || !Array.isArray(event.bands)) {
             return;
           }
+          if (!protocolMatches(event)) {
+            this._studioBands = [];
+            this._studioProtocolError = true;
+            if (!this._studioProtocolWarned) {
+              this._studioProtocolWarned = true;
+              console.warn(
+                `[ha-music] ha_music_studio protocol ${event.protocol} != ${PROTOCOL_VERSION}; spectrum disabled`
+              );
+            }
+            return;
+          }
+          this._studioProtocolError = false;
           this._studioBands = event.bands.map((value) => clamp(Number(value) || 0, 0, 1.6));
           this._studioPeak = Number(event.peak) || 0;
           this._studioRms = Number(event.rms) || 0;

@@ -19,6 +19,9 @@ jobs:
       - name: Install
         working-directory: card-src
         run: npm ci
+      - name: Build
+        working-directory: card-src
+        run: npm run build
       - name: Test
         working-directory: card-src
         run: npm test

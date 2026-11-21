@@ -71,6 +71,14 @@
 
 ## 安装
 
+### 配套版本
+
+| 卡片 | HA Music Studio | 协议 |
+|---|---|---|
+| `v2.13.0` 及以上 | `v0.3.9` 及以上 | `1` |
+
+先升级集成，再升级卡片。协议不匹配时，卡片会停用频谱并在歌词区提示更新集成；播放控制不受影响。
+
 ### 前置：歌词后端（可选）
 
 频谱和歌词都依赖 **HA Music Studio** 集成（`https://github.com/RockJesus/ha-music-studio`，类别选 Integration）。安装并重启 Home Assistant 后，在「设置 → 设备与服务」添加 **HA Music Studio**。未安装时卡片仍可播放和控制，但不会显示实时频谱和后端歌词。

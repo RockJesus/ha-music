@@ -4396,6 +4396,8 @@ export const cardStyles = css`
     flex: 0 0 auto;
     align-items: center;
     text-align: center;
+    /* 给外圈环形音柱留出向下伸出的空间，文字区不再被柱体压住 */
+    padding-top: clamp(28px, 5.6cqi, 34px);
   }
 
   .hm-card.hm-narrow-panel.hm-panel-compact[data-panel="true"] .hm-main[data-side-lyrics] .hm-info {
@@ -4405,8 +4407,14 @@ export const cardStyles = css`
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-meta {
     width: 100%;
-    align-items: stretch;
+    align-items: center;
     text-align: center;
+  }
+
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-tags,
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-modes,
+  .hm-card.hm-narrow-panel[data-panel="true"] .hm-now-lyric {
+    justify-content: center;
   }
 
   /* 矮屏竖排面板：优先保住标题/歌手/规格，隐藏标签与当前歌词行。 */

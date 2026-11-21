@@ -4393,7 +4393,7 @@ export const cardStyles = css`
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] {
-    --hm-ring-pad: 10px;
+    --hm-ring-pad: 72px;
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-cover-wrap {
@@ -4401,7 +4401,8 @@ export const cardStyles = css`
     height: auto;
     min-height: 0;
     flex: 0 1 auto;
-    overflow: hidden;
+    /* 环形音柱要画到封面外侧，容器不能再把外圈裁掉。 */
+    overflow: visible;
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-cover {

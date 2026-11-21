@@ -913,11 +913,12 @@ class HaMusicCard extends LitElement {
       72,
       Math.round(cover.getBoundingClientRect().width || this._coverPx(this._layoutKey())),
     );
-    // 面板窄屏里环形音柱只外扩 10px，跟封面容器预算对齐，避免被裁掉。
+    // 窄屏面板同样要留出足够的环形律动空间。之前只外扩 10px，封面半径
+    // 已经大于画布半径，音柱几乎全部画在画布外，只剩零星几根短线。
     const narrowPanel =
       Boolean(this._panel) &&
       Boolean(this.renderRoot?.querySelector?.(".hm-card")?.classList?.contains("hm-narrow-panel"));
-    const band = narrowPanel ? 10 : width >= 300 ? 88 : 48;
+    const band = narrowPanel ? 72 : width >= 300 ? 88 : 48;
     const size = Math.min(1200, width + band);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;

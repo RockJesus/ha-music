@@ -4114,11 +4114,8 @@ export const cardStyles = css`
     .hm-cover::before,
     .hm-cover-eq-glow,
     .hm-play.is-playing::after,
-    .hm-entity-eq i,
-    .hm-entity-chip[data-playing="true"]::after,
-    .hm-dot {
-      animation: none !important;
-    }
+    /* 播放中的设备指示条、光点和呼吸点只做 transform/opacity，
+       不能随“手机性能模式”一起关掉，否则播放中的设备看起来是静止的。 */
 
     .hm-cover,
     .hm-play,

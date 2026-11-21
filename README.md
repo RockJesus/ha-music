@@ -79,23 +79,20 @@
 
 先升级集成，再升级卡片。协议不匹配时，卡片会停用频谱并在歌词区提示更新集成；播放控制不受影响。
 
-### 前置：歌词后端（可选）
+### 第一步：安装后端集成
 
-频谱和歌词都依赖 **HA Music Studio** 集成（`https://github.com/RockJesus/ha-music-studio`，类别选 Integration）。安装并重启 Home Assistant 后，在「设置 → 设备与服务」添加 **HA Music Studio**。未安装时卡片仍可播放和控制，但不会显示实时频谱和后端歌词。
+频谱和歌词都依赖 **HA Music Studio**。在 HACS → **Custom repositories** 添加 `https://github.com/RockJesus/ha-music-studio`，Category 选 **Integration**；下载后重启 Home Assistant，再到「设置 → 设备与服务」添加 **HA Music Studio**。
 
-### HACS（推荐）
+### 第二步：安装卡片
 
-1. HACS → 右上角菜单 → **Custom repositories**。
-2. Repository 填 `https://github.com/RockJesus/ha-music`，Category 选 **Lovelace / Dashboard**，点击 Add。
-3. 在 HACS 中搜索 **HA Music** 并下载。
-4. 刷新浏览器（必要时清缓存），HACS 会自动注册资源。
+在 HACS → **Custom repositories** 添加 `https://github.com/RockJesus/ha-music`，Category 选 **Lovelace / Dashboard**；搜索 **HA Music** 并下载，刷新浏览器即可。未安装后端时卡片仍可播放和控制，但没有实时频谱和后端歌词。
 
 ### 手动安装
 
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.12.9`
+   - URL：`/local/ha-music.js?v=2.13.0`
    - 类型：JavaScript 模块
 
 ## 配置

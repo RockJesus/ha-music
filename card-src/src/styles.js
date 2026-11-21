@@ -2946,13 +2946,18 @@ export const cardStyles = css`
 
   .hm-lyrics-empty {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     min-height: 84px;
     padding: 18px;
     border-radius: 14px;
-    border: 1px dashed rgba(255, 255, 255, 0.1);
-    color: rgba(246, 248, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(7, 9, 16, 0.7);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(14px);
+    color: rgba(246, 248, 255, 0.68);
     font-size: 12px;
     letter-spacing: 0.04em;
   }
@@ -2967,15 +2972,15 @@ export const cardStyles = css`
   }
 
   .hm-lyrics-empty-title {
-    color: rgba(246, 248, 255, 0.78);
-    font-size: 13px;
+    color: rgba(246, 248, 255, 0.94);
+    font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.02em;
   }
 
   .hm-lyrics-empty-hint {
-    max-width: 260px;
-    color: rgba(246, 248, 255, 0.46);
+    max-width: 300px;
+    color: rgba(246, 248, 255, 0.66);
     font-size: 11px;
     line-height: 1.55;
     text-align: center;

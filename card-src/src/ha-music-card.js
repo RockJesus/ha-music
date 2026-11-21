@@ -2753,6 +2753,10 @@ class HaMusicCard extends LitElement {
     this._dockOwner = true;
   }
 
+  _lyricsSource() {
+    return this._lyrics?.source || "Music Assistant";
+  }
+
   _installLyricDock() {
     if (this._isPreviewContext()) return;
     if (this._isMobileUi() && this._config?.mobile_hide_lyrics !== false) {

@@ -75,7 +75,7 @@
 
 | 卡片 | HA Music Studio | 协议 |
 |---|---|---|
-| `v2.14.0` 及以上 | `v0.4.0` 及以上 | `1` |
+| `v2.14.1` 及以上 | `v0.4.5` 及以上 | `1` |
 
 先升级集成，再升级卡片。协议不匹配时，卡片会停用频谱并在歌词区提示更新集成；播放控制不受影响。
 
@@ -92,7 +92,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.14.0`
+   - URL：`/local/ha-music.js?v=2.14.1`
    - 类型：JavaScript 模块
 
 ## 配置

@@ -3233,6 +3233,7 @@ class HaMusicCard extends LitElement {
     if (!this._panel) {
       this.style.removeProperty("--hm-panel-cover");
       this.style.removeProperty("--hm-panel-height");
+      this.renderRoot?.querySelector?.(".hm-main")?.style.removeProperty("flex");
       this._panelHeight = 0;
       this.renderRoot
         ?.querySelector?.(".hm-card")
@@ -3257,6 +3258,10 @@ class HaMusicCard extends LitElement {
     }
     const main = this.renderRoot?.querySelector?.(".hm-main");
     if (!main) return;
+    // 编辑态下 HA 会给卡片套编辑容器，主区的 flex 会被外部布局压回 0 0 auto，
+    // 于是主区高度塌成封面初始高度、_fitPanel 再按这个小高度缩封面，形成越缩越小。
+    // 面板模式直接内联锁定主区伸展，断开这条尺寸反馈链。
+    main.style.flex = "1 1 auto";
     const mainH = Math.round(main.clientHeight || 0);
     const mainW = Math.round(main.clientWidth || 0);
     if (mainH < 80 || mainW < 80) return;

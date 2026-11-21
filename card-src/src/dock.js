@@ -1681,7 +1681,7 @@ class HaMusicMini extends HTMLElement {
     event.preventDefault();
     event.stopPropagation();
     if (this._press || this._dragging) return;
-    this._showRemoveMenu();
+    this._showRemoveMenu(event);
   }
 
   _dockModeLabel() {
@@ -1692,21 +1692,23 @@ class HaMusicMini extends HTMLElement {
     return labels[this._mode] || this._mode;
   }
 
-  _showRemoveMenu() {
+  _showRemoveMenu(event) {
     this._closeRemoveMenu();
     const zh = !this._hass?.language || String(this._hass.language).startsWith("zh");
-    const dialog = document.createElement("dialog");
-    dialog.className = "ha-music-dock-dialog";
-    dialog.innerHTML = `
+    const x = Number(event?.clientX) || 0;
+    const y = Number(event?.clientY) || 0;
+    const bubble = document.createElement("div");
+    bubble.className = "ha-music-dock-bubble";
+    bubble.setAttribute("popover", "auto");
+    bubble.setAttribute("role", "dialog");
+    bubble.innerHTML = `
       <style>
-        dialog.ha-music-dock-dialog {
+        .ha-music-dock-bubble {
           position: fixed;
-          inset: 0;
-          margin: auto;
-          width: min(320px, calc(100vw - 32px));
-          height: max-content;
-          max-height: calc(100vh - 32px);
+          inset: auto;
+          margin: 0;
           padding: 0;
+          width: min(252px, calc(100vw - 16px));
           border: 0;
           background: transparent;
           color: #f6f8ff;
@@ -1714,62 +1716,98 @@ class HaMusicMini extends HTMLElement {
           font-size: 12px;
           line-height: 1.5;
           overflow: visible;
+          z-index: 2147483647;
         }
-        dialog.ha-music-dock-dialog::backdrop {
-          background: rgba(2, 6, 12, 0.6);
-          backdrop-filter: blur(3px);
-          -webkit-backdrop-filter: blur(3px);
-        }
-        dialog.ha-music-dock-dialog .confirm-card {
-          padding: 16px;
-          border: 1px solid rgba(46, 230, 197, 0.38);
-          border-radius: 16px;
+        .ha-music-dock-bubble .bubble-card {
+          position: relative;
+          padding: 13px 13px 11px;
+          border: 1px solid rgba(46, 230, 197, 0.4);
+          border-radius: 13px;
           background:
-            linear-gradient(135deg, rgba(46, 230, 197, 0.12), rgba(123, 92, 255, 0.1)),
-            rgba(5, 10, 18, 0.97);
-          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 22px -8px rgba(46, 230, 197, 0.5);
+            linear-gradient(135deg, rgba(46, 230, 197, 0.13), rgba(123, 92, 255, 0.11)),
+            rgba(5, 10, 18, 0.98);
+          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.58), 0 0 20px -8px rgba(46, 230, 197, 0.55);
         }
-        dialog.ha-music-dock-dialog .confirm-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
-        dialog.ha-music-dock-dialog .confirm-desc { margin: 0 0 14px; color: rgba(230, 238, 255, 0.62); font-size: 11px; }
-        dialog.ha-music-dock-dialog .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
-        dialog.ha-music-dock-dialog button {
-          min-height: 30px;
-          padding: 0 12px;
+        .ha-music-dock-bubble .bubble-card::before {
+          content: "";
+          position: absolute;
+          top: -6px;
+          left: var(--arrow-x, 22px);
+          width: 10px;
+          height: 10px;
+          border-top: 1px solid rgba(46, 230, 197, 0.4);
+          border-left: 1px solid rgba(46, 230, 197, 0.4);
+          background: rgba(9, 16, 26, 0.98);
+          transform: rotate(45deg);
+          pointer-events: none;
+        }
+        .ha-music-dock-bubble.is-above .bubble-card::before {
+          top: auto;
+          bottom: -6px;
+          border-top: 0;
+          border-left: 0;
+          border-right: 1px solid rgba(46, 230, 197, 0.4);
+          border-bottom: 1px solid rgba(46, 230, 197, 0.4);
+        }
+        .ha-music-dock-bubble .bubble-title {
+          margin: 0 0 4px;
+          font-size: 12px;
+          font-weight: 650;
+          letter-spacing: 0.01em;
+        }
+        .ha-music-dock-bubble .bubble-desc {
+          margin: 0 0 10px;
+          color: rgba(230, 238, 255, 0.62);
+          font-size: 10.5px;
+          line-height: 1.45;
+        }
+        .ha-music-dock-bubble .bubble-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 6px;
+        }
+        .ha-music-dock-bubble button {
+          min-height: 26px;
+          padding: 0 10px;
           border-radius: 999px;
           border: 1px solid rgba(255, 255, 255, 0.16);
           background: rgba(255, 255, 255, 0.06);
           color: rgba(246, 248, 255, 0.82);
           font: inherit;
-          font-size: 11px;
+          font-size: 10.5px;
           cursor: pointer;
         }
-        dialog.ha-music-dock-dialog button:hover { background: rgba(255, 255, 255, 0.12); }
-        dialog.ha-music-dock-dialog button.danger {
+        .ha-music-dock-bubble button:hover { background: rgba(255, 255, 255, 0.12); }
+        .ha-music-dock-bubble button.danger {
           border-color: rgba(255, 79, 156, 0.6);
           background: rgba(255, 79, 156, 0.16);
           color: #ffd8ea;
         }
-        dialog.ha-music-dock-dialog button.danger:hover { background: rgba(255, 79, 156, 0.26); }
+        .ha-music-dock-bubble button.danger:hover { background: rgba(255, 79, 156, 0.26); }
       </style>
-      <div class="confirm-card">
-        <div class="confirm-title"></div>
-        <div class="confirm-desc"></div>
-        <div class="confirm-actions">
+      <div class="bubble-card">
+        <div class="bubble-title"></div>
+        <div class="bubble-desc"></div>
+        <div class="bubble-actions">
           <button type="button" data-menu-action="cancel"></button>
           <button type="button" class="danger" data-menu-action="remove"></button>
         </div>
       </div>
     `;
-    dialog.querySelector(".confirm-title").textContent = zh
+    bubble.querySelector(".bubble-title").textContent = zh
       ? `删除${this._dockModeLabel()}悬浮播放器？`
       : `Remove this ${this._dockModeLabel()} floating player?`;
-    dialog.querySelector(".confirm-desc").textContent = zh
-      ? "删除后会同步取消卡片设置中对应位置的开关。"
+    bubble.querySelector(".bubble-desc").textContent = zh
+      ? "删除后会同步关闭卡片设置中对应位置的开关。"
       : "The matching card setting will be turned off as well.";
-    const cancel = dialog.querySelector('[data-menu-action="cancel"]');
-    const remove = dialog.querySelector('[data-menu-action="remove"]');
+    const cancel = bubble.querySelector('[data-menu-action="cancel"]');
+    const remove = bubble.querySelector('[data-menu-action="remove"]');
     cancel.textContent = zh ? "取消" : "Cancel";
     remove.textContent = zh ? "删除" : "Remove";
+    const cleanup = () => {
+      if (this._removeMenu === bubble) this._removeMenu = null;
+      bubble.remove();
+    };
     cancel.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -1780,29 +1818,57 @@ class HaMusicMini extends HTMLElement {
       event.stopPropagation();
       this._removeSelf();
     });
-    dialog.addEventListener("cancel", (event) => {
-      event.preventDefault();
-      this._closeRemoveMenu();
+    bubble.addEventListener("toggle", (event) => {
+      if (event.newState === "closed") cleanup();
     });
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) this._closeRemoveMenu();
+    bubble.addEventListener("click", (event) => {
+      event.stopPropagation();
     });
-    document.body.appendChild(dialog);
-    this._removeMenu = dialog;
-    if (typeof dialog.showModal === "function") dialog.showModal();
-    else dialog.setAttribute("open", "");
+    bubble.style.left = `${Math.round(x + 10)}px`;
+    bubble.style.top = `${Math.round(y + 10)}px`;
+    document.body.appendChild(bubble);
+    this._removeMenu = bubble;
+    if (typeof bubble.showPopover === "function") bubble.showPopover();
+    else bubble.style.display = "block";
+    const place = () => {
+      if (!bubble.isConnected) return;
+      const rect = bubble.getBoundingClientRect();
+      const gap = 10;
+      const margin = 8;
+      let left = x + gap;
+      let top = y + gap;
+      let arrow = 22;
+      if (left + rect.width > window.innerWidth - margin) {
+        left = x - rect.width - gap;
+        arrow = x - left - 12;
+      }
+      left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+      if (top + rect.height > window.innerHeight - margin) {
+        top = y - rect.height - gap;
+        bubble.classList.add("is-above");
+      }
+      top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+      bubble.style.left = `${Math.round(left)}px`;
+      bubble.style.top = `${Math.round(top)}px`;
+      bubble.style.setProperty(
+        "--arrow-x",
+        `${Math.round(Math.max(14, Math.min(rect.width - 24, arrow)))}px`
+      );
+    };
+    place();
+    window.requestAnimationFrame(place);
   }
 
   _closeRemoveMenu() {
     const menu = this._removeMenu;
     this._removeMenu = null;
     if (!menu) return;
-    if (typeof menu.close === "function" && menu.open) {
-      try {
-        menu.close();
-      } catch {
-        /* ignore */
+    try {
+      if (typeof menu.hidePopover === "function" && menu.matches?.(":popover-open")) {
+        menu.hidePopover();
       }
+    } catch {
+      /* ignore */
     }
     menu.remove();
   }

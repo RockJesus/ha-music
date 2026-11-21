@@ -2817,15 +2817,15 @@ export const cardStyles = css`
     background: linear-gradient(
       100deg,
       transparent 0%,
-      rgba(var(--hm-a2-rgb), 0.13) 18%,
-      rgba(var(--hm-a1-rgb), 0.27) 46%,
-      rgba(var(--hm-a2-rgb), 0.17) 74%,
+      rgba(var(--hm-ctl-a2-rgb), 0.13) 18%,
+      rgba(var(--hm-ctl-a1-rgb), 0.27) 46%,
+      rgba(var(--hm-ctl-a2-rgb), 0.17) 74%,
       transparent 100%
     );
     background-size: 180% 100%;
     box-shadow:
-      inset 0 0 0 1px rgba(var(--hm-a1-rgb), 0.14),
-      0 0 22px -8px rgba(var(--hm-a1-rgb), 0.55);
+      inset 0 0 0 1px rgba(var(--hm-ctl-a1-rgb), 0.14),
+      0 0 22px -8px rgba(var(--hm-ctl-a1-rgb), 0.55);
     transform: translateY(-50%);
     animation: hmLyricSheen 3.8s ease-in-out infinite;
     pointer-events: none;
@@ -2843,10 +2843,10 @@ export const cardStyles = css`
     border-radius: 999px;
     background: linear-gradient(
       90deg,
-      rgba(var(--hm-a2-rgb), 0.9),
-      rgba(var(--hm-a1-rgb), 0.9)
+      rgba(var(--hm-ctl-a2-rgb), 0.9),
+      rgba(var(--hm-ctl-a1-rgb), 0.9)
     );
-    box-shadow: 0 0 9px -1px rgba(var(--hm-a1-rgb), 0.75);
+    box-shadow: 0 0 9px -1px rgba(var(--hm-ctl-a1-rgb), 0.75);
     transform: translateX(-50%);
     pointer-events: none;
     transition: width 0.28s linear;
@@ -2872,8 +2872,8 @@ export const cardStyles = css`
 
   .hm-lyrics-line[data-active="true"] .hm-lyrics-text {
     text-shadow:
-      0 0 18px rgba(var(--hm-a1-rgb), 0.38),
-      0 0 6px rgba(var(--hm-a2-rgb), 0.22);
+      0 0 18px rgba(var(--hm-ctl-a1-rgb), 0.38),
+      0 0 6px rgba(var(--hm-ctl-a2-rgb), 0.22);
   }
 
   .hm-lyrics-line[data-static="true"] {

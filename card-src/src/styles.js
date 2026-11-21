@@ -4114,8 +4114,11 @@ export const cardStyles = css`
     .hm-cover::before,
     .hm-cover-eq-glow,
     .hm-play.is-playing::after,
-    /* 播放中的设备指示条、光点和呼吸点只做 transform/opacity，
-       不能随“手机性能模式”一起关掉，否则播放中的设备看起来是静止的。 */
+    .hm-entity-eq i,
+    .hm-entity-chip[data-playing="true"]::after,
+    .hm-dot {
+      animation: none !important;
+    }
 
     .hm-cover,
     .hm-play,
@@ -4159,11 +4162,8 @@ export const cardStyles = css`
       -webkit-backdrop-filter: none !important;
     }
 
-    .hm-entity-eq i,
-    .hm-entity-chip[data-playing="true"]::after,
-    .hm-dot {
-      animation: none !important;
-    }
+    /* 播放中的设备指示条、光点和呼吸点只做 transform/opacity，
+       不能随“手机性能模式”一起关掉，否则播放中的设备看起来是静止的。 */
   }
 
   /* 单行说明（专辑/来源）在窄列里必须省略，不能横向顶出卡片 */

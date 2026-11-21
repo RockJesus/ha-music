@@ -1985,8 +1985,9 @@ export const cardStyles = css`
     gap: 6px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 1px 0;
-    margin: -2px 0 -2px;
+    /* 给选中胶囊的主题外发光留出绘制空间，避免被滚动容器裁掉。 */
+    padding: 16px;
+    margin: -16px;
     scrollbar-width: none;
   }
 

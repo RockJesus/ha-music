@@ -1881,6 +1881,9 @@ export const cardStyles = css`
 
   /* ---------- 窄卡片适配 ---------- */
   @container (max-width: 380px) {
+    .hm-card[data-panel="true"] .hm-top .hm-status {
+      display: none;
+    }
     .hm-status-player,
     .hm-status + .hm-kicker-sep,
     .hm-status .hm-kicker-sep {
@@ -3197,24 +3200,41 @@ export const cardStyles = css`
       gap: 8px;
     }
 
-    /* 手机上状态和操作按钮分两行，避免状态文字被挤成“正…” */
+    /* 手机面板：顶栏状态与所有功能按钮压成一排，不再折成两行。 */
     .hm-card[data-panel="true"] .hm-status-player,
     .hm-card[data-panel="true"] .hm-status .hm-kicker-sep {
       display: none;
     }
 
     .hm-card[data-panel="true"] .hm-top {
-      flex-wrap: wrap;
-      row-gap: 8px;
+      flex-wrap: nowrap;
+      gap: 6px;
+      overflow: hidden;
     }
 
     .hm-card[data-panel="true"] .hm-status {
-      flex: 1 1 100%;
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+
+    .hm-card[data-panel="true"] .hm-status-text {
+      max-width: 48px;
     }
 
     .hm-card[data-panel="true"] .hm-top-actions {
-      width: 100%;
+      width: auto;
+      flex: 1 1 auto;
+      min-width: 0;
+      flex-wrap: nowrap;
       justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .hm-card[data-panel="true"] .hm-top-actions .hm-icon-btn {
+      flex: 0 0 30px;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
     }
 
     .hm-card[data-panel="true"] .hm-main {

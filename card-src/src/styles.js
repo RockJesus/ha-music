@@ -865,6 +865,81 @@ export const cardStyles = css`
     cursor: not-allowed;
   }
 
+  .hm-wave {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 1px;
+    height: 42px;
+    margin: 0;
+    padding: 0 2px;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .hm-wave[data-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .hm-wave-bar {
+    flex: 1 1 0;
+    min-width: 1px;
+    height: var(--h, 20%);
+    border-radius: 1px;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background 0.15s ease;
+  }
+
+  .hm-wave-bar[data-past="true"] {
+    background: linear-gradient(
+      180deg,
+      rgba(var(--hm-a1-rgb), 0.95),
+      rgba(var(--hm-a2-rgb), 0.95)
+    );
+  }
+
+  .hm-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .hm-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(246, 248, 255, 0.6);
+    font: inherit;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+
+  .hm-mode[data-on="true"] {
+    color: #fff;
+    border-color: rgba(var(--hm-a1-rgb), 0.62);
+    background: rgba(var(--hm-a1-rgb), 0.2);
+  }
+
+  .hm-mode:hover {
+    color: #fff;
+    border-color: rgba(var(--hm-a1-rgb), 0.75);
+  }
+
+  .hm-favorite[data-on="true"] {
+    color: #ff5f87;
+    border-color: rgba(255, 95, 135, 0.5);
+    background: rgba(255, 95, 135, 0.12);
+  }
+
   /* ---------- 控制区 ---------- */
   .hm-controls {
     display: flex;

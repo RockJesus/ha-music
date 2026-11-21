@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.14.2";
+export const CARD_VERSION = "2.15.0";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -166,6 +166,11 @@ const EN = {
   lyricsRetry: "Retry",
   lyricsOffset: "Lyric timing offset",
   lyricsInstrumental: "Instrumental · no lyrics",
+  favorite: "Favorite",
+  favoriteOn: "Remove from favorites",
+  favoriteUnavailable: "Favorites need a track with a source URI",
+  autoplay: "Autoplay",
+  crossfade: "Crossfade",
 };
 
 const ZH = {
@@ -226,6 +231,11 @@ const ZH = {
   lyricsRetry: "重试",
   lyricsOffset: "歌词时间偏移",
   lyricsInstrumental: "纯音乐 · 无歌词",
+  favorite: "收藏",
+  favoriteOn: "取消收藏",
+  favoriteUnavailable: "当前曲目缺少来源地址，无法收藏",
+  autoplay: "自动播放",
+  crossfade: "淡入淡出",
 };
 
 export function isChinese(language) {

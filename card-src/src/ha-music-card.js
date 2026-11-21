@@ -183,6 +183,13 @@ class HaMusicCard extends LitElement {
     this._queueSubscriptionKey = "";
     this._queueFirst = null;
     this._queueSnapshot = null;
+    this._studioQueueKey = "";
+    this._studioFavorite = null;
+    this._studioAutoplay = false;
+    this._studioCrossfade = false;
+    this._studioBusy = false;
+    this._waveform = null;
+    this._waveformKey = "";
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
@@ -1578,6 +1585,152 @@ class HaMusicCard extends LitElement {
     this._guard(this._call("unjoin"));
   }
 
+  _studioReady() {
+    return Boolean(this._isMaPlayer() && this._hass?.services?.ha_music_studio);
+  }
+
+  _studioQueue() {
+    return (
+      this._queueQueueId ||
+      this._state()?.attributes?.active_queue ||
+      this._state()?.attributes?.queue_id ||
+      ""
+    );
+  }
+
+  _syncStudioQueue() {
+    if (!this._studioReady() || this._thumbMode()) return;
+    const queueId = this._studioQueue();
+    if (!queueId) return;
+    const media = this._readMedia();
+    const key = [
+      queueId,
+      this._state()?.attributes?.media_content_id || "",
+      media.title,
+      media.duration,
+    ].join("|");
+    if (key === this._studioQueueKey) return;
+    this._studioQueueKey = key;
+    this._queueQueueId = queueId;
+    this._loadStudioQueue(queueId, key).catch(() => {});
+  }
+
+  async _loadStudioQueue(queueId, key) {
+    if (!this._studioReady()) return;
+    const response = await this._queueCommand("snapshot");
+    const queue = response?.result?.queue || response?.queue;
+    if (!queue || this._studioQueueKey !== key) return;
+    const active = (queue.items || []).find((item) => item.active);
+    this._studioFavorite = active ? Boolean(active.favorite) : null;
+    this._studioAutoplay = Boolean(queue.autoplay_enabled);
+    this._studioCrossfade = Boolean(queue.crossfade_enabled);
+    this._queueSnapshot = queue;
+    this.requestUpdate();
+    this._loadWaveform(queueId, key).catch(() => {});
+  }
+
+  async _loadWaveform(queueId, key) {
+    if (this._waveformKey === key) return;
+    this._waveformKey = key;
+    try {
+      const response = await this._queueCommand("waveform", { queue_id: queueId });
+      const bins = response?.result?.bins;
+      if (this._studioQueueKey !== key) return;
+      this._waveform = Array.isArray(bins) && bins.length ? bins : null;
+    } catch (error) {
+      this._waveform = null;
+    }
+    this.requestUpdate();
+  }
+
+  _waveBars(count = 96) {
+    const bins = this._waveform;
+    if (!Array.isArray(bins) || !bins.length) return [];
+    const width = Math.min(count, bins.length);
+    const step = bins.length / width;
+    const bars = [];
+    for (let i = 0; i < width; i++) {
+      const start = Math.floor(i * step);
+      const end = Math.max(start + 1, Math.floor((i + 1) * step));
+      let peak = 0;
+      for (let j = start; j < end && j < bins.length; j++) {
+        peak = Math.max(peak, Number(bins[j]) || 0);
+      }
+      bars.push(clamp(peak, 0, 1));
+    }
+    return bars;
+  }
+
+  async _toggleStudioFavorite() {
+    if (!this._studioReady() || this._studioBusy) return;
+    const attrs = this._state()?.attributes || {};
+    const uri = String(attrs.media_content_id || "");
+    if (!uri) {
+      this._notify(translator(this._hass?.language)("favoriteUnavailable"));
+      return;
+    }
+    const next = !this._studioFavorite;
+    this._studioBusy = true;
+    this._studioFavorite = next;
+    this.requestUpdate();
+    try {
+      await this._queueCommand("favorite", { item_uri: uri, favorite: next });
+    } catch (error) {
+      this._studioFavorite = !next;
+      this._notify(error?.message || String(error));
+    } finally {
+      this._studioBusy = false;
+      this.requestUpdate();
+    }
+  }
+
+  async _toggleStudioAutoplay() {
+    if (!this._studioReady() || this._studioBusy) return;
+    const next = !this._studioAutoplay;
+    this._studioBusy = true;
+    this._studioAutoplay = next;
+    this.requestUpdate();
+    try {
+      await this._queueCommand("autoplay", { autoplay: next });
+    } catch (error) {
+      this._studioAutoplay = !next;
+      this._notify(error?.message || String(error));
+    } finally {
+      this._studioBusy = false;
+      this.requestUpdate();
+    }
+  }
+
+  async _toggleStudioCrossfade() {
+    if (!this._studioReady() || this._studioBusy) return;
+    const next = !this._studioCrossfade;
+    this._studioBusy = true;
+    this._studioCrossfade = next;
+    this.requestUpdate();
+    try {
+      await this._queueCommand("crossfade", { crossfade: next });
+    } catch (error) {
+      this._studioCrossfade = !next;
+      this._notify(error?.message || String(error));
+    } finally {
+      this._studioBusy = false;
+      this.requestUpdate();
+    }
+  }
+
+  _onWaveformClick(event) {
+    if (!this._canSeekNow()) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = clamp((event.clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
+    const media = this._readMedia();
+    if (!media.duration) return;
+    this._seekTo(media.duration * ratio);
+  }
+
+  _canSeekNow() {
+    return hasFeature(this._state(), FEATURES.SEEK);
+  }
+
   async _queueCommand(action, extra = {}) {
     const connection = this._hass?.connection;
     if (!connection?.sendMessagePromise) {
@@ -1987,6 +2140,13 @@ class HaMusicCard extends LitElement {
     this._queueSubscriptionKey = "";
     this._queueFirst = null;
     this._queueSnapshot = null;
+    this._studioQueueKey = "";
+    this._studioFavorite = null;
+    this._studioAutoplay = false;
+    this._studioCrossfade = false;
+    this._studioBusy = false;
+    this._waveform = null;
+    this._waveformKey = "";
     if (typeof unsub === "function") {
       try {
         unsub();
@@ -2420,6 +2580,7 @@ class HaMusicCard extends LitElement {
       }
     });
     this._safeEffect("range", () => this._syncRangeValues());
+    this._safeEffect("studio", () => this._syncStudioQueue());
     this._safeEffect("panel", () => {
       this._syncPanelFlag();
       this._queuePanelFit();
@@ -3406,6 +3567,7 @@ class HaMusicCard extends LitElement {
     const duration = media.duration;
     const position = this._seekPreview ?? media.position;
     const percent = duration ? clamp((position / duration) * 100, 0, 100) : 0;
+    const waveBars = this._waveBars();
     const volumePercent = Math.round(
       (this._volumePreview ?? volume.level) * 100
     );
@@ -3699,6 +3861,30 @@ class HaMusicCard extends LitElement {
                       : nothing}
                   </div>`
                 : nothing}
+              ${studioQueueReady && !this._thumbMode() && layout !== "mini"
+                ? html`<div class="hm-modes">
+                    <button
+                      class="hm-mode"
+                      data-role="autoplay"
+                      data-on=${this._studioAutoplay ? "true" : "false"}
+                      aria-pressed=${this._studioAutoplay ? "true" : "false"}
+                      title=${t("autoplay")}
+                      @click=${() => this._toggleStudioAutoplay()}
+                    >
+                      ${icon("autoplay", 14)}<span>${t("autoplay")}</span>
+                    </button>
+                    <button
+                      class="hm-mode"
+                      data-role="crossfade"
+                      data-on=${this._studioCrossfade ? "true" : "false"}
+                      aria-pressed=${this._studioCrossfade ? "true" : "false"}
+                      title=${t("crossfade")}
+                      @click=${() => this._toggleStudioCrossfade()}
+                    >
+                      ${icon("crossfade", 14)}<span>${t("crossfade")}</span>
+                    </button>
+                  </div>`
+                : nothing}
               ${lyricLine && !sideLyrics && layout === "full" && !this._thumbMode() && (this._panel || this._height >= 360)
                 ? html`<div class="hm-now-lyric">
                     <span class="hm-now-lyric-mark">${icon("lyrics", 12)}</span>
@@ -3723,20 +3909,41 @@ class HaMusicCard extends LitElement {
           ${duration > 0 || previewUi
             ? html`<section class="hm-progress">
                 <span class="hm-time">${formatTime(position)}</span>
-                <input
-                  class="hm-range"
-                  data-role="seek"
-                  type="range"
-                  min="0"
-                  max=${duration}
-                  step="0.01"
-                  .value=${String(position)}
-                  data-disabled=${!canSeek ? "true" : "false"}
-                  style=${styleMap({ "--pct": `${percent}%` })}
-                  @input=${this._onSeekInput}
-                  @change=${this._onSeekCommit}
-                  aria-label=${t("seek")}
-                />
+                ${waveBars.length
+                  ? html`<div
+                      class="hm-wave"
+                      data-role="seek"
+                      data-disabled=${!canSeek ? "true" : "false"}
+                      role="slider"
+                      tabindex="0"
+                      aria-label=${t("seek")}
+                      aria-valuemin="0"
+                      aria-valuemax=${duration}
+                      aria-valuenow=${position}
+                      @click=${(event) => this._onWaveformClick(event)}
+                    >
+                      ${waveBars.map(
+                        (bar, index) => html`<span
+                          class="hm-wave-bar"
+                          data-past=${index / waveBars.length <= percent / 100 ? "true" : "false"}
+                          style=${styleMap({ "--h": `${Math.round(6 + bar * 94)}%` })}
+                        ></span>`
+                      )}
+                    </div>`
+                  : html`<input
+                      class="hm-range"
+                      data-role="seek"
+                      type="range"
+                      min="0"
+                      max=${duration}
+                      step="0.01"
+                      .value=${String(position)}
+                      data-disabled=${!canSeek ? "true" : "false"}
+                      style=${styleMap({ "--pct": `${percent}%` })}
+                      @input=${this._onSeekInput}
+                      @change=${this._onSeekCommit}
+                      aria-label=${t("seek")}
+                    />`}
                 <span
                   class="hm-time end hoverable"
                   title=${t("remaining")}
@@ -3757,6 +3964,18 @@ class HaMusicCard extends LitElement {
             data-volume-below=${volumeBelowControls ? "true" : "false"}
           >
             <div class="hm-transport">
+              ${studioQueueReady
+                ? html`<button
+                    class="hm-btn hm-favorite"
+                    data-role="favorite"
+                    data-on=${this._studioFavorite ? "true" : "false"}
+                    aria-label=${this._studioFavorite ? t("favoriteOn") : t("favorite")}
+                    title=${this._studioFavorite ? t("favoriteOn") : t("favorite")}
+                    @click=${() => this._toggleStudioFavorite()}
+                  >
+                    ${icon(this._studioFavorite ? "heartFill" : "heart", 18)}
+                  </button>`
+                : nothing}
               ${canShuffle
                 ? html`<button
                     class="hm-btn"

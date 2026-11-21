@@ -1203,8 +1203,13 @@ export const cardStyles = css`
     box-sizing: border-box;
     padding: 4px 12px 4px 4px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.2);
+    background: linear-gradient(
+      135deg,
+      rgba(var(--hm-ctl-a1-rgb), 0.09),
+      rgba(var(--hm-ctl-a2-rgb), 0.06)
+    );
+    box-shadow: 0 0 20px -14px rgba(var(--hm-ctl-a1-rgb), 0.85);
   }
 
   .hm-volume .hm-vol-step {
@@ -1213,16 +1218,29 @@ export const cardStyles = css`
   }
 
   .hm-volume .hm-icon-btn {
-    border: none;
-    background: transparent;
+    border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.24);
+    background: linear-gradient(
+      135deg,
+      rgba(var(--hm-ctl-a1-rgb), 0.16),
+      rgba(var(--hm-ctl-a2-rgb), 0.16)
+    );
+    color: #fff;
     width: 34px;
     height: 34px;
     border-radius: 50%;
     flex: 0 0 auto;
+    box-shadow: 0 0 14px -9px rgba(var(--hm-ctl-a1-rgb), 0.9);
   }
 
   .hm-volume .hm-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: linear-gradient(
+      135deg,
+      var(--hm-ctl-a1),
+      var(--hm-ctl-a2)
+    );
+    border-color: rgba(var(--hm-ctl-a1-rgb), 0.55);
+    box-shadow: 0 0 18px -6px rgba(var(--hm-ctl-a1-rgb), 0.9);
+    color: #fff;
   }
 
   /* 音量/静音两枚图标常驻 DOM，只切换显示，避免状态回传时图标停在旧图。 */
@@ -3245,8 +3263,12 @@ export const cardStyles = css`
       min-height: 36px;
       margin: 0;
       padding: 4px 12px 4px 4px;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.2);
+      background: linear-gradient(
+        135deg,
+        rgba(var(--hm-ctl-a1-rgb), 0.09),
+        rgba(var(--hm-ctl-a2-rgb), 0.06)
+      );
       box-sizing: border-box;
     }
 

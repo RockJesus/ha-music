@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.16.6";
+export const CARD_VERSION = "2.16.7";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 

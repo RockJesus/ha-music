@@ -918,7 +918,11 @@ class HaMusicCard extends LitElement {
     const narrowPanel =
       Boolean(this._panel) &&
       Boolean(this.renderRoot?.querySelector?.(".hm-card")?.classList?.contains("hm-narrow-panel"));
-    const band = narrowPanel ? 72 : width >= 300 ? 88 : 48;
+    const band = narrowPanel
+      ? Math.min(120, Math.max(84, Math.round(width * 0.24)))
+      : width >= 300
+        ? 88
+        : 48;
     const size = Math.min(1200, width + band);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;

@@ -4393,7 +4393,7 @@ export const cardStyles = css`
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] {
-    --hm-ring-pad: 72px;
+    --hm-ring-pad: 110px;
   }
 
   .hm-card.hm-narrow-panel[data-panel="true"] .hm-cover-wrap {

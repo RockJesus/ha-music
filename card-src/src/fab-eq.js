@@ -54,22 +54,22 @@ function paint(canvas, bars, glow) {
   for (let i = 0; i < barCount; i += 1) {
     const v = clamp(bars[i] || 0, 0, 1);
     const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
-    const len = 2.2 + Math.pow(v, 1.05) * maxLen;
+    const len = 3.2 + Math.pow(v, 1.05) * maxLen;
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = Math.abs(i - half) / half;
     const color = blend(accent[0], accent[1], t);
     const alpha = 0.5 + v * 0.48;
-    // 柱底（贴近封面的一侧）alpha 从 0 渐入，避免柱根叠加成封面外圈亮边；
-    // 外端保持原色与辉光，柱形仍有清晰的长度读数。
+    // 柱底保留少量 alpha，让每一根柱都从根部可见；若从 0 渐入，
+    // 短柱只剩外端几个像素，整圈会退化成虚线，看起来像音柱缺失。
     const x0 = R + c * r0;
     const y0 = R + s * r0;
     const x1 = R + c * (r0 + len);
     const y1 = R + s * (r0 + len);
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
-    grad.addColorStop(0, rgba(color, 0));
-    grad.addColorStop(0.18, rgba(color, 0));
-    grad.addColorStop(0.46, rgba(color, alpha * 0.52));
+    grad.addColorStop(0, rgba(color, alpha * 0.22));
+    grad.addColorStop(0.18, rgba(color, alpha * 0.28));
+    grad.addColorStop(0.46, rgba(color, alpha * 0.62));
     grad.addColorStop(1, rgba(color, alpha));
     ctx.strokeStyle = grad;
     ctx.shadowColor = rgba(color, 0.12 + glow * 0.26);

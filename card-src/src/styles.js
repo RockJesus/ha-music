@@ -940,6 +940,130 @@ export const cardStyles = css`
     background: rgba(255, 95, 135, 0.12);
   }
 
+  .hm-players {
+    position: absolute;
+    z-index: 8;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-height: min(62%, 430px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    background: rgba(10, 12, 26, 0.92);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(18px);
+    overflow: hidden;
+  }
+
+  .hm-players-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 12px 9px 16px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: rgba(246, 248, 255, 0.88);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .hm-players-body {
+    overflow: auto;
+    padding: 6px 8px 9px;
+  }
+
+  .hm-player-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 8px;
+    border-radius: 12px;
+  }
+
+  .hm-player-row[data-current="true"] {
+    background: rgba(var(--hm-a1-rgb), 0.14);
+  }
+
+  .hm-player-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .hm-player-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    flex: 0 0 auto;
+  }
+
+  .hm-player-dot[data-playing="true"] {
+    background: rgb(var(--hm-a1-rgb));
+    box-shadow: 0 0 8px rgba(var(--hm-a1-rgb), 0.75);
+  }
+
+  .hm-player-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .hm-player-name {
+    font-size: 13px;
+    color: #f6f8ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hm-player-sub {
+    font-size: 10.5px;
+    color: rgba(246, 248, 255, 0.5);
+  }
+
+  .hm-player-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+
+  .hm-player-btn {
+    padding: 5px 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(246, 248, 255, 0.78);
+    font: inherit;
+    font-size: 10.5px;
+    cursor: pointer;
+  }
+
+  .hm-player-btn[data-on="true"] {
+    border-color: rgba(var(--hm-a1-rgb), 0.55);
+    background: rgba(var(--hm-a1-rgb), 0.18);
+    color: #fff;
+  }
+
+  .hm-player-badge {
+    font-size: 10px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .hm-players-empty {
+    padding: 24px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(246, 248, 255, 0.5);
+  }
+
   /* ---------- 控制区 ---------- */
   .hm-controls {
     display: flex;

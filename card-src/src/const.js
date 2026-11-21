@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.15.0";
+export const CARD_VERSION = "2.15.1";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -171,6 +171,16 @@ const EN = {
   favoriteUnavailable: "Favorites need a track with a source URI",
   autoplay: "Autoplay",
   crossfade: "Crossfade",
+  devices: "Devices & grouping",
+  selectDevice: "Switch",
+  joinGroup: "Join group",
+  leaveGroup: "Leave group",
+  groupLeader: "Leader",
+  groupMember: "In group",
+  groupUnits: "devices",
+  groupLeaderMissing: "Select a Music Assistant player first",
+  deviceUnavailable: "No Home Assistant entity for this player",
+  playersEmpty: "No players available",
 };
 
 const ZH = {
@@ -236,6 +246,16 @@ const ZH = {
   favoriteUnavailable: "当前曲目缺少来源地址，无法收藏",
   autoplay: "自动播放",
   crossfade: "淡入淡出",
+  devices: "设备与分组",
+  selectDevice: "切换",
+  joinGroup: "加入分组",
+  leaveGroup: "移出分组",
+  groupLeader: "主设备",
+  groupMember: "已加入",
+  groupUnits: "台设备",
+  groupLeaderMissing: "请先选择 Music Assistant 播放器",
+  deviceUnavailable: "该播放器没有对应的 Home Assistant 实体",
+  playersEmpty: "没有可用播放器",
 };
 
 export function isChinese(language) {

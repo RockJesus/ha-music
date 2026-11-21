@@ -190,6 +190,9 @@ class HaMusicCard extends LitElement {
     this._studioBusy = false;
     this._waveform = null;
     this._waveformKey = "";
+    this._playersOpen = false;
+    this._maPlayers = [];
+    this._playersBusy = false;
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
@@ -1585,6 +1588,99 @@ class HaMusicCard extends LitElement {
     this._guard(this._call("unjoin"));
   }
 
+  async _openPlayers() {
+    this._playersOpen = true;
+    this.requestUpdate();
+    await this._loadPlayers();
+  }
+
+  _closePlayers() {
+    this._playersOpen = false;
+    this.requestUpdate();
+  }
+
+  async _loadPlayers() {
+    if (!this._studioReady()) return;
+    try {
+      const response = await this._hass.connection.sendMessagePromise({
+        type: "ha_music_studio/player_group",
+        action: "players",
+      });
+      this._maPlayers = Array.isArray(response?.players) ? response.players : [];
+    } catch (error) {
+      this._notify(error?.message || String(error));
+      this._maPlayers = [];
+    }
+    this.requestUpdate();
+  }
+
+  _currentMaPlayer() {
+    const queueId = this._studioQueue();
+    return (
+      this._maPlayers.find(
+        (player) => player.active_source === queueId || player.active_queue === queueId
+      ) ||
+      this._maPlayers.find((player) => player.player_id === this._state()?.attributes?.ma_player_id)
+      ||
+      null
+    );
+  }
+
+  _entityForMaPlayer(player) {
+    const states = this._hass?.states || {};
+    const queueId = player?.active_source || player?.active_queue || "";
+    for (const [entityId, state] of Object.entries(states)) {
+      if (!entityId.startsWith("media_player.")) continue;
+      if (queueId && state?.attributes?.active_queue === queueId) return entityId;
+    }
+    const name = String(player?.name || "").toLowerCase();
+    if (!name) return "";
+    for (const [entityId, state] of Object.entries(states)) {
+      if (!entityId.startsWith("media_player.")) continue;
+      if (friendlyName(this._hass, entityId, entityId).toLowerCase() === name) {
+        return entityId;
+      }
+    }
+    return "";
+  }
+
+  _selectMaPlayer(player) {
+    const entityId = this._entityForMaPlayer(player);
+    if (!entityId) {
+      this._notify(translator(this._hass?.language)("deviceUnavailable"));
+      return;
+    }
+    this._switchEntity(entityId, true);
+    this._closePlayers();
+  }
+
+  async _toggleMaGroup(player) {
+    if (this._playersBusy) return;
+    const current = this._currentMaPlayer();
+    if (!current) {
+      this._notify(translator(this._hass?.language)("groupLeaderMissing"));
+      return;
+    }
+    if (player.player_id === current.player_id) return;
+    const member = (current.group_members || []).includes(player.player_id);
+    this._playersBusy = true;
+    try {
+      await this._hass.connection.sendMessagePromise({
+        type: "ha_music_studio/player_group",
+        action: "set_members",
+        target_player: current.player_id,
+        add: member ? [] : [player.player_id],
+        remove: member ? [player.player_id] : [],
+      });
+      await this._loadPlayers();
+    } catch (error) {
+      this._notify(error?.message || String(error));
+    } finally {
+      this._playersBusy = false;
+      this.requestUpdate();
+    }
+  }
+
   _studioReady() {
     return Boolean(this._isMaPlayer() && this._hass?.services?.ha_music_studio);
   }
@@ -2147,6 +2243,9 @@ class HaMusicCard extends LitElement {
     this._studioBusy = false;
     this._waveform = null;
     this._waveformKey = "";
+    this._playersOpen = false;
+    this._maPlayers = [];
+    this._playersBusy = false;
     if (typeof unsub === "function") {
       try {
         unsub();
@@ -3657,6 +3756,17 @@ class HaMusicCard extends LitElement {
                     ${icon("ma", 16)}
                   </button>`
                 : nothing}
+              ${studioQueueReady
+                ? html`<button
+                    class="hm-icon-btn hm-players-btn"
+                    data-role="players"
+                    aria-label=${t("devices")}
+                    title=${t("devices")}
+                    @click=${() => this._openPlayers()}
+                  >
+                    ${icon("speaker", 16)}
+                  </button>`
+                : nothing}
               ${showQueue
                 ? html`<button
                     class="hm-icon-btn"
@@ -4114,6 +4224,59 @@ class HaMusicCard extends LitElement {
           : nothing}
 
         ${this._renderDrawer()}
+
+        ${this._playersOpen
+          ? html`<div class="hm-players">
+              <div class="hm-players-head">
+                <span>${t("devices")}</span>
+                <button
+                  class="hm-icon-btn"
+                  aria-label=${t("close")}
+                  title=${t("close")}
+                  @click=${() => this._closePlayers()}
+                >
+                  ${icon("close", 15)}
+                </button>
+              </div>
+              <div class="hm-players-body">
+                ${this._maPlayers.length
+                  ? this._maPlayers.map((player) => {
+                      const current = this._currentMaPlayer();
+                      const isLeader = current?.player_id === player.player_id;
+                      const member = (current?.group_members || []).includes(player.player_id);
+                      const entityId = this._entityForMaPlayer(player);
+                      return html`<div class="hm-player-row" data-current=${isLeader ? "true" : "false"}>
+                        <div class="hm-player-main">
+                          <span class="hm-player-dot" data-playing=${player.state === "playing" ? "true" : "false"}></span>
+                          <div class="hm-player-text">
+                            <span class="hm-player-name">${player.name}</span>
+                            <span class="hm-player-sub">
+                              ${member ? t("groupMember") : player.state || t("idle")}
+                              ${player.group_members?.length ? ` · ${player.group_members.length} ${t("groupUnits")}` : ""}
+                            </span>
+                          </div>
+                        </div>
+                        <div class="hm-player-actions">
+                          ${isLeader
+                            ? html`<span class="hm-player-badge">${t("groupLeader")}</span>`
+                            : html`<button class="hm-player-btn" @click=${() => this._selectMaPlayer(player)}>${t("selectDevice")}</button>`}
+                          ${!isLeader && entityId && player.can_group_with?.length !== 0
+                            ? html`<button
+                                class="hm-player-btn"
+                                data-role="group"
+                                data-on=${member ? "true" : "false"}
+                                @click=${() => this._toggleMaGroup(player)}
+                              >
+                                ${member ? t("leaveGroup") : t("joinGroup")}
+                              </button>`
+                            : nothing}
+                        </div>
+                      </div>`;
+                    })
+                  : html`<div class="hm-players-empty">${t("playersEmpty")}</div>`}
+              </div>
+            </div>`
+          : nothing}
 
         <div class="hm-toast ${this._toast ? "show" : ""}">${this._toast}</div>
       </div>

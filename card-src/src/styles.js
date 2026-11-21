@@ -1344,9 +1344,9 @@ export const cardStyles = css`
 
   .hm-controls.is-stacked .hm-volume {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 100%;
-    margin-left: 0;
+    width: min(100%, 460px);
+    max-width: min(100%, 460px);
+    margin-inline: auto;
   }
 
   .hm-card:not([data-layout="mini"]) .hm-controls.is-stacked .hm-volume .hm-vol-step,
@@ -3703,10 +3703,10 @@ export const cardStyles = css`
 
   .hm-card[data-panel="true"] .hm-controls.is-stacked .hm-volume {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 100%;
+    width: min(100%, 460px);
+    max-width: min(100%, 460px);
     min-width: 0;
-    margin-left: 0;
+    margin-inline: auto;
   }
 
   /* ---------- 卡片选择器缩略预览（独立于仪表盘正常卡片） ---------- */

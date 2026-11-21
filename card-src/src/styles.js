@@ -313,8 +313,10 @@ export const cardStyles = css`
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
-    will-change: transform;
-    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform, opacity;
+    transition:
+      opacity 0.3s ease,
+      transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   .hm-cover:hover {
@@ -415,52 +417,45 @@ export const cardStyles = css`
 
 
   .hm-cover[data-gesture="next"] {
-    animation: hmCoverNext 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: hmCoverNext 0.4s ease-out both;
   }
 
   .hm-cover[data-gesture="prev"] {
-    animation: hmCoverPrev 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: hmCoverPrev 0.4s ease-out both;
   }
 
   .hm-cover[data-gesture="tap"] {
     animation: hmCoverTap 0.3s ease-out;
   }
 
+  /* 滑动切歌只做渐隐，不做位移回弹：透明度收干后换封面再淡入。 */
   @keyframes hmCoverNext {
     0% {
-      transform: translateX(0) scale(1);
+      transform: scale(1);
       opacity: 1;
     }
-    34% {
-      transform: translateX(-15%) rotate(-2.5deg) scale(0.94);
-      opacity: 0.82;
-    }
-    70% {
-      transform: translateX(3%) rotate(0.6deg) scale(1.01);
-      opacity: 1;
+    55% {
+      transform: scale(0.96);
+      opacity: 0.52;
     }
     100% {
-      transform: translateX(0) scale(1);
-      opacity: 1;
+      transform: scale(1);
+      opacity: 0;
     }
   }
 
   @keyframes hmCoverPrev {
     0% {
-      transform: translateX(0) scale(1);
+      transform: scale(1);
       opacity: 1;
     }
-    34% {
-      transform: translateX(15%) rotate(2.5deg) scale(0.94);
-      opacity: 0.82;
-    }
-    70% {
-      transform: translateX(-3%) rotate(-0.6deg) scale(1.01);
-      opacity: 1;
+    55% {
+      transform: scale(0.96);
+      opacity: 0.52;
     }
     100% {
-      transform: translateX(0) scale(1);
-      opacity: 1;
+      transform: scale(1);
+      opacity: 0;
     }
   }
 

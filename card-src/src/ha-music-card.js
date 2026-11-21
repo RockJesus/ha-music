@@ -4343,16 +4343,6 @@ class HaMusicCard extends LitElement {
                     ${icon("speaker", 16)}
                   </button>`
                 : nothing}
-              ${showQueue
-                ? html`<button
-                    class="hm-icon-btn"
-                    aria-label=${t("queue")}
-                    title=${t("queue")}
-                    @click=${() => this._openQueue()}
-                  >
-                    ${icon("queue", 16)}
-                  </button>`
-                : nothing}
               ${showLibrary
                 ? html`<button
                     class="hm-icon-btn"
@@ -4759,6 +4749,17 @@ class HaMusicCard extends LitElement {
                     @click=${() => this._repeat()}
                   >
                     ${icon(repeat === "one" ? "repeatOne" : "repeat", 18)}
+                  </button>`
+                : nothing}
+              ${showQueue
+                ? html`<button
+                    class="hm-btn hm-queue"
+                    data-role="queue"
+                    aria-label=${t("queue")}
+                    title=${t("queue")}
+                    @click=${() => this._openQueue()}
+                  >
+                    ${icon("queue", 18)}
                   </button>`
                 : nothing}
             </div>

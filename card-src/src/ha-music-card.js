@@ -4566,16 +4566,6 @@ class HaMusicCard extends LitElement {
               >
                 ${icon(this._sfxKey === "off" ? "sfxOff" : "sfx", 16)}
               </button>
-              <button
-                class="hm-icon-btn hm-fullscreen-btn"
-                data-role="fullscreen"
-                data-on=${this._isFullscreen ? "true" : "false"}
-                aria-label=${this._isFullscreen ? t("exitFullscreen") : t("fullscreen")}
-                title=${this._isFullscreen ? t("exitFullscreen") : t("fullscreen")}
-                @click=${() => this._toggleFullscreen()}
-              >
-                ${icon(this._isFullscreen ? "fullscreenExit" : "fullscreen", 16)}
-              </button>
               ${maShow
                 ? html`<button
                     class="hm-icon-btn hm-ma"
@@ -4619,13 +4609,14 @@ class HaMusicCard extends LitElement {
                   </button>`
                 : nothing}
               <button
-                class="hm-icon-btn"
-                data-role="more"
-                aria-label=${t("more")}
-                title=${t("more")}
-                @click=${() => this._moreInfo()}
+                class="hm-icon-btn hm-fullscreen-btn"
+                data-role="fullscreen"
+                data-on=${this._isFullscreen ? "true" : "false"}
+                aria-label=${this._isFullscreen ? t("exitFullscreen") : t("fullscreen")}
+                title=${this._isFullscreen ? t("exitFullscreen") : t("fullscreen")}
+                @click=${() => this._toggleFullscreen()}
               >
-                ${icon("more", 16)}
+                ${icon(this._isFullscreen ? "fullscreenExit" : "fullscreen", 16)}
               </button>
             </div>
           </header>

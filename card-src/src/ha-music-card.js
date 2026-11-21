@@ -2183,7 +2183,8 @@ class HaMusicCard extends LitElement {
     const path = event.composedPath?.() || [];
     if (this._sfxOpen) {
       const insideSfx = path.some((node) => node?.classList?.contains?.("hm-sfx-menu"));
-      if (!insideSfx) {
+      const onSfxButton = path.some((node) => node?.dataset?.role === "sfx");
+      if (!insideSfx && !onSfxButton) {
         this._sfxOpen = false;
         this.requestUpdate();
       }

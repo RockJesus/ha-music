@@ -1354,6 +1354,14 @@ export const cardStyles = css`
     display: inline-flex;
   }
 
+  /* 堆叠布局里音量加减按钮被重新显示为 inline-flex，必须显式居中，
+     否则 16px 的加减图标会贴在圆形按钮左边。 */
+  .hm-card:not([data-layout="mini"]) .hm-controls.is-stacked .hm-volume .hm-vol-step {
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+  }
+
   /* ---------- 分组 ---------- */
   .hm-group {
     display: flex;

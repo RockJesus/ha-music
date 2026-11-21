@@ -75,17 +75,17 @@ export function fallbackCover(media = {}) {
   const dotY = 126 + ((hash >>> 11) % 260);
   const glyphSize = Array.from(monogram).length > 1 ? 92 : 116;
   const label = artist ? escapeXml(clean(artist, 24)) : "";
-  const baseA = color(hue, 50, 18);
-  const baseB = color(hue2, 46, 10);
-  const baseC = color(hue3, 58, 7);
-  const glowA = color(hue, 82, 59);
-  const glowAMid = color(hue, 78, 52);
-  const glowAEnd = color(hue, 78, 48);
-  const glowB = color(hue2, 86, 60);
-  const glowBMid = color(hue2, 82, 54);
-  const glowBEnd = color(hue2, 82, 50);
-  const wedge = color(hue3, 68, 46);
-  const dot = color(hue, 88, 72);
+  const baseA = color(hue, 36, 15);
+  const baseB = color(hue2, 32, 8);
+  const baseC = color(hue3, 40, 6);
+  const glowA = color(hue, 70, 52);
+  const glowAMid = color(hue, 66, 46);
+  const glowAEnd = color(hue, 66, 42);
+  const glowB = color(hue2, 74, 54);
+  const glowBMid = color(hue2, 70, 48);
+  const glowBEnd = color(hue2, 70, 44);
+  const wedge = color(hue3, 56, 38);
+  const dot = color(hue, 78, 66);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
@@ -95,13 +95,13 @@ export function fallbackCover(media = {}) {
       <stop offset="1" stop-color="${baseC}"/>
     </linearGradient>
     <radialGradient id="glowA" cx="${x1}%" cy="${y1}%" r="58%">
-      <stop offset="0" stop-color="${glowA}" stop-opacity=".62"/>
-      <stop offset=".42" stop-color="${glowAMid}" stop-opacity=".2"/>
+      <stop offset="0" stop-color="${glowA}" stop-opacity=".46"/>
+      <stop offset=".42" stop-color="${glowAMid}" stop-opacity=".15"/>
       <stop offset="1" stop-color="${glowAEnd}" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="glowB" cx="${x2}%" cy="${y2}%" r="54%">
-      <stop offset="0" stop-color="${glowB}" stop-opacity=".5"/>
-      <stop offset=".48" stop-color="${glowBMid}" stop-opacity=".16"/>
+      <stop offset="0" stop-color="${glowB}" stop-opacity=".38"/>
+      <stop offset=".48" stop-color="${glowBMid}" stop-opacity=".12"/>
       <stop offset="1" stop-color="${glowBEnd}" stop-opacity="0"/>
     </radialGradient>
     <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
@@ -111,10 +111,11 @@ export function fallbackCover(media = {}) {
   <rect width="512" height="512" fill="url(#base)"/>
   <circle cx="${x1}%" cy="${y1}%" r="46%" fill="url(#glowA)" filter="url(#soft)"/>
   <circle cx="${x2}%" cy="${y2}%" r="42%" fill="url(#glowB)" filter="url(#soft)"/>
-  <path d="M-40 394 C 128 292, 286 468, 552 318 L552 552 L-40 552 Z" fill="${wedge}" opacity=".13"/>
+  <path d="M-40 394 C 128 292, 286 468, 552 318 L552 552 L-40 552 Z" fill="${wedge}" opacity=".1"/>
+  <rect width="512" height="512" fill="#05060a" opacity=".18"/>
   <circle cx="256" cy="256" r="204" fill="none" stroke="#ffffff" stroke-opacity=".18" stroke-width="1.4"/>
-  <circle cx="256" cy="256" r="184" fill="#05060a" fill-opacity=".18" stroke="#ffffff" stroke-opacity=".08" stroke-width="1"/>
-  <circle cx="${dotX}" cy="${dotY}" r="4.5" fill="${dot}" opacity=".8"/>
+  <circle cx="256" cy="256" r="184" fill="#05060a" fill-opacity=".2" stroke="#ffffff" stroke-opacity=".08" stroke-width="1"/>
+  <circle cx="${dotX}" cy="${dotY}" r="4.5" fill="${dot}" opacity=".75"/>
   <text x="256" y="256" text-anchor="middle" dominant-baseline="middle" font-family="'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif" font-size="${glyphSize}" font-weight="700" letter-spacing="2" fill="#ffffff" fill-opacity=".94">${escapeXml(monogram)}</text>
   ${label ? `<text x="256" y="362" text-anchor="middle" font-family="'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif" font-size="19" font-weight="500" letter-spacing="2.4" fill="#ffffff" fill-opacity=".58">${label}</text>` : ""}
 </svg>`;

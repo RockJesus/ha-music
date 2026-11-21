@@ -2752,9 +2752,18 @@ class HaMusicCard extends LitElement {
     if (!event || event.type !== "queue") return;
     if (key !== this._queueSubscriptionKey) return;
     if (!protocolMatches(event.protocol)) {
-      this._notify(protocolErrorText(this._hass?.language));
-      this._teardownQueueSubscription();
-      return;
+      // 订阅建立瞬间偶尔会收到一帧没有 protocol 的完整队列快照（尤其集成刚重载后）。
+      // 队列结构本身可自校验，这种缺省元数据不该打断播放，更不能反复弹“更新后端”。
+      const missingProtocol = event.protocol === undefined || event.protocol === null;
+      const compatibleQueue =
+        event.type === "queue" &&
+        Boolean(event.queue_id) &&
+        Array.isArray(event.items);
+      if (!missingProtocol || !compatibleQueue) {
+        this._notify(protocolErrorText(this._hass?.language));
+        this._teardownQueueSubscription();
+        return;
+      }
     }
     this._queueSnapshot = event;
     const first = this._queueFirst;

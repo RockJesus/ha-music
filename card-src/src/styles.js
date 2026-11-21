@@ -2944,6 +2944,12 @@ export const cardStyles = css`
     background: transparent;
   }
 
+  .hm-lyrics[data-status="none"] .hm-lyrics-scroll,
+  .hm-lyrics[data-status="error"] .hm-lyrics-scroll {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
   .hm-lyrics-empty {
     display: flex;
     flex-direction: column;
@@ -2956,6 +2962,7 @@ export const cardStyles = css`
     border: 1px solid rgba(255, 255, 255, 0.09);
     background: rgba(7, 9, 16, 0.7);
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+    margin: 12px 0;
     backdrop-filter: blur(14px);
     color: rgba(246, 248, 255, 0.68);
     font-size: 12px;

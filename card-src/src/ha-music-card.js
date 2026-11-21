@@ -1600,7 +1600,7 @@ class HaMusicCard extends LitElement {
   }
 
   async _loadPlayers() {
-    if (!this._studioReady()) return;
+    if (!this._hass?.connection) return;
     try {
       const response = await this._hass.connection.sendMessagePromise({
         type: "ha_music_studio/player_group",
@@ -4285,6 +4285,9 @@ class HaMusicCard extends LitElement {
                                 class="hm-player-btn"
                                 data-role="group"
                                 data-on=${member ? "true" : "false"}
+                                data-disabled=${!current ? "true" : "false"}
+                                title=${!current ? t("groupLeaderMissing") : ""}
+                                ?disabled=${!current}
                                 @click=${() => this._toggleMaGroup(player)}
                               >
                                 ${member ? t("leaveGroup") : t("joinGroup")}

@@ -4140,7 +4140,7 @@ class HaMusicCard extends LitElement {
       layout !== "mini" &&
       (this._isMobileUi() ||
         layout === "compact" ||
-        (this._width || 0) < 620);
+        (this._width || 0) < 720);
     // 卡片选择器预览（preview=true）里实体往往没有能力位，按完整控制骨架渲染，
     // 否则预览只剩一个播放键，看起来像坏掉。
     // sm 预览只有 ~300×160，塞不下进度+音量+五个键，只保留播放键；

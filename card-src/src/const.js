@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.16.1";
+export const CARD_VERSION = "2.16.2";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -34,7 +34,7 @@ export const DEFAULT_COVER = "ambient";
 export const DEFAULT_VISUALIZER = "bars";
 
 
-export const SFX_PRESETS = ["off", "click", "bubble", "wood", "laser", "hifi"];
+export const SFX_PRESETS = ["off", "hifi", "vocal", "bass"];
 
 export const LAYOUTS = {
   adaptive: { en: "Adaptive", zh: "自适应" },
@@ -185,12 +185,12 @@ const EN = {
   playersEmpty: "No players available",
   themeTitle: "Theme",
   soundFx: "Sound effects",
+  soundFxHint: "Applies to the playing track",
   sfxOff: "Off",
-  sfxClick: "Crisp",
-  sfxBubble: "Bubble",
-  sfxWood: "Wood",
-  sfxLaser: "Laser",
   sfxHifi: "HiFi Surround",
+  sfxVocal: "Clear vocal",
+  sfxBass: "Deep bass",
+  soundFxFailed: "Failed to change the sound effect",
   fullscreen: "Fullscreen",
   exitFullscreen: "Exit fullscreen",
   fullscreenUnsupported: "Fullscreen is not supported here",
@@ -271,12 +271,12 @@ const ZH = {
   playersEmpty: "没有可用播放器",
   themeTitle: "主题",
   soundFx: "音效",
+  soundFxHint: "作用于正在播放的音乐",
   sfxOff: "关闭",
-  sfxClick: "清脆",
-  sfxBubble: "气泡",
-  sfxWood: "木质",
-  sfxLaser: "电子",
   sfxHifi: "模拟Hifi环绕",
+  sfxVocal: "清澈人声",
+  sfxBass: "重低音",
+  soundFxFailed: "音效切换失败",
   fullscreen: "全屏播放",
   exitFullscreen: "退出全屏",
   fullscreenUnsupported: "当前环境不支持全屏",

@@ -198,7 +198,8 @@ class HaMusicCard extends LitElement {
     this._themeOpen = false;
     this._sfxKey = this._loadSfx();
     this._sfxOpen = false;
-    this._sfxCtx = null;
+    this._sfxBusy = false;
+    this._sfxSynced = false;
     this._isFullscreen = false;
     this._artUrl = "";
     this._artSource = "";
@@ -270,6 +271,7 @@ class HaMusicCard extends LitElement {
     this._hass = hass;
     if (!hass) return;
     this._autoSwitchToPlaying(hass);
+    if (!this._sfxSynced) queueMicrotask(() => this._syncSoundEffect());
     const entityId = this._eid();
     const state = hass.states?.[entityId];
     const attrs = state?.attributes || {};
@@ -355,6 +357,7 @@ class HaMusicCard extends LitElement {
     }
     if (!list.includes(this._activeEntity)) {
       this._activeEntity = list[0];
+      this._sfxSynced = false;
       this._palette = null;
       this._paletteKey = "";
       this._artUrl = "";
@@ -1164,129 +1167,76 @@ class HaMusicCard extends LitElement {
 
   _loadSfx() {
     try {
-      const stored = window.localStorage?.getItem("ha-music-sfx");
+      const stored = window.localStorage?.getItem("ha-music-effect");
       return SFX_PRESETS.includes(stored) ? stored : "off";
     } catch {
       return "off";
     }
   }
 
-  _setSfx(key) {
-    if (!SFX_PRESETS.includes(key)) return;
+  _sfxLabel(key) {
+    const labelKey =
+      key === "off" ? "sfxOff" : `sfx${key[0].toUpperCase()}${key.slice(1)}`;
+    return translator(this._hass?.language)(labelKey);
+  }
+
+  async _setSfx(key) {
+    if (!SFX_PRESETS.includes(key) || this._sfxBusy) return;
+    const previous = this._sfxKey;
     this._sfxKey = key;
     this._sfxOpen = false;
+    this._sfxBusy = true;
     try {
-      window.localStorage?.setItem("ha-music-sfx", key);
+      window.localStorage?.setItem("ha-music-effect", key);
     } catch {
       /* localStorage 不可用时仅当前会话生效 */
     }
-    if (key !== "off") this._playSfx(key);
     this.requestUpdate();
+    try {
+      if (!this._hass?.callWS) throw new Error("not connected");
+      const result = await this._hass.callWS({
+        type: "ha_music_studio/sound_effect",
+        action: "set",
+        effect: key,
+        entity_id: this._eid(),
+      });
+      if (result?.ok === false) throw new Error("effect failed");
+      this._notify(this._sfxLabel(key));
+    } catch (err) {
+      this._sfxKey = previous;
+      try {
+        window.localStorage?.setItem("ha-music-effect", previous);
+      } catch {
+        /* ignore */
+      }
+      this._notify(translator(this._hass?.language)("soundFxFailed"));
+    } finally {
+      this._sfxBusy = false;
+      this.requestUpdate();
+    }
   }
 
-  _playSfx(key) {
-    if (!key || key === "off" || typeof window === "undefined") return;
+  async _syncSoundEffect() {
+    if (this._sfxSynced || !this._hass?.callWS || !this._eid()) return;
+    this._sfxSynced = true;
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = this._sfxCtx || new Ctx();
-      this._sfxCtx = ctx;
-      if (ctx.state === "suspended") ctx.resume?.();
-      const at = ctx.currentTime + 0.005;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.connect(ctx.destination);
-      const tone = (freq, endFreq, duration, type = "sine", volume = 0.12) => {
-        const osc = ctx.createOscillator();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, at);
-        if (endFreq && endFreq !== freq) {
-          osc.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), at + duration);
-        }
-        gain.gain.setValueAtTime(0.0001, at);
-        gain.gain.exponentialRampToValueAtTime(volume, at + 0.012);
-        gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-        osc.connect(gain);
-        osc.start(at);
-        osc.stop(at + duration + 0.01);
-      };
-      if (key === "click") {
-        tone(760, 560, 0.055, "triangle", 0.11);
-      } else if (key === "bubble") {
-        tone(430, 780, 0.13, "sine", 0.14);
-        tone(620, 980, 0.1, "sine", 0.07);
-      } else if (key === "wood") {
-        tone(300, 190, 0.08, "triangle", 0.12);
-        tone(150, 120, 0.1, "sine", 0.06);
-      } else if (key === "laser") {
-        tone(1250, 320, 0.18, "sawtooth", 0.08);
-        tone(900, 260, 0.16, "square", 0.035);
-      } else if (key === "hifi") {
-        // 模拟 Hifi 环绕：左右声道错时 + 宽声场 + 短延迟尾音，合成一次空间感提示音
-        const space = ctx.createGain();
-        space.gain.setValueAtTime(0.0001, at);
-        space.gain.exponentialRampToValueAtTime(0.13, at + 0.04);
-        space.gain.exponentialRampToValueAtTime(0.0001, at + 0.62);
-        space.connect(ctx.destination);
-        const echo = ctx.createDelay(0.2);
-        echo.delayTime.setValueAtTime(0.06, at);
-        const echoGain = ctx.createGain();
-        echoGain.gain.setValueAtTime(0.0001, at);
-        echoGain.gain.exponentialRampToValueAtTime(0.055, at + 0.06);
-        echoGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
-        echo.connect(echoGain);
-        echoGain.connect(ctx.destination);
-        const voice = (freq, endFreq, duration, type, volume, pan, delayMs = 0) => {
-          const osc = ctx.createOscillator();
-          osc.type = type;
-          osc.frequency.setValueAtTime(freq, at);
-          osc.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), at + duration);
-          const env = ctx.createGain();
-          env.gain.setValueAtTime(0.0001, at);
-          env.gain.exponentialRampToValueAtTime(volume, at + 0.03);
-          env.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-          osc.connect(env);
-          let tail = env;
-          const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-          if (panner) {
-            panner.pan.setValueAtTime(pan, at);
-            env.connect(panner);
-            tail = panner;
-          }
-          if (delayMs > 0) {
-            const hop = ctx.createDelay(0.2);
-            hop.delayTime.setValueAtTime(delayMs, at);
-            tail.connect(hop);
-            tail = hop;
-          }
-          tail.connect(space);
-          tail.connect(echo);
-          osc.start(at);
-          osc.stop(at + duration + 0.02);
-        };
-        voice(246, 262, 0.46, "sine", 0.075, -0.9);
-        voice(330, 349, 0.44, "sine", 0.065, 0.9, 0.024);
-        voice(523, 587, 0.34, "triangle", 0.045, -0.25, 0.012);
-        voice(1046, 1174, 0.22, "sine", 0.022, 0.55, 0.04);
-        setTimeout(() => {
-          try {
-            space.disconnect();
-            echo.disconnect();
-            echoGain.disconnect();
-          } catch {
-            /* ignore */
-          }
-        }, 900);
-      }
-      setTimeout(() => {
+      const result = await this._hass.callWS({
+        type: "ha_music_studio/sound_effect",
+        action: "get",
+        entity_id: this._eid(),
+      });
+      const effect = SFX_PRESETS.includes(result?.effect) ? result.effect : "off";
+      if (effect !== this._sfxKey) {
+        this._sfxKey = effect;
         try {
-          gain.disconnect();
+          window.localStorage?.setItem("ha-music-effect", effect);
         } catch {
           /* ignore */
         }
-      }, 600);
+        this.requestUpdate();
+      }
     } catch {
-      /* 音频上下文被浏览器策略阻止时静默降级 */
+      /* 后端未就绪时保持本地选择，不打扰播放 */
     }
   }
 
@@ -1324,14 +1274,6 @@ class HaMusicCard extends LitElement {
         this._notify(translator(this._hass?.language)("fullscreenUnsupported"));
       }
     }
-  }
-
-  _maybeSfxTrigger(event) {
-    if (this._sfxKey === "off") return;
-    const path = event.composedPath?.() || [];
-    const button = path.find((node) => node?.tagName === "BUTTON");
-    if (!button || button.disabled || button.dataset?.noSfx === "true") return;
-    this._playSfx(this._sfxKey);
   }
 
   _themeVars() {
@@ -2275,7 +2217,6 @@ class HaMusicCard extends LitElement {
   }
 
   _onCardClick(event) {
-    this._maybeSfxTrigger(event);
     const path = event.composedPath?.() || [];
     if (this._sfxOpen) {
       const insideSfx = path.some((node) => node?.classList?.contains?.("hm-sfx-menu"));
@@ -2542,7 +2483,8 @@ class HaMusicCard extends LitElement {
     this._themeOpen = false;
     this._sfxKey = this._loadSfx();
     this._sfxOpen = false;
-    this._sfxCtx = null;
+    this._sfxBusy = false;
+    this._sfxSynced = false;
     this._isFullscreen = false;
     if (typeof unsub === "function") {
       try {
@@ -4158,6 +4100,7 @@ class HaMusicCard extends LitElement {
           ${this._sfxOpen
             ? html`<div class="hm-menu hm-sfx-menu">
                 <div class="hm-menu-head">${t("soundFx")}</div>
+                <div class="hm-menu-note">${t("soundFxHint")}</div>
                 ${SFX_PRESETS.map((key) => {
                   const labelKey = key === "off" ? "sfxOff" : `sfx${key[0].toUpperCase()}${key.slice(1)}`;
                   return html`<button

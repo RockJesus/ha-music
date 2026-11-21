@@ -33,7 +33,7 @@ test("bundle has no retired analysis or external lyric sources", () => {
 });
 
 test("bundle ships theme, sound and fullscreen controls", () => {
-  for (const token of ["ha-music-sfx", "ha-music-theme", "hm-theme-menu", "requestFullscreen", "exitFullscreen", "sfxLaser", "sfxHifi"]) {
+  for (const token of ["ha-music-effect", "ha-music-theme", "hm-theme-menu", "requestFullscreen", "exitFullscreen", "ha_music_studio/sound_effect", "sfxHifi", "sfxVocal"]) {
     assert.ok(bundle.includes(token), token);
   }
 });

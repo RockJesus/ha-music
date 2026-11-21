@@ -1419,6 +1419,13 @@ export const cardStyles = css`
     overflow-y: auto;
   }
 
+  .hm-menu-note {
+    padding: 0 10px 6px;
+    font-size: 10px;
+    line-height: 1.3;
+    opacity: 0.55;
+  }
+
   .hm-menu-head {
     padding: 6px 10px 4px;
     font-size: 9.5px;

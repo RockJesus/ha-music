@@ -3404,15 +3404,8 @@ class HaMusicCard extends LitElement {
 
   _openPlaylists() {
     const t = translator(this._hass?.language);
-    if (!this._isMaPlayer()) {
-      // 非 MA 播放器也保留 MA 入口：直接打开 MA 面板，而不是只弹一句提示。
-      if (this._maUrl()) {
-        this._openAssistant();
-        return;
-      }
-      this._notify(t("maPlayerRequired"));
-      return;
-    }
+    // 无论当前播放在哪个播放器，MA 按钮都只弹歌单抽屉，绝不跳转 MA 面板。
+    // 当前不是 MA 播放器时，歌单改由可用的 MA 播放器提供，避免抽屉空白。
     this._drawer = {
       open: true,
       mode: "playlists",
@@ -3428,12 +3421,21 @@ class HaMusicCard extends LitElement {
     this._fetchPlaylists();
   }
 
-  async _browseMedia(contentId, contentType) {
+  _playlistEntityId() {
+    const current = this._eid();
+    if (this._isMaPlayer(current)) return current;
+    const leader = this._currentMaPlayer();
+    const leaderEntity = leader ? this._entityForMaPlayer(leader) : "";
+    if (leaderEntity && this._isMaPlayer(leaderEntity)) return leaderEntity;
+    return this._entities().find((id) => this._isMaPlayer(id)) || "";
+  }
+
+  async _browseMedia(contentId, contentType, entityId = this._eid()) {
     const connection = this._hass?.connection;
     if (!connection?.sendMessagePromise) throw new Error("unsupported");
     const payload = {
       type: "media_player/browse_media",
-      entity_id: this._eid(),
+      entity_id: entityId,
     };
     if (contentId) {
       payload.media_content_id = contentId;
@@ -3445,7 +3447,8 @@ class HaMusicCard extends LitElement {
   async _fetchPlaylists() {
     const t = translator(this._hass?.language);
     try {
-      const root = await this._browseMedia();
+      const browseEntity = this._playlistEntityId() || this._eid();
+      const root = await this._browseMedia(null, null, browseEntity);
       const children = root?.children || [];
       const folder = children.find(
         (child) =>
@@ -3459,7 +3462,8 @@ class HaMusicCard extends LitElement {
       if (folder) {
         const result = await this._browseMedia(
           folder.media_content_id,
-          folder.media_content_type
+          folder.media_content_type,
+          browseEntity
         );
         list = result?.children || [];
       }
@@ -3499,8 +3503,8 @@ class HaMusicCard extends LitElement {
   async _playPlaylistItem(item) {
     if (!item?.contentId) return;
     const t = translator(this._hass?.language);
-    const entityId = this._eid();
-    if (!this._isMaPlayer(entityId)) {
+    const entityId = this._playlistEntityId();
+    if (!entityId || !this._isMaPlayer(entityId)) {
       this._notify(t("maPlayerRequired"));
       return;
     }

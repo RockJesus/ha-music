@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.15.7";
+export const CARD_VERSION = "2.15.8";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -33,6 +33,8 @@ export const DEFAULT_THEME = "cyber";
 export const DEFAULT_COVER = "ambient";
 export const DEFAULT_VISUALIZER = "bars";
 
+
+export const SFX_PRESETS = ["off", "click", "bubble", "wood", "laser"];
 
 export const LAYOUTS = {
   adaptive: { en: "Adaptive", zh: "自适应" },
@@ -181,6 +183,16 @@ const EN = {
   groupLeaderMissing: "Select a Music Assistant player first",
   deviceUnavailable: "No Home Assistant entity for this player",
   playersEmpty: "No players available",
+  randomTheme: "Random theme",
+  soundFx: "Sound effects",
+  sfxOff: "Off",
+  sfxClick: "Crisp",
+  sfxBubble: "Bubble",
+  sfxWood: "Wood",
+  sfxLaser: "Laser",
+  fullscreen: "Fullscreen",
+  exitFullscreen: "Exit fullscreen",
+  fullscreenUnsupported: "Fullscreen is not supported here",
 };
 
 const ZH = {
@@ -256,6 +268,16 @@ const ZH = {
   groupLeaderMissing: "请先选择 Music Assistant 播放器",
   deviceUnavailable: "该播放器没有对应的 Home Assistant 实体",
   playersEmpty: "没有可用播放器",
+  randomTheme: "随机主题",
+  soundFx: "音效",
+  sfxOff: "关闭",
+  sfxClick: "清脆",
+  sfxBubble: "气泡",
+  sfxWood: "木质",
+  sfxLaser: "电子",
+  fullscreen: "全屏播放",
+  exitFullscreen: "退出全屏",
+  fullscreenUnsupported: "当前环境不支持全屏",
 };
 
 export function isChinese(language) {

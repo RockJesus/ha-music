@@ -14,6 +14,18 @@ export const cardStyles = css`
     color-scheme: dark;
   }
 
+  :host(:fullscreen) {
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+  }
+
+  :host(:fullscreen) .hm-card {
+    height: 100vh;
+    border-radius: 0;
+    border: 0;
+  }
+
   .hm-card {
     position: relative;
     box-sizing: border-box;
@@ -1384,6 +1396,16 @@ export const cardStyles = css`
 
   .hm-menu-item[data-active="true"] .hm-menu-check {
     opacity: 1;
+  }
+
+  .hm-sfx-menu {
+    top: 52px;
+    right: 12px;
+    left: auto;
+    bottom: auto;
+    min-width: 172px;
+    max-width: min(240px, 72%);
+    max-height: none;
   }
 
   .hm-menu-head {
@@ -3930,6 +3952,13 @@ export const cardStyles = css`
   /* 手机端性能模式：WebView 上多层 backdrop-filter + 全卡动画网格会逐帧重算合成，
      是手机 HA App 卡顿的主要来源。手机上改为不透明底色、静态网格，保留视觉层次。 */
   @media (max-width: 700px) {
+    .hm-top-actions {
+      max-width: 64%;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      row-gap: 6px;
+    }
+
     .hm-grid {
       animation: none !important;
     }

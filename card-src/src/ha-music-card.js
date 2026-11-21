@@ -7,6 +7,7 @@ import {
   CARD_TYPE,
   CARD_VERSION,
   FEATURES,
+  SFX_PRESETS,
   THEMES,
   DEFAULT_THEME,
   translator,
@@ -193,6 +194,11 @@ class HaMusicCard extends LitElement {
     this._playersOpen = false;
     this._maPlayers = [];
     this._playersBusy = false;
+    this._themeOverride = null;
+    this._sfxKey = this._loadSfx();
+    this._sfxOpen = false;
+    this._sfxCtx = null;
+    this._isFullscreen = false;
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
@@ -366,11 +372,19 @@ class HaMusicCard extends LitElement {
     this._onKeyDown = (event) => {
       if (event.key !== "Escape") return;
       if (this._drawer.open) this._closeDrawer();
-      else if (this._menu) {
+      else if (this._sfxOpen) {
+        this._sfxOpen = false;
+        this.requestUpdate();
+      } else if (this._menu) {
         this._menu = null;
         this.requestUpdate();
       }
     };
+    this._onFullscreenChange = () => {
+      this._isFullscreen = Boolean(document.fullscreenElement);
+      this.requestUpdate();
+    };
+    document.addEventListener("fullscreenchange", this._onFullscreenChange);
     window.addEventListener("keydown", this._onKeyDown);
     // 手机/平板判定随时可能随旋转或窗口变化；变化时重新挂载全局悬浮层，
     // 只影响粗指针窄屏，桌面与平板仍保持原 UI。
@@ -418,6 +432,8 @@ class HaMusicCard extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    window.removeEventListener("keydown", this._onKeyDown);
+    document.removeEventListener("fullscreenchange", this._onFullscreenChange);
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
@@ -1090,8 +1106,136 @@ class HaMusicCard extends LitElement {
   }
 
   _themeKey() {
+    if (this._themeOverride && THEMES[this._themeOverride]) return this._themeOverride;
     const theme = this._config?.theme;
     return theme && THEMES[theme] ? theme : DEFAULT_THEME;
+  }
+
+  _randomTheme() {
+    const keys = Object.keys(THEMES).filter((key) => key !== this._themeKey());
+    if (!keys.length) return;
+    const next = keys[Math.floor(Math.random() * keys.length)];
+    this._themeOverride = next;
+    const label = THEMES[next]?.label;
+    this._notify(
+      label ? (String(this._hass?.language || "").startsWith("zh") ? label.zh : label.en) : next
+    );
+    this.requestUpdate();
+  }
+
+  _loadSfx() {
+    try {
+      const stored = window.localStorage?.getItem("ha-music-sfx");
+      return SFX_PRESETS.includes(stored) ? stored : "off";
+    } catch {
+      return "off";
+    }
+  }
+
+  _setSfx(key) {
+    if (!SFX_PRESETS.includes(key)) return;
+    this._sfxKey = key;
+    this._sfxOpen = false;
+    try {
+      window.localStorage?.setItem("ha-music-sfx", key);
+    } catch {
+      /* localStorage 不可用时仅当前会话生效 */
+    }
+    if (key !== "off") this._playSfx(key);
+    this.requestUpdate();
+  }
+
+  _playSfx(key) {
+    if (!key || key === "off" || typeof window === "undefined") return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = this._sfxCtx || new Ctx();
+      this._sfxCtx = ctx;
+      if (ctx.state === "suspended") ctx.resume?.();
+      const at = ctx.currentTime + 0.005;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.connect(ctx.destination);
+      const tone = (freq, endFreq, duration, type = "sine", volume = 0.12) => {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, at);
+        if (endFreq && endFreq !== freq) {
+          osc.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), at + duration);
+        }
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(volume, at + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+        osc.connect(gain);
+        osc.start(at);
+        osc.stop(at + duration + 0.01);
+      };
+      if (key === "click") {
+        tone(760, 560, 0.055, "triangle", 0.11);
+      } else if (key === "bubble") {
+        tone(430, 780, 0.13, "sine", 0.14);
+        tone(620, 980, 0.1, "sine", 0.07);
+      } else if (key === "wood") {
+        tone(300, 190, 0.08, "triangle", 0.12);
+        tone(150, 120, 0.1, "sine", 0.06);
+      } else if (key === "laser") {
+        tone(1250, 320, 0.18, "sawtooth", 0.08);
+        tone(900, 260, 0.16, "square", 0.035);
+      }
+      setTimeout(() => {
+        try {
+          gain.disconnect();
+        } catch {
+          /* ignore */
+        }
+      }, 600);
+    } catch {
+      /* 音频上下文被浏览器策略阻止时静默降级 */
+    }
+  }
+
+  _toggleSfxMenu() {
+    this._sfxOpen = !this._sfxOpen;
+    this.requestUpdate();
+  }
+
+  _toggleFullscreen() {
+    const doc = document;
+    if (doc.fullscreenElement) {
+      doc.exitFullscreen?.().catch(() => {});
+      return;
+    }
+    const target = this;
+    const request = target.requestFullscreen || target.webkitRequestFullscreen;
+    if (!request) {
+      this._notify(translator(this._hass?.language)("fullscreenUnsupported"));
+      return;
+    }
+    try {
+      const promise = request.call(target, { navigationUI: "hide" });
+      promise?.catch?.(() => {
+        try {
+          target.webkitRequestFullscreen?.();
+        } catch {
+          this._notify(translator(this._hass?.language)("fullscreenUnsupported"));
+        }
+      });
+    } catch {
+      try {
+        target.webkitRequestFullscreen?.();
+      } catch {
+        this._notify(translator(this._hass?.language)("fullscreenUnsupported"));
+      }
+    }
+  }
+
+  _maybeSfxTrigger(event) {
+    if (this._sfxKey === "off") return;
+    const path = event.composedPath?.() || [];
+    const button = path.find((node) => node?.tagName === "BUTTON");
+    if (!button || button.disabled || button.dataset?.noSfx === "true") return;
+    this._playSfx(this._sfxKey);
   }
 
   _themeVars() {
@@ -2035,8 +2179,16 @@ class HaMusicCard extends LitElement {
   }
 
   _onCardClick(event) {
-    if (!this._menu) return;
+    this._maybeSfxTrigger(event);
     const path = event.composedPath?.() || [];
+    if (this._sfxOpen) {
+      const insideSfx = path.some((node) => node?.classList?.contains?.("hm-sfx-menu"));
+      if (!insideSfx) {
+        this._sfxOpen = false;
+        this.requestUpdate();
+      }
+    }
+    if (!this._menu) return;
     const insideMenu = path.some(
       (node) =>
         node?.classList?.contains?.("hm-menu") ||
@@ -2281,6 +2433,11 @@ class HaMusicCard extends LitElement {
     this._playersOpen = false;
     this._maPlayers = [];
     this._playersBusy = false;
+    this._themeOverride = null;
+    this._sfxKey = this._loadSfx();
+    this._sfxOpen = false;
+    this._sfxCtx = null;
+    this._isFullscreen = false;
     if (typeof unsub === "function") {
       try {
         unsub();
@@ -3781,6 +3938,35 @@ class HaMusicCard extends LitElement {
                     ${icon("lyrics", 16)}
                   </button>`
                 : nothing}
+              <button
+                class="hm-icon-btn hm-theme-btn"
+                data-role="theme"
+                aria-label=${t("randomTheme")}
+                title=${t("randomTheme")}
+                @click=${() => this._randomTheme()}
+              >
+                ${icon("palette", 16)}
+              </button>
+              <button
+                class="hm-icon-btn hm-sfx-btn"
+                data-role="sfx"
+                data-on=${this._sfxKey === "off" ? "false" : "true"}
+                aria-label=${t("soundFx")}
+                title=${t("soundFx")}
+                @click=${() => this._toggleSfxMenu()}
+              >
+                ${icon(this._sfxKey === "off" ? "sfxOff" : "sfx", 16)}
+              </button>
+              <button
+                class="hm-icon-btn hm-fullscreen-btn"
+                data-role="fullscreen"
+                data-on=${this._isFullscreen ? "true" : "false"}
+                aria-label=${this._isFullscreen ? t("exitFullscreen") : t("fullscreen")}
+                title=${this._isFullscreen ? t("exitFullscreen") : t("fullscreen")}
+                @click=${() => this._toggleFullscreen()}
+              >
+                ${icon(this._isFullscreen ? "fullscreenExit" : "fullscreen", 16)}
+              </button>
               ${maShow
                 ? html`<button
                     class="hm-icon-btn hm-ma"
@@ -3844,6 +4030,24 @@ class HaMusicCard extends LitElement {
               </button>
             </div>
           </header>
+
+          ${this._sfxOpen
+            ? html`<div class="hm-menu hm-sfx-menu">
+                <div class="hm-menu-head">${t("soundFx")}</div>
+                ${SFX_PRESETS.map((key) => {
+                  const labelKey = key === "off" ? "sfxOff" : `sfx${key[0].toUpperCase()}${key.slice(1)}`;
+                  return html`<button
+                    class="hm-menu-item"
+                    data-no-sfx="true"
+                    data-active=${this._sfxKey === key ? "true" : "false"}
+                    @click=${() => this._setSfx(key)}
+                  >
+                    <span>${t(labelKey)}</span>
+                    <span class="hm-menu-check">${icon("check", 13)}</span>
+                  </button>`;
+                })}
+              </div>`
+            : nothing}
 
           ${entities.length > 1
             ? html`

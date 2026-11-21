@@ -16,7 +16,6 @@ test("bundle has no deprecated queue or local audio paths", () => {
     "mass_queue",
     "ingress_session",
     "player_queues/get",
-    "AudioContext",
     "spectrum_audio_url",
   ]) {
     assert.equal(bundle.includes(token), false, token);
@@ -30,5 +29,11 @@ test("bundle carries the protocol version", () => {
 test("bundle has no retired analysis or external lyric sources", () => {
   for (const token of ["ha_music_analysis", "netease_lyrics", "lyrics.ovh", "lrclib", "kugou"]) {
     assert.equal(bundle.includes(token), false, token);
+  }
+});
+
+test("bundle ships theme, sound and fullscreen controls", () => {
+  for (const token of ["ha-music-sfx", "requestFullscreen", "exitFullscreen", "sfxLaser"]) {
+    assert.ok(bundle.includes(token), token);
   }
 });

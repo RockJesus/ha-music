@@ -1699,9 +1699,14 @@ class HaMusicCard extends LitElement {
         add: member ? [] : [player.player_id],
         remove: member ? [player.player_id] : [],
       });
-      // Music Assistant 的 group_members 会稍后才广播，延迟重读以校准本地乐观状态。
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      await this._loadPlayers();
+      // Music Assistant 的 group_members 会稍后才广播，轮询到实际成员状态再停止，避免旧快照覆盖乐观值。
+      const expected = !member;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        await this._loadPlayers();
+        const leader = this._maPlayers.find((entry) => entry.player_id === current.player_id);
+        if (Boolean((leader?.group_members || []).includes(player.player_id)) === expected) break;
+      }
     } catch (error) {
       this._notify(error?.message || String(error));
       await this._loadPlayers();

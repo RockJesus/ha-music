@@ -1256,18 +1256,34 @@ export const cardStyles = css`
   }
 
   .hm-volume .hm-icon-btn {
-    border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.24);
+    border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.46);
     background: linear-gradient(
       135deg,
-      rgba(var(--hm-ctl-a1-rgb), 0.16),
-      rgba(var(--hm-ctl-a2-rgb), 0.16)
+      rgba(var(--hm-ctl-a1-rgb), 0.34),
+      rgba(var(--hm-ctl-a2-rgb), 0.28)
     );
     color: #fff;
     width: 34px;
     height: 34px;
     border-radius: 50%;
     flex: 0 0 auto;
-    box-shadow: 0 0 14px -9px rgba(var(--hm-ctl-a1-rgb), 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 0 16px -8px rgba(var(--hm-ctl-a1-rgb), 0.95);
+  }
+
+  /* 静音态也保持主题渐变，不再回落到白色/灰色按钮底。 */
+  .hm-volume .hm-volume-mute[data-on="true"] {
+    border-color: rgba(var(--hm-ctl-a1-rgb), 0.62);
+    background: linear-gradient(
+      135deg,
+      rgba(var(--hm-ctl-a1-rgb), 0.52),
+      rgba(var(--hm-ctl-a2-rgb), 0.42)
+    );
+    color: #fff;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 0 20px -7px rgba(var(--hm-ctl-a1-rgb), 1);
   }
 
   .hm-volume .hm-icon-btn:hover {

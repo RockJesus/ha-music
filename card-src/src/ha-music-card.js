@@ -37,6 +37,7 @@ import {
   pickAutoFollowEntity,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
+import { fallbackCover } from "./fallback-cover.js";
 import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
@@ -3598,7 +3599,7 @@ class HaMusicCard extends LitElement {
     const state = this._state();
     const unavailable =
       !state || state.state === "unavailable" || state.state === "unknown";
-    const artSource = unavailable ? "" : media?.art || "";
+    const artSource = unavailable ? "" : media?.art || fallbackCover(media);
     if (artSource === this._artSource) return;
     this._artSource = artSource;
     this._artFailedSource = "";
@@ -4201,7 +4202,7 @@ class HaMusicCard extends LitElement {
     const coverUrl =
       state.state === "unavailable" || state.state === "unknown"
         ? ""
-        : this._artUrl;
+        : this._artUrl || fallbackCover(media);
 
     return html`
       <div
@@ -5543,7 +5544,13 @@ class HaMusicCard extends LitElement {
           </span>
         </button>`;
       }
-      const thumb = normalizeArt(this._hass, item.art);
+      const thumb =
+        normalizeArt(this._hass, item.art) ||
+        fallbackCover({
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+        });
       return html`<button
         class="hm-list-item"
         data-active=${item.active ? "true" : "false"}

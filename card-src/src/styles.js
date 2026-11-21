@@ -854,6 +854,174 @@ export const cardStyles = css`
     cursor: not-allowed;
   }
 
+  /* ---------- 频谱进度合一（可选动效） ---------- */
+  .hm-vis[data-style="rail"],
+  .hm-vis[data-style="dual"] {
+    height: clamp(56px, 12cqi, 76px);
+    overflow: visible;
+    opacity: 1;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .hm-fusion {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    --pct: 0%;
+  }
+
+  .hm-fusion .hm-spectrum {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: calc(100% - 30px);
+  }
+
+  .hm-fusion-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 18px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.13);
+  }
+
+  .hm-fusion[data-kind="dual"] .hm-fusion-track {
+    bottom: 22px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .hm-fusion-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--pct);
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--hm-ctl-a1-rgb), 1),
+      rgba(var(--hm-ctl-a2-rgb), 1)
+    );
+    box-shadow: 0 0 14px -3px rgba(var(--hm-ctl-a1-rgb), 0.8);
+  }
+
+  .hm-fusion-knob {
+    position: absolute;
+    left: var(--pct);
+    top: 50%;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      circle at 35% 30%,
+      #fff,
+      rgba(var(--hm-ctl-a1-rgb), 1) 46%,
+      rgba(var(--hm-ctl-a2-rgb), 1) 100%
+    );
+    box-shadow: 0 0 14px rgba(var(--hm-ctl-a1-rgb), 0.65);
+    pointer-events: none;
+  }
+
+  .hm-fusion[data-kind="dual"] .hm-fusion-knob {
+    width: 20px;
+    height: 20px;
+  }
+
+  .hm-fusion-range {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 6px;
+    z-index: 3;
+    width: 100%;
+    height: 36px;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .hm-fusion-range[data-disabled="true"] {
+    cursor: default;
+  }
+
+  .hm-fusion-times {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(246, 248, 255, 0.55);
+    pointer-events: none;
+  }
+
+  /* 环形频谱进度：外圈音柱兼作进度，外圈区域可拖动 seek */
+  .hm-cover-wrap[data-ringseek="true"] .hm-cover-eq {
+    opacity: 1;
+  }
+
+  .hm-cover-wrap[data-fusion-linear="true"] .hm-cover-eq {
+    opacity: 0;
+  }
+
+  .hm-cover-wrap[data-ringseek="true"] .hm-cover {
+    z-index: 4;
+  }
+
+  .hm-ring-seek {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 3;
+    width: calc(var(--hm-cover-size, 168px) + var(--hm-ring-pad, 48px));
+    height: calc(var(--hm-cover-size, 168px) + var(--hm-ring-pad, 48px));
+    translate: -50% -50%;
+    border-radius: 50%;
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .hm-ring-seek[data-disabled="true"] {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .hm-ring-readout {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + (var(--hm-cover-size, 168px) / 2) - 24px);
+    z-index: 5;
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(8, 6, 14, 0.62);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    color: rgba(246, 248, 255, 0.86);
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  .hm-ring-readout .hm-ring-sep {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
   .hm-wave {
     position: relative;
     display: flex;

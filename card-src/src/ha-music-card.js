@@ -177,6 +177,9 @@ class HaMusicCard extends LitElement {
     this._seekPreview = null;
     this._seekPending = null;
     this._seekSettleTimer = null;
+    this._ringSeeking = false;
+    this._ringSeekId = 0;
+    this._ringSeekValue = null;
     this._volumePreview = null;
     this._volumeCommitAt = 0;
     this._mutedOverride = null;
@@ -935,6 +938,12 @@ class HaMusicCard extends LitElement {
     const canvas = this.renderRoot?.querySelector?.(".hm-cover-eq");
     const cover = this.renderRoot?.querySelector?.(".hm-cover");
     if (!canvas || !cover) return;
+    const wrapNode = cover.parentElement;
+    // 线性频谱进度模式下，横向频谱已经承担音柱职责，外圈再画一圈会重复且抢焦点。
+    if (wrapNode?.dataset?.fusionLinear === "true") {
+      wrapNode.dataset.eq = "false";
+      return;
+    }
     const state = this._state();
     const media = this._readMedia();
     const width = Math.max(
@@ -986,6 +995,8 @@ class HaMusicCard extends LitElement {
       maxFps: this._isMobileUi() ? 30 : 0,
       dpr: this._isMobileUi() ? 1.5 : 2,
       accent,
+      progress: this._fusionLayout() === "ring" ? this._fusionPercent() : -1,
+      persist: this._fusionLayout() === "ring",
       title: first(media.title),
       artist: first(media.artist),
       album: first(media.album),
@@ -1660,24 +1671,104 @@ class HaMusicCard extends LitElement {
     this._seekPreview = value;
     this._stopProgressTicker();
     const duration = this._readMedia().duration;
-    input.style.setProperty(
-      "--pct",
-      `${duration ? clamp((value / duration) * 100, 0, 100) : 0}%`
-    );
+    const pct = duration ? clamp((value / duration) * 100, 0, 100) : 0;
+    input.style.setProperty("--pct", `${pct}%`);
+    // 频谱进度条用同一个 input 驱动，直接改 CSS 变量，避免每帧整卡重渲染。
+    const fusion = input.closest?.(".hm-fusion");
+    if (fusion) {
+      fusion.style.setProperty("--pct", `${pct}%`);
+      const label = fusion.querySelector?.('[data-role="fusion-start"]');
+      if (label) setLitText(label, formatTime(value));
+    }
   }
 
-  _onSeekCommit(event) {
+  _onRingSeekDown(event) {
+    if (!hasFeature(this._state(), FEATURES.SEEK)) return;
+    if (!this._readMedia().duration) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this._ringSeeking = true;
+    this._ringSeekId = event.pointerId;
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      /* 旧浏览器无 pointer capture，move/up 仍可在元素上触发 */
+    }
+    this._applyRingSeek(event);
+  }
+
+  _onRingSeekMove(event) {
+    if (!this._ringSeeking || event.pointerId !== this._ringSeekId) return;
+    event.preventDefault();
+    this._applyRingSeek(event);
+  }
+
+  _onRingSeekUp(event) {
+    if (!this._ringSeeking || event.pointerId !== this._ringSeekId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this._ringSeeking = false;
+    try {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const value = this._ringSeekValue;
+    this._ringSeekValue = null;
+    if (value != null) this._commitSeekValue(value);
+  }
+
+  _onRingSeekCancel(event) {
+    if (!this._ringSeeking) return;
+    this._ringSeeking = false;
+    this._ringSeekValue = null;
+    this._seekPreview = null;
+    this._syncCoverEq();
+    this.requestUpdate();
+  }
+
+  _applyRingSeek(event) {
+    const el = event.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = event.clientX - cx;
+    const dy = event.clientY - cy;
+    let angle = Math.atan2(dy, dx) + Math.PI / 2;
+    if (angle < 0) angle += Math.PI * 2;
+    const ratio = clamp(angle / (Math.PI * 2), 0, 1);
+    const duration = Number(this._readMedia().duration) || 0;
+    if (!duration) return;
+    const value = ratio * duration;
+    this._ringSeekValue = value;
+    this._seekPreview = value;
+    this._stopProgressTicker();
+    this._syncRingReadout(value);
+    this._syncCoverEq();
+  }
+
+  _syncRingReadout(value) {
+    const root = this.renderRoot;
+    if (!root) return;
+    const label = root.querySelector('[data-role="ring-start"]');
+    if (label) setLitText(label, formatTime(value));
+    const slider = root.querySelector('[data-role="ringseek"]');
+    if (slider) slider.setAttribute("aria-valuenow", String(Math.round(value)));
+  }
+
+  _commitSeekValue(value) {
     if (!hasFeature(this._state(), FEATURES.SEEK)) {
       this.requestUpdate();
       return;
     }
-    const value = Number(event.target.value);
+    const duration = Number(this._readMedia().duration) || 0;
+    const clamped = duration ? clamp(value, 0, duration) : value;
     const state = this._state();
     const attrs = state?.attributes || {};
-    this._seekPreview = value;
+    this._seekPreview = clamped;
     this._stopProgressTicker();
     this._seekPending = {
-      value,
+      value: clamped,
       from: Number(attrs.media_position) || 0,
       stamp: String(attrs.media_position_updated_at || ""),
       trackKey: this._trackKey(state),
@@ -1686,7 +1777,7 @@ class HaMusicCard extends LitElement {
     const pending = this._seekPending;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
     const release = () => {
-      if (this._seekPreview !== value) return;
+      if (this._seekPreview !== clamped) return;
       this._seekSettleTimer = null;
       this._seekPending = null;
       this._seekPreview = null;
@@ -1694,14 +1785,17 @@ class HaMusicCard extends LitElement {
       this._syncProgressTicker();
       this.requestUpdate();
     };
-    // 播放器 seek 可能晚于服务返回数秒；超时兜底保证 UI 不会永久停在拖动值。
     this._seekSettleTimer = setTimeout(release, 4000);
-    this._seekTo(value).catch(() => {
+    this._seekTo(clamped).catch(() => {
       if (this._seekPending !== pending) return;
       if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
       release();
     });
     this.requestUpdate();
+  }
+
+  _onSeekCommit(event) {
+    this._commitSeekValue(Number(event.target.value));
   }
 
   _onVolumeInput(event) {
@@ -4765,6 +4859,11 @@ class HaMusicCard extends LitElement {
         (maPlayer && (Boolean(state.attributes?.active_queue) || studioQueueReady)));
     const showLibrary = config.show_library !== false && canBrowse;
     const visualizer = config.visualizer || "bars";
+    const fusionMode = this._fusionLayout();
+    const fusionRequested =
+      visualizer === "ring" || visualizer === "rail" || visualizer === "dual";
+    const visualizerKind =
+      fusionMode === "ring" ? "none" : fusionMode || (fusionRequested ? "bars" : visualizer);
     const coverMode = config.cover || "ambient";
     const duration = media.duration;
     const position = this._seekPreview ?? media.position;
@@ -5033,10 +5132,38 @@ class HaMusicCard extends LitElement {
           ${this._lyricsOpen
             ? this._renderLyrics(media, position)
             : html`<section class="hm-main" data-side-lyrics=${sideLyrics ? "true" : "false"}>
-            <div class="hm-cover-wrap">
+            <div
+              class="hm-cover-wrap"
+              data-ringseek=${fusionMode === "ring" ? "true" : "false"}
+              data-fusion-linear=${fusionMode === "rail" || fusionMode === "dual" ? "true" : "false"}
+            >
               ${this._thumbMode()
                 ? nothing
                 : html`<canvas class="hm-cover-eq" aria-hidden="true"></canvas>`}
+              ${fusionMode === "ring" && duration > 0
+                ? html`<div
+                    class="hm-ring-seek"
+                    data-role="ringseek"
+                    role="slider"
+                    tabindex="0"
+                    aria-label=${t("seek")}
+                    aria-valuemin="0"
+                    aria-valuemax=${duration}
+                    aria-valuenow=${position}
+                    data-disabled=${canSeek ? "false" : "true"}
+                    @pointerdown=${(event) => this._onRingSeekDown(event)}
+                    @pointermove=${(event) => this._onRingSeekMove(event)}
+                    @pointerup=${(event) => this._onRingSeekUp(event)}
+                    @pointercancel=${(event) => this._onRingSeekCancel(event)}
+                  ></div>`
+                : nothing}
+              ${fusionMode === "ring" && duration > 0
+                ? html`<div class="hm-ring-readout" aria-hidden="true">
+                    <span data-role="ring-start">${formatTime(position)}</span>
+                    <span class="hm-ring-sep">/</span>
+                    <span>${formatTime(duration)}</span>
+                  </div>`
+                : nothing}
               <button
                 class="hm-cover"
                 data-playing=${playing ? "true" : "false"}
@@ -5189,17 +5316,17 @@ class HaMusicCard extends LitElement {
             </div>
           </section>`}
 
-          ${visualizer !== "none" && !this._lyricsOpen
+          ${visualizerKind !== "none" && !this._lyricsOpen
             ? html`<div
                 class="hm-vis"
                 data-playing=${playing ? "true" : "false"}
-                data-style=${visualizer}
+                data-style=${visualizerKind}
               >
-                ${this._renderVisualizer(visualizer, media)}
+                ${this._renderVisualizer(visualizerKind, media)}
               </div>`
             : nothing}
 
-          ${duration > 0 || previewUi
+          ${(duration > 0 || previewUi) && !fusionMode
             ? html`<section class="hm-progress">
                 <span class="hm-time">${formatTime(position)}</span>
                 ${waveBars.length
@@ -5513,7 +5640,64 @@ class HaMusicCard extends LitElement {
     `;
   }
 
+  _fusionLayout() {
+    const value = this._config?.visualizer || "bars";
+    if (value !== "ring" && value !== "rail" && value !== "dual") return "";
+    if (this._layoutKey() !== "full" || this._thumbPreview) return "";
+    return value;
+  }
+
+  _fusionPercent() {
+    const media = this._readMedia();
+    const duration = Number(media.duration) || 0;
+    if (!duration) return -1;
+    const position = Number(this._seekPreview ?? media.position) || 0;
+    return clamp(position / duration, 0, 1);
+  }
+
+  _renderFusionSeek(kind) {
+    const state = this._state();
+    const media = this._readMedia();
+    const duration = Number(media.duration) || 0;
+    const position = Number(this._seekPreview ?? media.position) || 0;
+    const percent = duration ? clamp((position / duration) * 100, 0, 100) : 0;
+    const canSeek = duration > 0 && hasFeature(state, FEATURES.SEEK);
+    const t = translator(this._hass?.language);
+    const flat = this._thumbPreview;
+    return html`<div
+      class="hm-fusion"
+      data-kind=${kind}
+      style=${styleMap({ "--pct": `${percent}%` })}
+    >
+      ${flat
+        ? html`<div class="hm-spectrum hm-spectrum-flat" aria-hidden="true"></div>`
+        : html`<canvas class="hm-spectrum" aria-hidden="true"></canvas>`}
+      <div class="hm-fusion-track" aria-hidden="true">
+        <span class="hm-fusion-fill"></span>
+        <span class="hm-fusion-knob"></span>
+      </div>
+      <input
+        class="hm-fusion-range"
+        type="range"
+        min="0"
+        max=${duration || 1}
+        step="0.01"
+        .value=${String(position)}
+        data-disabled=${canSeek ? "false" : "true"}
+        aria-label=${t("seek")}
+        @input=${(event) => this._onSeekInput(event)}
+        @change=${(event) => this._onSeekCommit(event)}
+      />
+      <div class="hm-fusion-times" aria-hidden="true">
+        <span data-role="fusion-start">${formatTime(position)}</span>
+        <span data-role="fusion-end">${formatTime(duration)}</span>
+      </div>
+    </div>`;
+  }
+
   _renderVisualizer(kind, media) {
+    if (kind === "rail" || kind === "dual") return this._renderFusionSeek(kind);
+    if (kind === "ring") return nothing;
     const frame = visualizerFrame(media);
     if (kind === "wave") {
       const amp1 = 7 + frame.energy * 6 + frame.low * 7;
@@ -5875,14 +6059,24 @@ class HaMusicCard extends LitElement {
       this._spectrumGrad = grad;
       this._spectrumGradKey = gradKey;
     }
-    ctx.fillStyle = this._spectrumGrad;
-    if (mobile) ctx.globalAlpha = idle ? 0.5 : 0.84;
+    // 频谱进度模式下：已播放区域亮色跟随频谱，未播放区域压成暗色轮廓，
+    // 让一根频谱条同时承担“实时响应 + 播放进度”两种语义。
+    const fusionMode = this._fusionLayout();
+    const fusion = fusionMode === "rail" || fusionMode === "dual";
+    const progress = fusion ? this._fusionPercent() : -1;
+    const dimColor = "rgba(126, 108, 160, 0.55)";
     for (let index = 0; index < count; index += 1) {
       const level = clamp(Number(levels[index]) || 0, 0.02, 1);
       const barHeight = Math.max(2, level * height);
       const x = index * cell + (cell - barWidth) / 2;
       const y = height - barHeight;
-      if (!mobile) ctx.globalAlpha = idle ? 0.5 : 0.58 + level * 0.36;
+      const played =
+        progress < 0 || index / Math.max(1, count - 1) <= progress + 0.002;
+      ctx.fillStyle = played ? this._spectrumGrad : dimColor;
+      if (mobile) ctx.globalAlpha = played ? (idle ? 0.5 : 0.84) : 0.18;
+      if (!mobile) ctx.globalAlpha = played
+        ? idle ? 0.5 : 0.58 + level * 0.36
+        : idle ? 0.14 : 0.18;
       if (!mobile && typeof ctx.roundRect === "function" && barWidth >= 3) {
         ctx.beginPath();
         ctx.roundRect(x, y, barWidth, barHeight, [radius, radius, 0, 0]);
@@ -5899,7 +6093,7 @@ class HaMusicCard extends LitElement {
     if (
       !canvas ||
       this._thumbPreview ||
-      (this._config?.visualizer || "bars") !== "bars"
+      !["bars", "rail", "dual"].includes(this._config?.visualizer || "bars")
     ) {
       this._spectrumCanvas = null;
       this._spectrumCtx = null;

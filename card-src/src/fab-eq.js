@@ -48,18 +48,23 @@ function paint(canvas, bars, glow) {
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
   const glowOn = state.applyShadow !== false;
+  const progress = Number.isFinite(state.progress) ? state.progress : -1;
   ctx.lineCap = state.cap || "round";
   ctx.shadowBlur = glowOn ? 5 + glow * 7 : 0;
 
   for (let i = 0; i < barCount; i += 1) {
     const v = clamp(bars[i] || 0, 0, 1);
+    // 环形频谱进度：已播放的一侧保持彩色律动，未播放一侧压暗成轮廓。
+    // 进度从 12 点方向顺时针增长，与圆形拖动方向一致。
+    const played = progress < 0 || i / barCount <= progress + 0.0008;
+    ctx.shadowBlur = played && glowOn ? 5 + glow * 7 : 0;
     const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
     const len = 3.2 + Math.pow(v, 1.05) * maxLen;
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = Math.abs(Math.sin(angle));
     const color = blend(accent[0], accent[1], t);
-    const alpha = 0.5 + v * 0.48;
+    const alpha = (0.5 + v * 0.48) * (played ? 1 : 0.26);
     // 柱底保留少量 alpha，让每一根柱都从根部可见；若从 0 渐入，
     // 短柱只剩外端几个像素，整圈会退化成虚线，看起来像音柱缺失。
     const x0 = R + c * r0;
@@ -72,7 +77,9 @@ function paint(canvas, bars, glow) {
     grad.addColorStop(0.46, rgba(color, alpha * 0.62));
     grad.addColorStop(1, rgba(color, alpha));
     ctx.strokeStyle = grad;
-    ctx.shadowColor = rgba(color, 0.12 + glow * 0.26);
+    ctx.shadowColor = played
+      ? rgba(color, 0.12 + glow * 0.26)
+      : "rgba(0, 0, 0, 0)";
     ctx.lineWidth = state.lineWidth || 3;
     ctx.beginPath();
     ctx.moveTo(x0, y0);
@@ -80,7 +87,7 @@ function paint(canvas, bars, glow) {
     ctx.stroke();
 
     // 上半环加一道近白亮芯，让紫色一端在深色背景上仍能读出柱长。
-    const core = clamp((t - 0.3) / 0.45, 0, 1);
+    const core = played ? clamp((t - 0.3) / 0.45, 0, 1) : 0;
     if (core > 0.01) {
       ctx.shadowBlur = 0;
       ctx.strokeStyle = `rgba(255, 255, 255, ${((0.05 + v * 0.24) * core).toFixed(2)})`;
@@ -91,6 +98,35 @@ function paint(canvas, bars, glow) {
   }
   ctx.shadowBlur = 0;
   ctx.shadowColor = "transparent";
+  // 细进度弧压在音柱内侧：柱子负责实时频谱，弧负责精确读数与拖动反馈。
+  if (progress >= 0) {
+    const arcR = Math.max(8, r0 - 5);
+    const start = -Math.PI / 2;
+    const end = start + Math.PI * 2 * clamp(progress, 0, 1);
+    const arcGrad = ctx.createLinearGradient(0, 0, size, size);
+    arcGrad.addColorStop(0, accent[0]);
+    arcGrad.addColorStop(1, accent[1]);
+    ctx.strokeStyle = arcGrad;
+    ctx.lineWidth = Math.max(1.6, (state.lineWidth || 3) * 0.8);
+    ctx.globalAlpha = 0.95;
+    ctx.shadowColor = rgba(parseHex(accent[1]), 0.5);
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(R, R, arcR, start, end);
+    ctx.stroke();
+    // 弧尾加一颗亮点，拖动时能明确看到当前播放位置。
+    if (progress > 0.002) {
+      const ax = R + Math.cos(end) * arcR;
+      const ay = R + Math.sin(end) * arcR;
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(ax, ay, Math.max(1.6, ctx.lineWidth * 0.9), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
 }
 
 function clear(canvas) {
@@ -190,7 +226,7 @@ function frame(canvas, now) {
   state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
 }
 
-function stop(canvas, { clearNow = false } = {}) {
+function stop(canvas, { clearNow = false, persist = false } = {}) {
   const state = states.get(canvas);
   if (!state) return;
   if (state.raf) {
@@ -198,7 +234,20 @@ function stop(canvas, { clearNow = false } = {}) {
     state.raf = 0;
   }
   setBeat(state.root, 1, 0, state.accent, state.target, state.applyShadow);
+  const levels = state.smooth.slice(0, state.barCount || BARS);
+  // 暂停时环形频谱不能整圈消失：没有历史波形（刚刷新/刚切换）时用一组
+  // 静态的镜像柱高兜底，进度弧和已播放色带仍然可读。
+  if (persist && !levels.some((value) => value > 0.02)) {
+    for (let i = 0; i < levels.length; i += 1) {
+      const vertical = Math.abs(Math.sin((i / levels.length) * Math.PI * 2));
+      levels[i] = 0.1 + 0.15 * (1 - vertical) + 0.03 * Math.abs(Math.sin(i * 1.7));
+    }
+  }
   state.smooth.fill(0);
+  if (persist) {
+    paint(canvas, levels, 0.28);
+    return;
+  }
   if (clearNow) {
     clear(canvas);
     return;
@@ -245,6 +294,8 @@ export function syncFabEq(canvas, root, media = {}) {
       phase: 0,
       energy: 0.6,
       bands: null,
+      progress: -1,
+      persist: false,
       accent: FALLBACK_ACCENT,
       smooth: new Array(MAX_BARS).fill(0),
       barCount: BARS,
@@ -273,6 +324,9 @@ export function syncFabEq(canvas, root, media = {}) {
   }
   state.target = media.target || null;
   state.bands = Array.isArray(media.bands) && media.bands.length ? media.bands : null;
+  const progress = Number(media.progress);
+  state.progress = Number.isFinite(progress) ? clamp(progress, 0, 1) : -1;
+  state.persist = media.persist === true;
   state.applyShadow = media.applyShadow !== false;
   state.maxFps = Math.max(0, Number(media.maxFps) || 0);
   const dpr = Math.min(2, Math.max(1, Number(media.dpr) || DPR));
@@ -314,7 +368,7 @@ export function syncFabEq(canvas, root, media = {}) {
   state.visible = visible;
 
   if (!playing || !visible) {
-    stop(canvas, { clearNow: !visible });
+    stop(canvas, { clearNow: !visible, persist: state.persist && visible });
     return;
   }
   if (!state.raf) {

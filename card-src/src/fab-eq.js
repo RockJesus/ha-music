@@ -57,7 +57,7 @@ function paint(canvas, bars, glow) {
     const len = 3.2 + Math.pow(v, 1.05) * maxLen;
     const c = Math.cos(angle);
     const s = Math.sin(angle);
-    const t = Math.abs(i - half) / half;
+    const t = Math.abs(Math.sin(angle));
     const color = blend(accent[0], accent[1], t);
     const alpha = 0.5 + v * 0.48;
     // 柱底保留少量 alpha，让每一根柱都从根部可见；若从 0 渐入，
@@ -145,15 +145,17 @@ function frame(canvas, now) {
 
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
-  for (let h = 0; h < half; h += 1) {
-    const d = h / (half - 1); // 0 = 12 点低频，1 = 6 点高频
-    const wobble = Math.sin(t * (4.6 + (state.hash % 9) * 0.25) + h * 1.1 + state.phase);
-    const shimmer = Math.sin(t * (11.4 + (state.hash % 5) * 0.4) + h * 2.3);
-    const transient = 0.18 * kick * Math.pow(1 - d, 2.2);
+  for (let i = 0; i < barCount; i += 1) {
+    const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
+    // 以纵向位置决定频段：12 点与 6 点同为低频，左右两侧为高频。
+    // 这样上下半圈天然镜像，不会出现上半圈长、下半圈短。
+    const vertical = Math.abs(Math.sin(angle));
+    const d = 1 - vertical;
+    const wobble = Math.sin(t * (4.6 + (state.hash % 9) * 0.25) + i * 1.1 + state.phase);
+    const shimmer = Math.sin(t * (11.4 + (state.hash % 5) * 0.4) + i * 2.3);
+    const transient = 0.18 * kick * Math.pow(vertical, 2.2);
     let base;
     if (state.bands?.length && state.bands.live) {
-      // 整圈按上下左右镜像分配：低频集中在中线，越高频越靠左右两侧；
-      // 下半圈与上半圈使用同一组长度，避免高频段能量低导致下半圈音柱变短。
       const bandIndex = d < 0.28 ? 0 : d < 0.55 ? 1 : 2;
       const drive = clamp(state.bands[bandIndex] || 0, 0, 1);
       base =
@@ -165,12 +167,7 @@ function frame(canvas, now) {
       base = (0.16 + 0.68 * band) * (0.62 + 0.38 * (0.5 + 0.5 * wobble));
       base *= 0.55 + 0.45 * (0.5 + 0.5 * shimmer);
     }
-    const value = clamp(base + transient + 0.04 * state.energy, 0, 1);
-    bars[h] = value;
-    bars[barCount - 1 - h] = value;
-    // 上下镜像：下半圈与上半圈完全同形，不再把低频/高频拆分到上下两端。
-    bars[half + h] = value;
-    bars[half - 1 - h] = value;
+    bars[i] = clamp(base + transient + 0.04 * state.energy, 0, 1);
   }
 
   for (let i = 0; i < barCount; i += 1) {

@@ -819,8 +819,8 @@ export const cardStyles = css`
     border-radius: 999px;
     background: linear-gradient(
       90deg,
-      rgba(var(--hm-a1-rgb), 1) 0%,
-      rgba(var(--hm-a2-rgb), 1) var(--pct),
+      rgba(var(--hm-ctl-a1-rgb), 1) 0%,
+      rgba(var(--hm-ctl-a2-rgb), 1) var(--pct),
       rgba(255, 255, 255, 0.13) var(--pct),
       rgba(255, 255, 255, 0.13) 100%
     );
@@ -834,8 +834,8 @@ export const cardStyles = css`
     margin-top: -5.5px;
     border: none;
     border-radius: 50%;
-    background: transparent;
-    box-shadow: none;
+    background: linear-gradient(135deg, var(--hm-ctl-a1), var(--hm-ctl-a2));
+    box-shadow: 0 0 10px -2px rgba(var(--hm-ctl-a1-rgb), 0.9);
     transition: none;
   }
 
@@ -858,8 +858,8 @@ export const cardStyles = css`
     border-radius: 999px;
     background: linear-gradient(
       90deg,
-      rgba(var(--hm-a1-rgb), 1),
-      rgba(var(--hm-a2-rgb), 1)
+      var(--hm-ctl-a1),
+      var(--hm-ctl-a2)
     );
   }
 
@@ -868,8 +868,8 @@ export const cardStyles = css`
     height: 18px;
     border: none;
     border-radius: 50%;
-    background: transparent;
-    box-shadow: none;
+    background: linear-gradient(135deg, var(--hm-ctl-a1), var(--hm-ctl-a2));
+    box-shadow: 0 0 10px -2px rgba(var(--hm-ctl-a1-rgb), 0.9);
   }
 
   .hm-range[data-disabled="true"] {
@@ -1152,12 +1152,12 @@ export const cardStyles = css`
     color: #fff;
     background: linear-gradient(
       135deg,
-      rgba(var(--hm-a1-rgb), 1) 0%,
-      rgba(var(--hm-a2-rgb), 1) 100%
+      var(--hm-ctl-a1) 0%,
+      var(--hm-ctl-a2) 100%
     );
     box-shadow:
-      0 14px 30px -10px rgba(var(--hm-a1-rgb), 0.85),
-      0 4px 14px -6px rgba(var(--hm-a2-rgb), 0.9),
+      0 14px 30px -10px rgba(var(--hm-ctl-a1-rgb), 0.85),
+      0 4px 14px -6px rgba(var(--hm-ctl-a2-rgb), 0.9),
       inset 0 1px 0 rgba(255, 255, 255, 0.4),
       inset 0 -1px 2px rgba(0, 0, 0, 0.25);
     transition: transform 0.16s ease, box-shadow 0.22s ease;
@@ -1170,8 +1170,8 @@ export const cardStyles = css`
   .hm-play:hover {
     transform: translateY(-1px) scale(1.02);
     box-shadow:
-      0 18px 36px -10px rgba(var(--hm-a1-rgb), 0.95),
-      0 6px 18px -6px rgba(var(--hm-a2-rgb), 1),
+      0 18px 36px -10px rgba(var(--hm-ctl-a1-rgb), 0.95),
+      0 6px 18px -6px rgba(var(--hm-ctl-a2-rgb), 1),
       inset 0 1px 0 rgba(255, 255, 255, 0.45);
   }
 

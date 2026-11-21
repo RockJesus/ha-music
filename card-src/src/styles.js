@@ -304,7 +304,7 @@ export const cardStyles = css`
     aspect-ratio: 1 / 1;
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 50%;
+    border-radius: 18px;
     overflow: hidden;
     background: rgba(9, 11, 18, 0.92);
     box-shadow: 0 18px 38px -14px rgba(0, 0, 0, 0.9);

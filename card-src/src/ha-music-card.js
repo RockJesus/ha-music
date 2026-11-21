@@ -19,7 +19,6 @@ import {
   readMedia,
   readQueue,
   readMassQueueItems,
-  readMaQueueDetails,
   hasFeature,
   normalizeArt,
   resolveArtUrl,
@@ -180,6 +179,10 @@ class HaMusicCard extends LitElement {
     this._showRemaining = false;
     this._drawer = this._emptyDrawer();
     this._queueLoadToken = 0;
+    this._queueUnsub = null;
+    this._queueSubscriptionKey = "";
+    this._queueFirst = null;
+    this._queueSnapshot = null;
     this._artUrl = "";
     this._artSource = "";
     this._artApplied = "";
@@ -229,27 +232,7 @@ class HaMusicCard extends LitElement {
     this._bandLevels = Object.assign([0.18, 0.14, 0.1], { live: false });
     this._spectrumLast = 0;
     this._spectrumKey = "";
-    this._spectrumAudioUrl = "";
-    this._spectrumPlaylistUrl = "";
-    this._spectrumPlaylist = null;
-    this._spectrumPlaylistAt = 0;
-    this._spectrumPlaylistLoading = false;
-    this._spectrumPlaylistAbort = null;
-    this._spectrumPlaylistErrorAt = 0;
-    this._spectrumResolvedUrl = "";
-    this._spectrumTrack = null;
     this._audioShape = null;
-    this._audioEl = null;
-    this._audioCtx = null;
-    this._audioAnalyser = null;
-    this._audioSource = null;
-    this._audioMute = null;
-    this._audioBins = null;
-    this._audioFailedUrl = "";
-    this._audioZeroFrames = 0;
-    this._audioPeak = 0;
-    this._audioStartedAt = 0;
-    this._audioGestureArmed = false;
     this._positionClock = null;
     // HA Music Studio：服务端 30fps 48 段真实频谱。
     this._studioBands = null;
@@ -343,31 +326,6 @@ class HaMusicCard extends LitElement {
       throw new Error("ha-music: 需要配置 entity（media_player.*）或 entities 列表");
     }
     this._config = { ...config };
-    const spectrumAudioUrl =
-      typeof config.spectrum_audio_url === "string"
-        ? config.spectrum_audio_url.trim()
-        : "";
-    const spectrumPlaylistUrl =
-      typeof config.spectrum_playlist_url === "string"
-        ? config.spectrum_playlist_url.trim()
-        : "";
-    if (
-      spectrumAudioUrl !== this._spectrumAudioUrl ||
-      spectrumPlaylistUrl !== this._spectrumPlaylistUrl
-    ) {
-      this._spectrumAudioUrl = spectrumAudioUrl;
-      this._spectrumPlaylistUrl = spectrumPlaylistUrl;
-      this._spectrumPlaylist = null;
-      this._spectrumPlaylistAt = 0;
-      this._spectrumPlaylistErrorAt = 0;
-      this._spectrumPlaylistAbort?.abort?.();
-      this._spectrumPlaylistAbort = null;
-      this._spectrumResolvedUrl = "";
-      this._spectrumTrack = null;
-      this._audioFailedUrl = "";
-      this._resetAudioShape();
-      this._teardownAudioSpectrum();
-    }
     if (!list.includes(this._activeEntity)) {
       this._activeEntity = list[0];
       this._palette = null;
@@ -417,12 +375,6 @@ class HaMusicCard extends LitElement {
     } else {
       this._mobileMq?.addListener?.(this._onMobileChange);
     }
-    this._onSpectrumGesture = () => {
-      if (this._spectrumPlaying() && (this._config?.visualizer || "bars") === "bars") {
-        this._primeAudioSpectrum();
-      }
-    };
-    this.addEventListener("pointerdown", this._onSpectrumGesture, { passive: true });
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = subscribeDockPref(() => {
       // 任意一张卡片的编辑器改动都会广播到这里；重装全局迷你播放器，
@@ -493,7 +445,6 @@ class HaMusicCard extends LitElement {
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
     if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
     this._stopSpectrum();
-    this._teardownAudioSpectrum();
     this._coverGestureTimer = null;
     this._coverSuppressTimer = null;
     this._coverPress = null;
@@ -1283,13 +1234,10 @@ class HaMusicCard extends LitElement {
   _togglePlay() {
     const state = this._state()?.state;
     const playing = state === "playing" || state === "buffering";
-    if (playing) this._pauseAudioSpectrum();
-    else this._primeAudioSpectrum();
     this._guard(this._call(playing ? "media_pause" : "media_play"));
   }
 
   _skip(direction) {
-    this._primeAudioSpectrum();
     this._guard(this._call(direction === "next" ? "media_next_track" : "media_previous_track"));
   }
 
@@ -1630,65 +1578,41 @@ class HaMusicCard extends LitElement {
     this._guard(this._call("unjoin"));
   }
 
-  _callMassQueue(service, data) {
-    const hass = this._hass;
-    if (!hass?.callService) return Promise.resolve();
-    try {
-      const result = hass.callService("mass_queue", service, {
-        entity: this._eid(),
-        ...data,
-      });
-      return Promise.resolve(result);
-    } catch (error) {
-      this._notify(error?.message || String(error));
-      return Promise.reject(error);
+  async _queueCommand(action, extra = {}) {
+    const connection = this._hass?.connection;
+    if (!connection?.sendMessagePromise) {
+      throw new Error("Home Assistant WebSocket unavailable");
     }
+    const queueId =
+      this._queueQueueId || this._state()?.attributes?.active_queue || "";
+    return connection.sendMessagePromise({
+      type: "ha_music_studio/queue_command",
+      action,
+      entity_id: this._eid(),
+      queue_id: queueId,
+      ...extra,
+    });
   }
 
   async _playQueueItem(item) {
-    const queueId =
-      this._queueQueueId || this._state()?.attributes?.active_queue || "";
-    if (item?.queueItemId && queueId) {
-      const played = await this._playMaApiItem(queueId, item.queueItemId);
-      if (played) {
-        this._drawer = {
-          ...this._drawer,
-          items: (this._drawer?.items || []).map((entry) => ({
-            ...entry,
-            active: entry.queueItemId === item.queueItemId,
-          })),
-        };
-        this.requestUpdate();
-        return;
-      }
+    if (!item?.queueItemId) {
+      this._notify(translator(this._hass?.language)("queueEmpty"));
+      return;
     }
-    const massQueueReady = Boolean(
-      this._hass?.services?.mass_queue?.play_queue_item
-    );
-    if (item?.queueItemId && massQueueReady) {
-      this._guard(
-        this._callMassQueue("play_queue_item", { queue_item_id: item.queueItemId })
-      );
+    try {
+      await this._queueCommand("play_item", { item_id: item.queueItemId });
       this._drawer = {
         ...this._drawer,
-        items: (this._drawer.items || []).map((entry) => ({
+        items: (this._drawer?.items || []).map((entry) => ({
           ...entry,
           active: entry.queueItemId === item.queueItemId,
         })),
       };
       this.requestUpdate();
-      return;
+    } catch (error) {
+      this._notify(error?.message || String(error));
+      this._loadQueue(++this._queueLoadToken).catch(() => {});
     }
-    if (!item?.contentId) {
-      this._notify(translator(this._hass?.language)("queueEmpty"));
-      return;
-    }
-    this._guard(
-      this._call("play_media", {
-        media_content_id: item.contentId,
-        media_content_type: item.contentType || "music",
-      })
-    );
   }
 
   _playBrowseItem(item) {
@@ -1913,22 +1837,6 @@ class HaMusicCard extends LitElement {
     throw new Error("Service response unavailable");
   }
 
-  async _fetchMassQueueItems() {
-    const limit = clamp(Number(this._config?.max_queue) || 60, 20, QUEUE_WINDOW_SIZE);
-    try {
-      const response = await this._serviceResponse("mass_queue", "get_queue_items", {
-        entity: this._eid(),
-        limit,
-        limit_before: Math.min(15, limit),
-        limit_after: limit,
-      });
-      const items = this._pickQueueResponse(response);
-      return Array.isArray(items) ? items : null;
-    } catch {
-      return null;
-    }
-  }
-
   // Music Assistant 的队列快照里带 current_item.media_item.stream_details，
   // 本地库/主流音乐源会给出编码、采样率、位深、码率；流媒体源可能只有编码。
   async _loadAudioSpec(trackKey) {
@@ -2028,294 +1936,113 @@ class HaMusicCard extends LitElement {
     return map[raw] || raw.toUpperCase();
   }
 
-  async _fetchMaQueueDetails() {
-    try {
-      const response = await this._serviceResponse("music_assistant", "get_queue", {
-        entity_id: this._eid(),
-      });
-      return this._pickQueueResponse(response);
-    } catch {
-      return null;
+  async _subscribeQueue(queueId) {
+    const key = `${this._eid()}|${queueId}`;
+    if (this._queueSubscriptionKey === key && this._queueUnsub) {
+      return this._queueSnapshot;
     }
-  }
-
-  // Music Assistant 的完整队列不在 HA 的 get_queue 响应里，但可以经
-  // Supervisor Ingress 直接连 MA 的 websocket。这样无需安装 mass_queue，
-  // 也能拿到完整队列并精确切歌；失败时再回退到 HA 服务。
-  async _maIngressPath() {
-    if (this._maIngressPathValue) return this._maIngressPathValue;
-    if (this._maIngressPromise) return this._maIngressPromise;
-    this._maIngressPromise = (async () => {
-      const hass = this._hass;
-      if (!hass?.callWS) return "";
-      try {
-        const list = await hass.callWS({
-          type: "supervisor/api",
-          endpoint: "/addons",
-          method: "get",
-        });
-        const addons = Array.isArray(list?.addons) ? list.addons : [];
-        const candidates = addons.filter(
-          (addon) =>
-            addon &&
-            addon.state === "started" &&
-            /music\s*assistant/i.test(`${addon.name || ""} ${addon.slug || ""}`)
-        );
-        for (const addon of candidates) {
-          const info = await hass.callWS({
-            type: "supervisor/api",
-            endpoint: `/addons/${encodeURIComponent(addon.slug)}/info`,
-            method: "get",
-          });
-          if (info?.ingress_url) {
-            this._maIngressPathValue = String(info.ingress_url);
-            await this._maGrantIngressSession(addon.slug, this._maIngressPathValue);
-            return this._maIngressPathValue;
-          }
-        }
-      } catch {
-        // 非管理员、未安装加载项或旧版 HA 都可能没有 supervisor/api。
-      }
-      return "";
-    })();
-    try {
-      return await this._maIngressPromise;
-    } finally {
-      this._maIngressPromise = null;
+    this._teardownQueueSubscription();
+    const connection = this._hass?.connection;
+    if (!connection?.subscribeMessage) {
+      throw new Error("Home Assistant WebSocket unavailable");
     }
-  }
-
-  async _maGrantIngressSession(slug, path) {
-    if (!slug || !path || !this._hass?.callWS) return;
-    try {
-      const result = await this._hass.callWS({
-        type: "supervisor/ingress/session",
-        slug: String(slug),
-      });
-      const token = result?.session || result?.ingress_session || "";
-      if (!token || typeof document === "undefined") return;
-      const cookiePath = path.endsWith("/") ? path : `${path}/`;
-      const secure = window.location.protocol === "https:" ? "; Secure" : "";
-      document.cookie = `ingress_session=${token}; Path=${cookiePath}; SameSite=Strict${secure}`;
-    } catch {
-      // 没有 ingress 权限时继续尝试；失败后由 _fetchMaApiQueue 回退。
-    }
-  }
-
-  _maOpenSocket(path) {
-    return new Promise((resolve, reject) => {
-      let socket;
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const base = path.startsWith("/") ? path : `/${path}`;
-        const url = `${protocol}//${window.location.host}${base}${
-          base.endsWith("/") ? "" : "/"
-        }ws`;
-        socket = new WebSocket(url);
-      } catch (error) {
-        reject(error);
-        return;
-      }
+    const first = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        try {
-          socket.close();
-        } catch {
-          // ignore
-        }
-        reject(new Error("Music Assistant websocket timeout"));
+        if (this._queueFirst?.reject === reject) this._queueFirst = null;
+        reject(new Error(translator(this._hass?.language)("queueEmpty")));
       }, 10000);
-      socket.addEventListener("open", () => {
-        clearTimeout(timer);
-        resolve(socket);
-      });
-      socket.addEventListener("error", () => {
-        clearTimeout(timer);
-        reject(new Error("Music Assistant websocket failed"));
-      });
-      socket.addEventListener("close", () => {
-        clearTimeout(timer);
-      });
+      this._queueFirst = {
+        resolve: (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      };
     });
-  }
-
-  _maSend(socket, command, args = {}, timeout = 15000) {
-    return new Promise((resolve, reject) => {
-      const messageId = `hm${(this._maMsgSeq = (this._maMsgSeq || 0) + 1)}`;
-      let settled = false;
-      const cleanup = () => {
-        clearTimeout(timer);
-        socket.removeEventListener("message", onMessage);
-        socket.removeEventListener("close", onClose);
-      };
-      const fail = (error) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        reject(error);
-      };
-      const timer = setTimeout(() => fail(new Error("Music Assistant API timeout")), timeout);
-      const onMessage = (event) => {
-        let message;
-        try {
-          message = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-        if (!message || message.message_id !== messageId) return;
-        if (message.error || message.error_code) {
-          fail(
-            new Error(
-              message.details ||
-                message.error?.message ||
-                `Music Assistant error ${message.error_code || ""}`
-            )
-          );
-          return;
-        }
-        settled = true;
-        cleanup();
-        resolve(message.result);
-      };
-      const onClose = () => fail(new Error("Music Assistant websocket closed"));
-      socket.addEventListener("message", onMessage);
-      socket.addEventListener("close", onClose);
-      try {
-        socket.send(JSON.stringify({ message_id: messageId, command, args }));
-      } catch (error) {
-        fail(error);
-      }
-    });
-  }
-
-  async _fetchMaApiQueue(queueId) {
-    if (!queueId) return null;
-    const path = await this._maIngressPath();
-    if (!path) return null;
-    let socket;
+    this._queueSubscriptionKey = key;
     try {
-      socket = await this._maOpenSocket(path);
-      const queue = await this._maSend(socket, "player_queues/get", {
-        queue_id: queueId,
-      });
-      const total = Number(queue?.items) || 0;
-      const activeItemId = queue?.current_item?.queue_item_id || "";
-      const currentIndex = Number(queue?.current_index);
-      // 只取当前曲目附近的一段：超长队列（几千首）整表拉取 + 全量渲染会把
-      // 主线程占满，抽屉要等很久才响应。当前曲目前后各取一段，完整队列走
-      // 「打开 MA」入口。
-      let start = 0;
-      if (Number.isFinite(currentIndex) && currentIndex >= 0) {
-        start = Math.max(0, currentIndex - QUEUE_WINDOW_BEFORE);
-      }
-      if (total > 0) {
-        start = Math.min(start, Math.max(0, total - QUEUE_WINDOW_SIZE));
-      }
-      const limit = total > 0
-        ? Math.min(QUEUE_WINDOW_SIZE, total - start)
-        : QUEUE_WINDOW_SIZE;
-      const page = await this._maSend(socket, "player_queues/items", {
-        queue_id: queueId,
-        limit,
-        offset: start,
-      });
-      if (!Array.isArray(page) || !page.length) return null;
-      const shown = page.length;
-      return {
-        items: page,
-        total: total || shown,
-        activeItemId,
-        currentIndex,
-        offset: start,
-        windowed: total > 0 && shown < total,
-      };
-    } catch {
-      return null;
-    } finally {
+      this._queueUnsub = await connection.subscribeMessage(
+        (event) => this._onQueueEvent(event, key),
+        {
+          type: "ha_music_studio/subscribe_queue",
+          entity_id: this._eid(),
+          queue_id: queueId,
+        }
+      );
+    } catch (error) {
+      this._teardownQueueSubscription();
+      this._queueFirst?.reject?.(error);
+      this._queueFirst = null;
+      throw error;
+    }
+    return first;
+  }
+
+  _teardownQueueSubscription() {
+    const unsub = this._queueUnsub;
+    this._queueUnsub = null;
+    this._queueSubscriptionKey = "";
+    this._queueFirst = null;
+    this._queueSnapshot = null;
+    if (typeof unsub === "function") {
       try {
-        socket?.close();
+        unsub();
       } catch {
         // ignore
       }
     }
   }
 
-  async _playMaApiItem(queueId, queueItemId) {
-    if (!queueId || !queueItemId) return false;
-    const path = await this._maIngressPath();
-    if (!path) return false;
-    let socket;
-    try {
-      socket = await this._maOpenSocket(path);
-      await this._maSend(socket, "player_queues/play_index", {
-        queue_id: queueId,
-        index: queueItemId,
-      });
-      return true;
-    } catch {
-      return false;
-    } finally {
-      try {
-        socket?.close();
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  async _loadQueue(token) {
-    const attrs = this._state()?.attributes || {};
-    const queueId = attrs.active_queue || "";
-    const [massItems, details] = await Promise.all([
-      this._fetchMassQueueItems(),
-      this._fetchMaQueueDetails(),
-    ]);
-    if (
-      token !== this._queueLoadToken ||
-      !this._drawer?.open ||
-      this._drawer.mode !== "queue"
-    ) {
+  _onQueueEvent(event, key) {
+    if (!event || event.type !== "queue") return;
+    if (key !== this._queueSubscriptionKey) return;
+    if (!protocolMatches(event.protocol)) {
+      this._notify(protocolErrorText(this._hass?.language));
+      this._teardownQueueSubscription();
       return;
     }
+    this._queueSnapshot = event;
+    const first = this._queueFirst;
+    this._queueFirst = null;
+    first?.resolve?.(event);
+    if (this._drawer?.open && this._drawer.mode === "queue") {
+      this._applyQueueSnapshot(event);
+    }
+  }
+
+  _applyQueueSnapshot(event) {
     const t = translator(this._hass?.language);
-    const direct = await this._fetchMaApiQueue(queueId || details?.queue_id || "");
-    if (
-      token !== this._queueLoadToken ||
-      !this._drawer?.open ||
-      this._drawer.mode !== "queue"
-    ) {
-      return;
+    const attrs = this._state()?.attributes || {};
+    const queueId = event.queue_id || this._queueQueueId;
+    this._queueQueueId = queueId;
+    const offset = Number(event.offset) || 0;
+    let items = readMassQueueItems(
+      event.items || [],
+      event.current_item_id || "",
+      attrs.media_content_id || ""
+    );
+    if (offset > 0) {
+      items = items.map((entry, i) => ({ ...entry, index: offset + i }));
     }
-    this._queueQueueId = queueId || details?.queue_id || "";
-    const currentId = direct?.activeItemId || details?.current_item?.queue_item_id || "";
-    const contentId = attrs.media_content_id || "";
-    let items = direct
-      ? readMassQueueItems(direct.items, currentId, contentId)
-      : massItems
-        ? readMassQueueItems(massItems, currentId, contentId)
-        : [];
-    const queueOffset = Number(direct?.offset) || 0;
-    if (items.length && queueOffset > 0) {
-      items = items.map((entry, i) => ({ ...entry, index: queueOffset + i }));
-    }
-    const fullQueue = !direct?.windowed && items.length > 0;
-    if (!items.length && details) {
-      items = readMaQueueDetails(details, contentId);
-    }
-    const total = Number(direct?.total ?? details?.items);
-    const index = Number(direct?.currentIndex ?? details?.current_index);
+    const total = Number(event.total) || 0;
+    const index = Number(event.current_index);
+    const fullQueue = !event.windowed && items.length > 0;
     const title = [t("queue")];
-    if (Number.isFinite(total) && total > 0) {
-      title.push(`${Number.isFinite(index) ? index + 1 : "?"}/${total}`);
+    if (total > 0) {
+      title.push(`${Number.isFinite(index) && index >= 0 ? index + 1 : "?"}/${total}`);
     }
     let note = !fullQueue && items.length ? t("queueLimited") : "";
-    if (direct?.windowed && items.length) {
-      note = `${t("queueWindow")} · ${queueOffset + 1}–${queueOffset + items.length}/${total}`;
+    if (event.windowed && items.length) {
+      note = `${t("queueWindow")} · ${offset + 1}–${offset + items.length}/${total}`;
     }
     this._drawer = {
       ...this._drawer,
       items,
       loading: false,
-      error: "",
+      error: event.error || "",
       title: title.join(" · "),
       note,
       maUrl: this._maUrl(),
@@ -2323,6 +2050,21 @@ class HaMusicCard extends LitElement {
     };
     this.requestUpdate();
     this.updateComplete.then(() => this._scrollQueueToActive());
+  }
+
+  async _loadQueue(token) {
+    const queueId =
+      this._queueQueueId || this._state()?.attributes?.active_queue || "";
+    if (!queueId) throw new Error(translator(this._hass?.language)("queueEmpty"));
+    const event = await this._subscribeQueue(queueId);
+    if (
+      token !== this._queueLoadToken ||
+      !this._drawer?.open ||
+      this._drawer.mode !== "queue"
+    ) {
+      return;
+    }
+    if (!event) throw new Error(translator(this._hass?.language)("queueEmpty"));
   }
 
   _openQueue() {
@@ -2347,7 +2089,7 @@ class HaMusicCard extends LitElement {
     };
     this.requestUpdate();
     if (items.length) this.updateComplete.then(() => this._scrollQueueToActive());
-    if (items.length || !maPlayer) return;
+    if (!maPlayer) return;
     this._loadQueue(token).catch((error) => {
       if (token !== this._queueLoadToken) return;
       this._drawer = {
@@ -2542,6 +2284,7 @@ class HaMusicCard extends LitElement {
   }
 
   _closeDrawer() {
+    this._teardownQueueSubscription();
     this._drawer = { ...this._drawer, open: false };
     this.requestUpdate();
     setTimeout(() => {
@@ -3639,11 +3382,11 @@ class HaMusicCard extends LitElement {
       soundModes.length > 0 && hasFeature(state, FEATURES.SELECT_SOUND_MODE);
     const groupMembers = media.groupMembers.filter((id) => id && id !== entityId);
     const showGroup = config.show_group !== false && media.groupMembers.length > 1;
-    const massQueueReady = Boolean(hass.services?.mass_queue?.get_queue_items);
+    const studioQueueReady = Boolean(hass.services?.ha_music_studio);
     const showQueue =
       config.show_queue !== false &&
       (queue.length > 0 ||
-        (maPlayer && (Boolean(state.attributes?.active_queue) || massQueueReady)));
+        (maPlayer && (Boolean(state.attributes?.active_queue) || studioQueueReady)));
     const showLibrary = config.show_library !== false && canBrowse;
     const visualizer = config.visualizer || "bars";
     const coverMode = config.cover || "ambient";
@@ -4252,260 +3995,6 @@ class HaMusicCard extends LitElement {
     return shape;
   }
 
-  _ensureSpectrumPlaylist() {
-    const url = this._spectrumPlaylistUrl;
-    if (!url || this._spectrumPlaylistLoading) return;
-    const now = Date.now();
-    if (
-      this._spectrumPlaylist &&
-      now - this._spectrumPlaylistAt < 10 * 60 * 1000
-    ) {
-      return;
-    }
-    if (
-      !this._spectrumPlaylist &&
-      this._spectrumPlaylistErrorAt &&
-      now - this._spectrumPlaylistErrorAt < 60 * 1000
-    ) {
-      return;
-    }
-
-    this._spectrumPlaylistLoading = true;
-    const controller =
-      typeof AbortController !== "undefined" ? new AbortController() : null;
-    this._spectrumPlaylistAbort = controller;
-    fetch(url, { cache: "no-store", signal: controller?.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error(String(response.status));
-        return response.json();
-      })
-      .then((data) => {
-        const tracks = normalizeSpectrumPlaylist(data);
-        if (!tracks.length) throw new Error("empty playlist");
-        this._spectrumPlaylist = tracks;
-        this._spectrumPlaylistAt = Date.now();
-        this._spectrumPlaylistErrorAt = 0;
-        this._spectrumResolvedUrl = "";
-        this._spectrumTrack = null;
-        this._syncSpectrumTrack(this._readMedia());
-        this._syncSpectrum();
-      })
-      .catch((error) => {
-        if (error?.name === "AbortError") return;
-        this._spectrumPlaylistErrorAt = Date.now();
-      })
-      .finally(() => {
-        if (this._spectrumPlaylistAbort === controller) {
-          this._spectrumPlaylistAbort = null;
-        }
-        this._spectrumPlaylistLoading = false;
-      });
-  }
-
-  _syncSpectrumTrack(media = this._readMedia()) {
-    let url = this._spectrumAudioUrl;
-    let track = null;
-    if (this._spectrumPlaylistUrl) {
-      this._ensureSpectrumPlaylist();
-      if (this._spectrumPlaylist) {
-        track = findSpectrumTrack(this._spectrumPlaylist, media);
-        if (track?.url) url = track.url;
-      }
-    }
-    if (url === this._spectrumResolvedUrl && track === this._spectrumTrack) {
-      return url;
-    }
-    this._spectrumResolvedUrl = url || "";
-    this._spectrumTrack = track;
-    this._audioFailedUrl = "";
-    const wasArmed = this._audioGestureArmed;
-    this._resetAudioShape();
-    this._teardownAudioSpectrum();
-    if (wasArmed && this._spectrumResolvedUrl) {
-      this._audioGestureArmed = true;
-      this._ensureAudioSpectrum();
-      this._startAudioElement();
-    }
-    return this._spectrumResolvedUrl;
-  }
-
-  _primeAudioSpectrum() {
-    if ((this._config?.visualizer || "bars") !== "bars") return;
-    // 先记住这次用户手势：歌单可能还没拉完，等匹配到源后自动接着启动分析音频。
-    this._audioGestureArmed = true;
-    this._audioFailedUrl = "";
-    this._audioZeroFrames = 0;
-    if (!this._spectrumResolvedUrl) {
-      this._syncSpectrumTrack(this._readMedia());
-    }
-    if (!this._spectrumResolvedUrl) return;
-    this._ensureAudioSpectrum();
-    this._resumeAudioContext();
-    this._startAudioElement();
-  }
-
-  _ensureAudioSpectrum() {
-    // 卡片选择器预览里不接 Web Audio：iOS 对同时存在的 AudioContext 数量有硬限，
-    // 预览反复实例化会有崩溃/无声道风险。
-    if (this._isPreviewContext()) return null;
-    const url = this._spectrumResolvedUrl;
-    if (!url || this._audioFailedUrl === url) {
-      return null;
-    }
-    if (this._audioEl && this._audioAnalyser && this._audioBins) {
-      return this._audioAnalyser;
-    }
-    if (this._audioEl) this._teardownAudioSpectrum();
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) {
-        this._failAudioSpectrum();
-        return null;
-      }
-      // 不是同源、也不在已知 CORS 白名单里的源不接 Web Audio：
-      // 接进去浏览器会把音频输出置零，表现为“进度在走、完全没声”。
-      if (
-        !canTapSpectrumAudio(
-          url,
-          typeof location !== "undefined" ? location.href : ""
-        )
-      ) {
-        this._audioFailedUrl = url;
-        return null;
-      }
-      const audio = new Audio();
-      audio.crossOrigin = "anonymous";
-      audio.preload = "auto";
-      audio.setAttribute("playsinline", "");
-      audio.addEventListener("error", () => this._failAudioSpectrum());
-      audio.src = url;
-      audio.load();
-      const ctx = new Ctx();
-      const source = ctx.createMediaElementSource(audio);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.55;
-      analyser.minDecibels = -84;
-      analyser.maxDecibels = -30;
-      source.connect(analyser);
-      // 分析节点后接 0 增益再落到 destination：保持媒体时钟推进，但完全静音，
-      // 不会和远程播放器重复出声。
-      const mute = ctx.createGain();
-      mute.gain.value = 0;
-      analyser.connect(mute);
-      mute.connect(ctx.destination);
-      this._audioEl = audio;
-      this._audioCtx = ctx;
-      this._audioSource = source;
-      this._audioAnalyser = analyser;
-      this._audioMute = mute;
-      this._audioBins = new Uint8Array(analyser.frequencyBinCount);
-      this._resetAudioShape();
-      return analyser;
-    } catch {
-      this._failAudioSpectrum();
-      return null;
-    }
-  }
-
-  _resumeAudioContext() {
-    if (this._audioCtx?.state === "suspended") {
-      this._audioCtx.resume().catch(() => {});
-    }
-  }
-
-  _startAudioElement() {
-    const audio = this._audioEl;
-    if (!audio || !this._audioGestureArmed) return;
-    this._resumeAudioContext();
-    const attempt = audio.play();
-    if (attempt?.catch) attempt.catch(() => {});
-    this._audioStartedAt = performance.now();
-  }
-
-  _pauseAudioSpectrum() {
-    this._audioEl?.pause();
-  }
-
-  _teardownAudioSpectrum() {
-    const audio = this._audioEl;
-    if (audio) {
-      try {
-        audio.pause();
-        audio.removeAttribute("src");
-        audio.load();
-      } catch {
-        /* noop */
-      }
-    }
-    try {
-      this._audioSource?.disconnect();
-      this._audioAnalyser?.disconnect();
-      this._audioMute?.disconnect();
-    } catch {
-      /* noop */
-    }
-    if (this._audioCtx) {
-      this._audioCtx.close().catch(() => {});
-    }
-    this._audioEl = null;
-    this._audioCtx = null;
-    this._audioSource = null;
-    this._audioAnalyser = null;
-    this._audioMute = null;
-    this._audioBins = null;
-    this._audioZeroFrames = 0;
-    this._audioPeak = 0;
-    this._audioStartedAt = 0;
-    this._audioGestureArmed = false;
-    this._resetAudioShape();
-  }
-
-  _failAudioSpectrum() {
-    if (!this._spectrumResolvedUrl) return;
-    this._audioFailedUrl = this._spectrumResolvedUrl;
-    this._teardownAudioSpectrum();
-  }
-
-  _syncAudioPlayback(playing, media) {
-    const audio = this._audioEl;
-    if (!audio) return;
-    if (!playing) {
-      audio.pause();
-      return;
-    }
-    if (this._audioGestureArmed && audio.paused) this._startAudioElement();
-    const audioDuration = audio.duration;
-    const remoteDuration = Number(media.duration);
-    const comparable =
-      Number.isFinite(audioDuration) &&
-      audioDuration > 0 &&
-      Number.isFinite(remoteDuration) &&
-      remoteDuration > 0 &&
-      Math.abs(audioDuration - remoteDuration) < 5;
-    const canSeekByPosition =
-      !comparable &&
-      !remoteDuration &&
-      Number.isFinite(audioDuration) &&
-      audioDuration > 0 &&
-      Number.isFinite(media.position) &&
-      media.position > 0 &&
-      media.position < audioDuration - 1;
-    if (
-      (comparable || canSeekByPosition) &&
-      audio.readyState >= 1 &&
-      Number.isFinite(audio.currentTime) &&
-      Number.isFinite(media.position) &&
-      Math.abs(audio.currentTime - media.position) > 2.5
-    ) {
-      try {
-        audio.currentTime = media.position;
-      } catch {
-        /* 直播流可能不可 seek */
-      }
-    }
-  }
-
   _studioAvailable() {
     return Boolean(this._hass?.services?.ha_music_studio);
   }
@@ -4615,82 +4104,6 @@ class HaMusicCard extends LitElement {
       .finally(() => {
         if (this._studioKey === key) this._studioPending = false;
       });
-  }
-
-  _audioSpectrumReady() {
-    return Boolean(
-      this._audioEl &&
-        !this._audioEl.paused &&
-        this._audioEl.readyState >= 2 &&
-        this._audioAnalyser &&
-        this._audioBins &&
-        this._audioCtx?.state === "running" &&
-        this._audioFailedUrl !== this._spectrumResolvedUrl
-    );
-  }
-
-  _readAudioLevels(count) {
-    const analyser = this._audioAnalyser;
-    const bins = this._audioBins;
-    const ctx = this._audioCtx;
-    if (!analyser || !bins || !ctx) return null;
-    analyser.getByteFrequencyData(bins);
-    const nyquist = ctx.sampleRate / 2;
-    const lowHz = 100;
-    const highHz = Math.min(6500, nyquist);
-    const binHz = ctx.sampleRate / analyser.fftSize;
-    const lo = Math.max(1, Math.floor(lowHz / binHz));
-    const hi = Math.min(bins.length - 1, Math.max(lo + 1, Math.ceil(highHz / binHz)));
-    const ratio = hi / lo;
-    const levels = new Array(count);
-    let peak = 0;
-    for (let index = 0; index < count; index += 1) {
-      // 100–6500Hz 对数分频；越靠右的高频越弱，按站点方式做等响度补偿。
-      const t0 = count > 1 ? index / (count - 1) : 0;
-      const t1 = count > 1 ? (index + 1) / (count - 1) : 1;
-      const b0 = clamp(Math.floor(lo * Math.pow(ratio, Math.pow(t0, 0.6))), lo, hi);
-      const b1 = clamp(
-        Math.max(b0 + 1, Math.ceil(lo * Math.pow(ratio, Math.pow(t1, 0.6)))),
-        b0,
-        hi
-      );
-      let sum = 0;
-      let n = 0;
-      let max = 0;
-      for (let bin = b0; bin <= b1; bin += 1) {
-        const value = bins[bin] || 0;
-        if (value > max) max = value;
-        sum += value;
-        n += 1;
-      }
-      const avg = n ? sum / n : 0;
-      const weight =
-        0.7 + 3.5 * Math.pow(count > 1 ? index / (count - 1) : 0, 1.15);
-      levels[index] = clamp((avg / 255) * weight, 0, 1.6);
-      if (max > peak) peak = max;
-    }
-    // 高中低三段能量独立归一化：低频管左侧/环顶部，中频管中部，高频管右侧/环底部。
-    const nyq = ctx.sampleRate / 2;
-    const ranges = [
-      [40, 250],
-      [250, 1600],
-      [1600, Math.min(8000, nyq)],
-    ];
-    const weights = [1.05, 1.28, 1.6];
-    const bands = ranges.map(([startHz, endHz], bandIndex) => {
-      const start = clamp(Math.floor(startHz / binHz), 0, bins.length - 1);
-      const end = clamp(Math.ceil(endHz / binHz), start, bins.length - 1);
-      let sum = 0;
-      let n = 0;
-      for (let bin = start; bin <= end; bin += 1) {
-        sum += bins[bin] || 0;
-        n += 1;
-      }
-      const avg = n ? sum / n / 255 : 0;
-      return clamp(avg * weights[bandIndex] * 1.75, 0, 1);
-    });
-    this._audioPeak = peak;
-    return { levels, bands };
   }
 
   _shapeAudioBars(raw) {
@@ -4867,7 +4280,6 @@ class HaMusicCard extends LitElement {
       this._spectrumCtx = null;
       this._spectrumCount = 0;
       this._stopSpectrum();
-      this._teardownAudioSpectrum();
       return;
     }
     if (!this._syncSpectrumCanvas()) return;
@@ -4877,14 +4289,10 @@ class HaMusicCard extends LitElement {
       matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!this._spectrumPlaying() || reduceMotion) {
       this._stopSpectrum();
-      this._syncAudioPlayback(false, this._readMedia());
       this._applySpectrumIdle();
       return;
     }
-    const media = this._readMedia();
-    this._syncSpectrumTrack(media);
-    this._ensureAudioSpectrum();
-    this._syncAudioPlayback(true, media);
+    this._ensureStudioSpectrum();
     if (this._spectrumRaf) return;
     this._spectrumLast = 0;
     this._spectrumRaf = requestAnimationFrame((now) => this._spectrumTick(now));
@@ -4937,7 +4345,6 @@ class HaMusicCard extends LitElement {
     }
     if (!this._spectrumPlaying()) {
       this._applySpectrumIdle();
-      this._syncAudioPlayback(false, this._readMedia());
       this._stopSpectrum();
       return;
     }
@@ -4964,27 +4371,17 @@ class HaMusicCard extends LitElement {
     if (key !== this._spectrumKey) {
       this._spectrumKey = key;
       this._spectrumLevels = new Array(this._spectrumCount).fill(0.12);
-      this._syncSpectrumTrack(media);
     }
     this._ensureStudioSpectrum();
     const time = now / 1000;
     const levels = this._spectrumLevels;
     const count = this._spectrumCount;
-    const audioReady = this._audioSpectrumReady();
-    const audioRead = audioReady ? this._readAudioLevels(count) : null;
-    const audioRaw = audioRead?.levels || null;
-    const shaped = audioRaw ? this._shapeAudioBars(audioRaw) : null;
-    const audioTargets = shaped?.bars || null;
+    // 频谱只由 ha_music_studio 集成提供：没有任何本地 Web Audio 分析。
     const studioReady = this._studioSpectrumReady();
     const studioRaw = studioReady ? this._resampleStudioBands(count) : null;
     const studioShaped = studioRaw ? this._shapeAudioBars(studioRaw) : null;
     const studioTargets = studioShaped?.bars || null;
-    // 后端只由 ha_music_studio 集成负责：卡片不再调用 ha_music_analysis，
-    // 也不在本地从 RMS 波形猜测频段。没有 Studio 时退回纯前端程序化律动。
-    const liveBands =
-      audioRead?.bands ||
-      (studioReady ? this._studioBandTriplet() : null) ||
-      null;
+    const liveBands = studioReady ? this._studioBandTriplet() : null;
     if (liveBands) {
       this._bandLevels.live = true;
       for (let band = 0; band < this._bandLevels.length; band += 1) {
@@ -4999,24 +4396,10 @@ class HaMusicCard extends LitElement {
         this._bandLevels[band] = Math.max(0.06, this._bandLevels[band] * 0.9);
       }
     }
-    if (audioReady) {
-      if (
-        !this._audioPeak &&
-        now - this._audioStartedAt > 1500
-      ) {
-        this._audioZeroFrames += 1;
-        if (this._audioZeroFrames > 90) {
-          this._failAudioSpectrum();
-        }
-      } else if (this._audioPeak) {
-        this._audioZeroFrames = 0;
-      }
-    }
     for (let index = 0; index < count; index += 1) {
       let target;
-      if (audioTargets || studioTargets) {
-        const source = { bars: audioTargets || studioTargets, bands: null };
-        target = source.bars[index];
+      if (studioTargets) {
+        target = studioTargets[index];
         const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
         const drive = this._bandLevels[zone] || 0;
         // 左/中/右三块用低频/中频/高频能量做增益，保留逐柱细节，避免整段被推到天花板。
@@ -5058,10 +4441,8 @@ class HaMusicCard extends LitElement {
       );
       if (this._isMobileUi()) target = clamp(target * 1.3 + 0.02, 0.08, 0.94);
       const current = Number.isFinite(levels[index]) ? levels[index] : 0.12;
-      // 真实频谱响应更快（约 15fps 更新），攻击段要比程序化律动更硬，
-      // 回落用稍慢的释放，避免柱子在两帧之间掉成一条虚线。
-      const realTargets = audioTargets || studioTargets;
-      const attack = target > current ? (realTargets ? 0.72 : 0.52) : realTargets ? 0.22 : 0.24;
+      // 真实频谱响应更快，攻击段比程序化律动更硬，回落用稍慢的释放。
+      const attack = target > current ? (studioTargets ? 0.72 : 0.52) : studioTargets ? 0.22 : 0.24;
       const next = current + (target - current) * (1 - Math.exp(-attack * dt * 60));
       levels[index] = next;
     }

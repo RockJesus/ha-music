@@ -317,7 +317,11 @@ function queueImage(media = {}, item = {}) {
     if (value && typeof value === "object") return value.url || value.path || "";
     return "";
   };
-  const direct = pick(media.image) || pick(item.media_image) || pick(item.entity_picture);
+  const direct =
+    pick(media.image) ||
+    pick(item.media_image) ||
+    pick(item.art) ||
+    pick(item.entity_picture);
   if (direct) return direct;
   const images = media.metadata?.images;
   if (Array.isArray(images)) {
@@ -331,7 +335,8 @@ export function readMassQueueItems(items, currentQueueItemId = "", currentConten
   if (!Array.isArray(items)) return [];
   return items.map((item, index) => {
     const media = item?.media_item || {};
-    const contentId = media.uri || item?.media_content_id || "";
+    const contentId =
+      media.uri || item?.media_content_id || item?.contentId || item?.uri || "";
     const queueItemId = item?.queue_item_id || item?.queueItemId || "";
     const active =
       Boolean(item?.active || item?.is_active || item?.current || item?.playing) ||
@@ -355,7 +360,8 @@ export function readMassQueueItems(items, currentQueueItemId = "", currentConten
         item?.local_image_encoded ||
         queueImage(media, item),
       contentId,
-      contentType: media.media_type || item?.media_content_type || "music",
+      contentType:
+        media.media_type || item?.media_content_type || item?.contentType || "music",
       queueItemId,
       active,
     };

@@ -4,9 +4,23 @@ import test from "node:test";
 
 const bundle = readFileSync(new URL("../../ha-music.js", import.meta.url), "utf8");
 
-test("bundle subscribes to both backend commands", () => {
+test("bundle subscribes to all backend streams", () => {
   assert.ok(bundle.includes("ha_music_studio/subscribe_lyrics"));
+  assert.ok(bundle.includes("ha_music_studio/subscribe_queue"));
+  assert.ok(bundle.includes("ha_music_studio/queue_command"));
   assert.ok(bundle.includes("ha_music_studio/subscribe"));
+});
+
+test("bundle has no deprecated queue or local audio paths", () => {
+  for (const token of [
+    "mass_queue",
+    "ingress_session",
+    "player_queues/get",
+    "AudioContext",
+    "spectrum_audio_url",
+  ]) {
+    assert.equal(bundle.includes(token), false, token);
+  }
 });
 
 test("bundle carries the protocol version", () => {

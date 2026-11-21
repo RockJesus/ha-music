@@ -43,7 +43,7 @@ function paint(canvas, bars, glow) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, size, size);
   const R = size / 2;
-  const maxLen = Math.max(4, R - r0 - 3);
+  const maxLen = Math.max(4, R - r0 - 8);
   const accent = state.accent || FALLBACK_ACCENT;
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
@@ -152,7 +152,8 @@ function frame(canvas, now) {
     const transient = 0.18 * kick * Math.pow(1 - d, 2.2);
     let base;
     if (state.bands?.length && state.bands.live) {
-      // 环顶部低频、两侧中频、底部高频；同一频段共用能量包络，柱体保留细碎纹理。
+      // 整圈按上下左右镜像分配：低频集中在中线，越高频越靠左右两侧；
+      // 下半圈与上半圈使用同一组长度，避免高频段能量低导致下半圈音柱变短。
       const bandIndex = d < 0.28 ? 0 : d < 0.55 ? 1 : 2;
       const drive = clamp(state.bands[bandIndex] || 0, 0, 1);
       base =
@@ -167,6 +168,9 @@ function frame(canvas, now) {
     const value = clamp(base + transient + 0.04 * state.energy, 0, 1);
     bars[h] = value;
     bars[barCount - 1 - h] = value;
+    // 上下镜像：下半圈与上半圈完全同形，不再把低频/高频拆分到上下两端。
+    bars[half + h] = value;
+    bars[half - 1 - h] = value;
   }
 
   for (let i = 0; i < barCount; i += 1) {

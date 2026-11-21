@@ -2966,6 +2966,21 @@ export const cardStyles = css`
     gap: 10px;
   }
 
+  .hm-lyrics-empty-title {
+    color: rgba(246, 248, 255, 0.78);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .hm-lyrics-empty-hint {
+    max-width: 260px;
+    color: rgba(246, 248, 255, 0.46);
+    font-size: 11px;
+    line-height: 1.55;
+    text-align: center;
+  }
+
   .hm-lyrics-retry {
     height: 28px;
     padding: 0 12px;

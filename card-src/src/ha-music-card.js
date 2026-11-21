@@ -3996,8 +3996,19 @@ class HaMusicCard extends LitElement {
       // 歌词匹配期间不显示「正在匹配歌词」占位框，避免侧边歌词/完整面板出现空框。
       body = nothing;
     } else if (lyrics.status === "none" || lyrics.status === "error") {
-      // 全部歌词源都失败时，整块歌词区直接不出现，不留占位文案、不铺任何行。
-      return nothing;
+      const isNone = lyrics.status === "none";
+      body = html`<div class="hm-lyrics-empty hm-lyrics-error">
+        <span class="hm-lyrics-empty-title">${isNone ? t("lyricsNone") : t("lyricsError")}</span>
+        <span class="hm-lyrics-empty-hint">${isNone ? t("lyricsNoneHint") : t("lyricsErrorHint")}</span>
+        <button
+          type="button"
+          class="hm-lyrics-retry"
+          @click=${(event) => {
+            event.stopPropagation();
+            this._retryLyrics();
+          }}
+        >${t("lyricsRetry")}</button>
+      </div>`;
     } else if (lyrics.instrumental) {
       body = html`<div class="hm-lyrics-empty">${t("lyricsInstrumental")}</div>`;
     } else if (timed) {
@@ -4184,6 +4195,7 @@ class HaMusicCard extends LitElement {
       layout !== "mini" &&
       (this._lyrics.status === "ready" ||
         this._lyrics.status === "loading" ||
+        this._lyrics.status === "none" ||
         this._lyrics.status === "error" ||
         this._lyricsOpen);
     const sideLyrics =

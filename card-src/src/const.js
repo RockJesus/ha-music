@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.18.0";
+export const CARD_VERSION = "2.18.1";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -164,7 +164,9 @@ const EN = {
   lyrics: "Lyrics",
   lyricsLoading: "Matching lyrics…",
   lyricsNone: "No lyrics found",
+  lyricsNoneHint: "Not found in Music Assistant or LRCLIB. Add a same-name .lrc beside the track, or retry.",
   lyricsError: "Lyrics unavailable",
+  lyricsErrorHint: "The lyrics source is temporarily unavailable. Retry in a moment.",
   lyricsRetry: "Retry",
   lyricsOffset: "Lyric timing offset",
   lyricsInstrumental: "Instrumental · no lyrics",
@@ -259,7 +261,9 @@ const ZH = {
   lyrics: "歌词",
   lyricsLoading: "正在匹配歌词…",
   lyricsNone: "未找到歌词",
+  lyricsNoneHint: "Music Assistant 与 LRCLIB 均未收录；可在歌曲目录放置同名 .lrc 后重试。",
   lyricsError: "歌词暂不可用",
+  lyricsErrorHint: "歌词来源暂时不可用，可稍后重试。",
   lyricsRetry: "重试",
   lyricsOffset: "歌词时间偏移",
   lyricsInstrumental: "纯音乐 · 无歌词",

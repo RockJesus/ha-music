@@ -4444,9 +4444,9 @@ class HaMusicCard extends LitElement {
           <header class="hm-top">
             <div class="hm-status">
               <span class="hm-dot"></span>
-              <span class="hm-status-text">${statusText}</span>
-              <span class="hm-kicker-sep">·</span>
               <span class="hm-status-text hm-status-player">${config.name || friendlyName(hass, entityId, entityId)}</span>
+              <span class="hm-kicker-sep">·</span>
+              <span class="hm-status-text">${statusText}</span>
             </div>
             <div class="hm-top-actions">
               ${showLyrics

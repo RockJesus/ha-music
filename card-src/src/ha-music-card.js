@@ -196,6 +196,7 @@ class HaMusicCard extends LitElement {
     this._playersOpen = false;
     this._maPlayers = [];
     this._playersBusy = false;
+    this._cardBusy = false;
     this._webPlayer = null;
     this._webTicket = "";
     this._webTicketUrl = "/api/ha_music_studio/sendspin";
@@ -2075,10 +2076,12 @@ class HaMusicCard extends LitElement {
     const leaderId = this._currentMaPlayer()?.player_id || "";
     return [...this._maPlayers]
       .filter((player) => {
-        // 隐藏历史测试或已关闭浏览器留下的离线 Web 播放器，避免设备列表重名。
+        // Web 播放器由抽屉顶部的本机播放器行单独承载，避免同一台浏览器出现两行。
         const isWeb = String(player?.name || "").startsWith("Web (");
-        const isCurrentWeb = player?.player_id && player.player_id === this._webPlayerId;
-        return !isWeb || player.available || isCurrentWeb;
+        const isCurrentWeb =
+          (player?.player_id && player.player_id === this._webPlayerId) ||
+          (isWeb && player?.name === this._webName);
+        return !isWeb || (player.available && !isCurrentWeb);
       })
       .sort((a, b) => {
       const la = a.player_id === leaderId ? 1 : 0;
@@ -2136,6 +2139,116 @@ class HaMusicCard extends LitElement {
     }
     this._switchEntity(entityId, true);
     this._closePlayers();
+  }
+
+  _cardsInView(config) {
+    const views = Array.isArray(config?.views) ? config.views : [];
+    const parts = String(window.location.pathname || "")
+      .split("/")
+      .filter(Boolean);
+    const viewPath = parts[parts.length - 1] || "";
+    let viewIndex = views.findIndex(
+      (view) => view && (view.url_path === viewPath || view.path === viewPath)
+    );
+    if (viewIndex < 0 && /^\d+$/.test(viewPath)) {
+      const numeric = Number(viewPath);
+      if (numeric >= 0 && numeric < views.length) viewIndex = numeric;
+    }
+    if (viewIndex < 0) throw new Error(translator(this._hass?.language)("cardConfigMissing"));
+    return { config, viewIndex };
+  }
+
+  _dashboardUrlPath() {
+    const parts = String(window.location.pathname || "")
+      .split("/")
+      .filter(Boolean);
+    const section = parts[0] || "";
+    return section === "lovelace" ? null : section || null;
+  }
+
+  async _saveCardEntities(next) {
+    const language = this._hass?.language;
+    const t = translator(language);
+    const urlPath = this._dashboardUrlPath();
+    const response = await this._hass.callWS({
+      type: "lovelace/config",
+      url_path: urlPath,
+    });
+    const locationInfo = this._cardsInView(response);
+    const view = locationInfo.config.views[locationInfo.viewIndex];
+    const cards = Array.isArray(view?.cards) ? view.cards : [];
+    const current = this._entities();
+    const signature = (card) => {
+      const list =
+        Array.isArray(card?.entities) && card.entities.length
+          ? card.entities.filter(Boolean)
+          : card?.entity
+            ? [card.entity]
+            : [];
+      return list.join("|");
+    };
+    let cardIndex = cards.findIndex(
+      (card) => card?.type === "custom:ha-music" && signature(card) === current.join("|")
+    );
+    if (cardIndex < 0) {
+      const candidates = cards
+        .map((card, index) => ({ card, index }))
+        .filter((entry) => entry.card?.type === "custom:ha-music");
+      if (candidates.length === 1) cardIndex = candidates[0].index;
+    }
+    if (cardIndex < 0) throw new Error(t("cardConfigMissing"));
+    const previous = { ...view.cards[cardIndex] };
+    const replacement = { ...previous };
+    if (next.length > 1) {
+      replacement.entities = next;
+      delete replacement.entity;
+    } else {
+      replacement.entity = next[0];
+      delete replacement.entities;
+    }
+    view.cards[cardIndex] = replacement;
+    await this._hass.callWS({
+      type: "lovelace/config/save",
+      url_path: urlPath,
+      config: locationInfo.config,
+    });
+    this._config = replacement;
+    if (!next.includes(this._activeEntity)) this._activeEntity = next[0];
+    this.requestUpdate();
+  }
+
+  async _toggleCardEntity(player) {
+    if (this._cardBusy) return;
+    const language = this._hass?.language;
+    const t = translator(language);
+    const entityId = this._entityForMaPlayer(player);
+    if (!entityId) {
+      this._notify(t("deviceUnavailable"));
+      return;
+    }
+    const entities = this._entities();
+    const inCard = entities.includes(entityId);
+    if (inCard && entities.length <= 1) {
+      this._notify(t("cardNeedsPlayer"));
+      return;
+    }
+    if (!inCard && !player.available) {
+      this._notify(t("deviceUnavailable"));
+      return;
+    }
+    const next = inCard
+      ? entities.filter((id) => id !== entityId)
+      : [...entities, entityId];
+    this._cardBusy = true;
+    this.requestUpdate();
+    try {
+      await this._saveCardEntities(next);
+    } catch (error) {
+      this._notify(error?.message || String(error));
+    } finally {
+      this._cardBusy = false;
+      this.requestUpdate();
+    }
   }
 
   async _toggleMaGroup(player) {
@@ -4878,15 +4991,34 @@ class HaMusicCard extends LitElement {
                         <div class="hm-player-actions">
                           ${isLeader
                             ? html`<span class="hm-player-badge">${t("groupLeader")}</span>`
-                            : html`<button
-                                class="hm-player-btn"
-                                data-disabled=${!entityId || !player.available ? "true" : "false"}
-                                title=${!entityId ? t("deviceUnavailable") : ""}
-                                ?disabled=${!entityId || !player.available}
-                                @click=${() => this._selectMaPlayer(player)}
-                              >
-                                ${t("selectDevice")}
-                              </button>`}
+                            : nothing}
+                          ${(() => {
+                            const entities = this._entities();
+                            const inCard = Boolean(entityId) && entities.includes(entityId);
+                            const lastOne = inCard && entities.length <= 1;
+                            const cardDisabled =
+                              this._cardBusy ||
+                              !entityId ||
+                              (inCard ? lastOne : !player.available);
+                            const cardTitle = !entityId
+                              ? t("deviceUnavailable")
+                              : lastOne
+                                ? t("cardNeedsPlayer")
+                                : !inCard && !player.available
+                                  ? t("deviceUnavailable")
+                                  : "";
+                            return html`<button
+                              class="hm-player-btn"
+                              data-role="card"
+                              data-on=${inCard ? "true" : "false"}
+                              data-disabled=${cardDisabled ? "true" : "false"}
+                              title=${cardTitle}
+                              ?disabled=${cardDisabled}
+                              @click=${() => this._toggleCardEntity(player)}
+                            >
+                              ${inCard ? t("removeFromCard") : t("addToCard")}
+                            </button>`;
+                          })()}
                           ${!isLeader && entityId && (member || player.can_group_with?.length !== 0)
                             ? html`<button
                                 class="hm-player-btn"

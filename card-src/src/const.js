@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.19.6";
+export const CARD_VERSION = "2.19.7";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -177,6 +177,10 @@ const EN = {
   crossfade: "Crossfade",
   devices: "Devices & grouping",
   selectDevice: "Switch",
+  addToCard: "Add to card",
+  removeFromCard: "Remove from card",
+  cardNeedsPlayer: "The card must keep at least one player",
+  cardConfigMissing: "Could not find this card in the dashboard configuration",
   joinGroup: "Join group",
   leaveGroup: "Leave group",
   groupLeader: "Leader",
@@ -274,6 +278,10 @@ const ZH = {
   crossfade: "淡入淡出",
   devices: "设备与分组",
   selectDevice: "切换",
+  addToCard: "加入卡片",
+  removeFromCard: "移出卡片",
+  cardNeedsPlayer: "卡片至少保留一个播放器",
+  cardConfigMissing: "未在仪表盘配置中找到这张卡片",
   joinGroup: "加入分组",
   leaveGroup: "移出分组",
   groupLeader: "主设备",

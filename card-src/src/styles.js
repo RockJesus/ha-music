@@ -1081,6 +1081,12 @@ export const cardStyles = css`
     color: #fff;
   }
 
+  .hm-player-btn[data-role="card"][data-on="true"] {
+    border-color: rgba(var(--hm-a2-rgb, var(--hm-a1-rgb)), 0.5);
+    background: rgba(var(--hm-a2-rgb, var(--hm-a1-rgb)), 0.16);
+    color: rgba(255, 255, 255, 0.92);
+  }
+
   .hm-player-badge {
     font-size: 10px;
     padding: 3px 7px;

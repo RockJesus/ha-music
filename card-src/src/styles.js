@@ -1974,57 +1974,46 @@ export const cardStyles = css`
   }
 
   .hm-entities-wrap {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: -16px;
     min-width: 0;
   }
 
-  /* 只有播放器多到装不下时才让出两侧空间并显示左右箭头。 */
+  /* 只有播放器多到装不下时才显示左右箭头，并让两侧留出按钮宽度。 */
   .hm-entities-wrap[data-overflow="true"] .hm-entities {
-    padding-left: 32px;
-    padding-right: 32px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .hm-entities-wrap[data-overflow="false"] .hm-entities-nav {
+    display: none;
   }
 
   .hm-entities-nav {
-    position: absolute;
-    top: 50%;
-    z-index: 4;
-    width: 24px;
-    height: 24px;
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 7px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     background: rgba(10, 14, 22, 0.72);
     color: rgba(246, 248, 255, 0.86);
     cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-50%);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     transition:
-      opacity 0.18s ease,
       color 0.18s ease,
       border-color 0.18s ease,
-      background 0.18s ease;
+      background 0.18s ease,
+      opacity 0.18s ease;
   }
 
-  .hm-entities-nav[data-dir="prev"] {
-    left: -12px;
-  }
-
-  .hm-entities-nav[data-dir="next"] {
-    right: -12px;
-  }
-
-  .hm-entities-wrap[data-overflow="true"] .hm-entities-nav {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .hm-entities-wrap[data-overflow="true"] .hm-entities-nav:hover:not(:disabled) {
+  .hm-entities-nav:hover:not(:disabled) {
     color: #fff;
     border-color: rgba(var(--hm-a1-rgb), 0.7);
     background: rgba(var(--hm-a1-rgb), 0.24);
@@ -2035,6 +2024,22 @@ export const cardStyles = css`
     cursor: default;
   }
 
+  .hm-entities {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* 给选中胶囊的主题外发光留出绘制空间，避免被滚动容器裁掉。 */
+    padding: 16px;
+    scrollbar-width: none;
+  }
+
+  .hm-entities::-webkit-scrollbar {
+    display: none;
+  }
   .hm-entities.hm-dragging {
     scroll-behavior: auto;
   }
@@ -2052,21 +2057,6 @@ export const cardStyles = css`
     cursor: grabbing;
   }
 
-  .hm-entities {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    /* 给选中胶囊的主题外发光留出绘制空间，避免被滚动容器裁掉。 */
-    padding: 16px;
-    margin: -16px;
-    scrollbar-width: none;
-  }
-
-  .hm-entities::-webkit-scrollbar {
-    display: none;
-  }
 
   .hm-entity-chip {
     display: inline-flex;

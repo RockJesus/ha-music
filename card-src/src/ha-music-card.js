@@ -205,6 +205,8 @@ class HaMusicCard extends LitElement {
     this._chipPressTimer = null;
     this._chipDrag = null;
     this._chipDragEndAt = 0;
+    this._chipOrderStyles = null;
+    this._chipOrderCommitPending = false;
     this._webPlayer = null;
     this._webTicket = "";
     this._webTicketUrl = "/api/ha_music_studio/sendspin";
@@ -490,6 +492,8 @@ class HaMusicCard extends LitElement {
     window.removeEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
     this._cancelChipPress();
     this._chipDrag = null;
+    this._chipOrderStyles = null;
+    this._chipOrderCommitPending = false;
     if (this._webEntityTimer) clearTimeout(this._webEntityTimer);
     this._webEntityTimer = null;
     if (this._localWebSyncTimer) clearTimeout(this._localWebSyncTimer);
@@ -2719,7 +2723,7 @@ class HaMusicCard extends LitElement {
       }),
       event.clientX
     );
-    if (target !== drag.index) this._reorderChipDrag(drag, others, target);
+    if (target !== drag.index) this._reorderChipDrag(drag, target);
   }
 
   _applyChipDragTransform() {
@@ -2735,15 +2739,23 @@ class HaMusicCard extends LitElement {
     chip.style.transform = `translateX(${next}px)`;
   }
 
-  _reorderChipDrag(drag, others, target) {
+  _reorderChipDrag(drag, target) {
     const strip = drag.chip.parentElement;
     if (!strip) return;
     const chips = Array.from(strip.querySelectorAll(".hm-entity-chip"));
     const before = new Map(
       chips.map((el) => [el, el.getBoundingClientRect().left])
     );
-    strip.insertBefore(drag.chip, others[target] || null);
+    // 不改 DOM 顺序，只用 flex order 做实时预览：Lit 仍按配置顺序持有节点，
+    // 松手写回配置后再由 Lit 自己重排，避免手动 insertBefore 打乱它的节点账本。
+    const rest = drag.order.filter((id) => id !== drag.entityId);
+    const preview = [...rest.slice(0, target), drag.entityId, ...rest.slice(target)];
     drag.index = target;
+    drag.preview = preview;
+    for (const el of chips) {
+      const index = preview.indexOf(el.dataset.entityId);
+      if (index >= 0) el.style.order = String(index);
+    }
     // FLIP：其余胶囊先回到旧位置，再在 0.18s 内滑回新槽位，形成磁吸感。
     const moved = chips.filter((el) => el !== drag.chip);
     for (const el of moved) {
@@ -2803,13 +2815,21 @@ class HaMusicCard extends LitElement {
       /* 已释放时忽略 */
     }
     this._vibrate(8);
-    const ordered = Array.from(
-      strip?.querySelectorAll?.(".hm-entity-chip") || []
-    )
-      .map((el) => el.dataset.entityId)
-      .filter(Boolean);
-    if (!ordered.length || ordered.length !== drag.order.length) return;
-    if (ordered.every((id, index) => id === drag.order[index])) return;
+    const ordered =
+      drag.preview && drag.preview.length === drag.order.length
+        ? drag.preview
+        : drag.order;
+    if (!ordered.length) return;
+    if (ordered.every((id, index) => id === drag.order[index])) {
+      // 没换位置：把预览用的 order 样式恢复成自然顺序。
+      for (const el of Array.from(strip?.querySelectorAll?.(".hm-entity-chip") || [])) {
+        el.style.order = "";
+      }
+      return;
+    }
+    // 预览顺序先留着，等配置写回成功、Lit 按新顺序渲染后再清理样式。
+    this._chipOrderStyles = ordered;
+    this._chipOrderCommitPending = true;
     this._commitEntityOrder(ordered);
   }
 
@@ -2822,8 +2842,32 @@ class HaMusicCard extends LitElement {
       this._notify(error?.message || String(error));
     } finally {
       this._cardBusy = false;
+      this._chipOrderCommitPending = false;
       this.requestUpdate();
     }
+  }
+
+  _syncChipOrderStyles() {
+    const target = this._chipOrderStyles;
+    if (!target || this._chipDrag || this._chipOrderCommitPending) return;
+    const strip = this.renderRoot?.querySelector?.(".hm-entities");
+    const chips = Array.from(strip?.querySelectorAll?.(".hm-entity-chip") || []);
+    if (!chips.length) {
+      this._chipOrderStyles = null;
+      return;
+    }
+    const ids = this._entities();
+    const applied = ids.length === target.length && ids.every((id, index) => id === target[index]);
+    for (const el of chips) {
+      if (applied) {
+        el.style.order = "";
+        continue;
+      }
+      // 写回失败：回到配置里的原顺序，不让界面停在未保存的顺序上。
+      const index = ids.indexOf(el.dataset.entityId);
+      el.style.order = index >= 0 ? String(index) : "";
+    }
+    this._chipOrderStyles = null;
   }
 
   _scrollEntities(direction) {
@@ -3657,6 +3701,7 @@ class HaMusicCard extends LitElement {
     });
     this._safeEffect("range", () => this._syncRangeValues());
     this._safeEffect("entities-nav", () => this._syncEntitiesNav());
+    this._safeEffect("entities-order", () => this._syncChipOrderStyles());
     this._safeEffect("studio", () => this._syncStudioQueue());
     this._safeEffect("panel", () => {
       this._syncPanelFlag();

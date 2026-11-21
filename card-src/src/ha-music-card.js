@@ -1675,7 +1675,14 @@ class HaMusicCard extends LitElement {
     }
     if (player.player_id === current.player_id) return;
     const member = (current.group_members || []).includes(player.player_id);
+    const nextMembers = member
+      ? (current.group_members || []).filter((id) => id !== player.player_id)
+      : [...(current.group_members || []), player.player_id];
+    this._maPlayers = this._maPlayers.map((entry) =>
+      entry.player_id === current.player_id ? { ...entry, group_members: nextMembers } : entry
+    );
     this._playersBusy = true;
+    this.requestUpdate();
     try {
       await this._hass.connection.sendMessagePromise({
         type: "ha_music_studio/player_group",
@@ -1684,9 +1691,12 @@ class HaMusicCard extends LitElement {
         add: member ? [] : [player.player_id],
         remove: member ? [player.player_id] : [],
       });
+      // Music Assistant 的 group_members 会稍后才广播，延迟重读以校准本地乐观状态。
+      await new Promise((resolve) => setTimeout(resolve, 700));
       await this._loadPlayers();
     } catch (error) {
       this._notify(error?.message || String(error));
+      await this._loadPlayers();
     } finally {
       this._playersBusy = false;
       this.requestUpdate();

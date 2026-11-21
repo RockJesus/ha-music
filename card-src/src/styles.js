@@ -1973,6 +1973,85 @@ export const cardStyles = css`
     pointer-events: none;
   }
 
+  .hm-entities-wrap {
+    position: relative;
+    min-width: 0;
+  }
+
+  /* 只有播放器多到装不下时才让出两侧空间并显示左右箭头。 */
+  .hm-entities-wrap[data-overflow="true"] .hm-entities {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  .hm-entities-nav {
+    position: absolute;
+    top: 50%;
+    z-index: 4;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(10, 14, 22, 0.72);
+    color: rgba(246, 248, 255, 0.86);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition:
+      opacity 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease;
+  }
+
+  .hm-entities-nav[data-dir="prev"] {
+    left: -12px;
+  }
+
+  .hm-entities-nav[data-dir="next"] {
+    right: -12px;
+  }
+
+  .hm-entities-wrap[data-overflow="true"] .hm-entities-nav {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .hm-entities-wrap[data-overflow="true"] .hm-entities-nav:hover:not(:disabled) {
+    color: #fff;
+    border-color: rgba(var(--hm-a1-rgb), 0.7);
+    background: rgba(var(--hm-a1-rgb), 0.24);
+  }
+
+  .hm-entities-nav:disabled {
+    opacity: 0.28;
+    cursor: default;
+  }
+
+  .hm-entities.hm-dragging {
+    scroll-behavior: auto;
+  }
+
+  .hm-entity-chip[data-drag="true"] {
+    z-index: 5;
+    cursor: grabbing;
+    opacity: 1;
+    color: #fff;
+    border-color: rgba(var(--hm-a1-rgb), 0.9);
+    box-shadow: 0 12px 26px -10px rgba(0, 0, 0, 0.85);
+  }
+
+  .hm-entities.hm-dragging .hm-entity-chip {
+    cursor: grabbing;
+  }
+
   .hm-entities {
     display: flex;
     align-items: center;
@@ -2003,6 +2082,9 @@ export const cardStyles = css`
     font-family: inherit;
     font-size: 10.5px;
     cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     opacity: 0.62;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -2013,6 +2095,13 @@ export const cardStyles = css`
       box-shadow 0.18s ease,
       opacity 0.18s ease,
       transform 0.18s ease;
+  }
+
+  /* 粗指针设备上把横向手势留给长按拖动；桌面滚轮/滚动条不受影响。 */
+  @media (pointer: coarse) {
+    .hm-entity-chip {
+      touch-action: pan-y;
+    }
   }
 
   .hm-entity-chip:hover {
@@ -4310,6 +4399,10 @@ export const cardStyles = css`
   }
 
   .hm-card[data-shape="banner"] .hm-entities {
+    display: none;
+  }
+
+  .hm-card[data-shape="banner"] .hm-entities-wrap {
     display: none;
   }
 

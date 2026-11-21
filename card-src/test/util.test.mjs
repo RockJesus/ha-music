@@ -18,6 +18,7 @@ import {
   trackMatchScore,
   pickPlayingEntity,
   pickAutoFollowEntity,
+  dropIndexFromRects,
 } from "../src/util.js";
 import { mediaClassLabel } from "../src/const.js";
 
@@ -416,4 +417,22 @@ test("pickAutoFollowEntity 缓冲开始也可跟随", () => {
     ),
     "media_player.b"
   );
+});
+
+test("dropIndexFromRects 按中线判断插入位置", () => {
+  const rects = [
+    { left: 0, width: 100 },
+    { left: 106, width: 80 },
+    { left: 192, width: 120 },
+  ];
+  assert.equal(dropIndexFromRects(rects, 10), 0);
+  assert.equal(dropIndexFromRects(rects, 55), 1);
+  assert.equal(dropIndexFromRects(rects, 150), 2);
+  assert.equal(dropIndexFromRects(rects, 260), 3);
+});
+
+test("dropIndexFromRects 忽略无效矩形", () => {
+  const rects = [{ left: Number.NaN, width: 60 }, { left: 100, width: 60 }];
+  assert.equal(dropIndexFromRects(rects, 120), 1);
+  assert.equal(dropIndexFromRects([], 40), 0);
 });

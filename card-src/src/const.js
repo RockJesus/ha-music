@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.20.3";
+export const CARD_VERSION = "2.20.4";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -209,6 +209,8 @@ const EN = {
   fullscreen: "Fullscreen",
   exitFullscreen: "Exit fullscreen",
   fullscreenUnsupported: "Fullscreen is not supported here",
+  entitiesScrollPrev: "Scroll players left",
+  entitiesScrollNext: "Scroll players right",
 };
 
 const ZH = {
@@ -310,6 +312,8 @@ const ZH = {
   fullscreen: "全屏播放",
   exitFullscreen: "退出全屏",
   fullscreenUnsupported: "当前环境不支持全屏",
+  entitiesScrollPrev: "向左查看更多播放器",
+  entitiesScrollNext: "向右查看更多播放器",
 };
 
 export function isChinese(language) {

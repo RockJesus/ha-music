@@ -542,3 +542,16 @@ export function mixHsl(a, b, weightB = 0.5) {
     rgb: hslToRgb(h, clamp(s, 25, 92), clamp(l, 38, 72)).join(","),
   };
 }
+
+// 拖动排序时判断落点：越过某个胶囊的中线就插到它前面，最后返回末尾下标。
+export function dropIndexFromRects(rects = [], x = 0) {
+  for (let index = 0; index < rects.length; index += 1) {
+    const rect = rects[index];
+    if (!rect) continue;
+    const left = Number(rect.left);
+    const width = Number(rect.width);
+    if (!Number.isFinite(left) || !Number.isFinite(width)) continue;
+    if (Number(x) < left + width / 2) return index;
+  }
+  return rects.length;
+}

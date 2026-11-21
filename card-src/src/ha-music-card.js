@@ -35,6 +35,7 @@ import {
   findSpectrumTrack,
   pickPlayingEntity,
   pickAutoFollowEntity,
+  dropIndexFromRects,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { fallbackCover } from "./fallback-cover.js";
@@ -46,6 +47,9 @@ import { WebPlayer, webPlayerName } from "./web-player.js";
 
 const MOBILE_MEDIA =
   "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)";
+
+// 播放器胶囊的长按判定：按住超过这个时长才算“拿起”，短按仍然是切换播放器。
+const CHIP_LONG_PRESS_MS = 380;
 
 function isMobileUi() {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -197,6 +201,10 @@ class HaMusicCard extends LitElement {
     this._maPlayers = [];
     this._playersBusy = false;
     this._cardBusy = false;
+    this._chipPress = null;
+    this._chipPressTimer = null;
+    this._chipDrag = null;
+    this._chipDragEndAt = 0;
     this._webPlayer = null;
     this._webTicket = "";
     this._webTicketUrl = "/api/ha_music_studio/sendspin";
@@ -480,6 +488,8 @@ class HaMusicCard extends LitElement {
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
     window.removeEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
+    this._cancelChipPress();
+    this._chipDrag = null;
     if (this._webEntityTimer) clearTimeout(this._webEntityTimer);
     this._webEntityTimer = null;
     if (this._localWebSyncTimer) clearTimeout(this._localWebSyncTimer);
@@ -2598,6 +2608,246 @@ class HaMusicCard extends LitElement {
     this._switchEntity(target, false);
   }
 
+  _onChipClick(entityId) {
+    // 长按拖动结束后浏览器仍会补发一次 click，这里直接吞掉，避免误切换播放器。
+    if (Date.now() - this._chipDragEndAt < 600) return;
+    this._switchEntity(entityId, true);
+  }
+
+  _onChipContextMenu(event) {
+    if (this._chipDrag) event.preventDefault();
+  }
+
+  _onChipPointerDown(event, entityId) {
+    if (this._chipDrag || this._cardBusy) return;
+    if (event.button !== undefined && event.button !== 0) return;
+    if (event.isPrimary === false) return;
+    this._cancelChipPress();
+    this._chipPress = {
+      chip: event.currentTarget,
+      entityId,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    this._chipPressTimer = setTimeout(() => {
+      this._chipPressTimer = null;
+      this._beginChipDrag();
+    }, CHIP_LONG_PRESS_MS);
+  }
+
+  _cancelChipPress() {
+    if (this._chipPressTimer) clearTimeout(this._chipPressTimer);
+    this._chipPressTimer = null;
+    this._chipPress = null;
+  }
+
+  _beginChipDrag() {
+    const press = this._chipPress;
+    this._chipPress = null;
+    if (!press?.chip?.isConnected) return;
+    const strip = this.renderRoot?.querySelector?.(".hm-entities");
+    if (!strip) return;
+    const chips = Array.from(strip.querySelectorAll(".hm-entity-chip"));
+    const index = chips.indexOf(press.chip);
+    if (index < 0) return;
+    this._chipDrag = {
+      chip: press.chip,
+      entityId: press.entityId,
+      pointerId: press.pointerId,
+      startX: press.x,
+      startY: press.y,
+      lastX: press.x,
+      index,
+      translate: 0,
+      startLeft: press.chip.getBoundingClientRect().left,
+      order: this._entities(),
+    };
+    this._chipDragEndAt = 0;
+    press.chip.dataset.drag = "true";
+    strip.classList.add("hm-dragging");
+    this.renderRoot.querySelector(".hm-entities-wrap")?.classList.add("hm-dragging");
+    try {
+      press.chip.setPointerCapture(press.pointerId);
+    } catch {
+      /* 个别浏览器不支持捕获，拖动仍由容器上的 pointermove 兜底 */
+    }
+    this._vibrate(12);
+  }
+
+  _vibrate(ms) {
+    if (typeof navigator === "undefined") return;
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      /* 触感反馈失败不影响拖动 */
+    }
+  }
+
+  _onChipPointerMove(event) {
+    const drag = this._chipDrag;
+    if (!drag) {
+      const press = this._chipPress;
+      if (!press || event.pointerId !== press.pointerId) return;
+      // 先划走视为滚动列表，取消长按，保留原生横向滚动。
+      if (
+        Math.abs(event.clientX - press.x) > 8 ||
+        Math.abs(event.clientY - press.y) > 8
+      ) {
+        this._cancelChipPress();
+      }
+      return;
+    }
+    if (event.pointerId !== drag.pointerId) return;
+    event.preventDefault?.();
+    drag.lastX = event.clientX;
+    const strip = drag.chip.parentElement;
+    if (strip) {
+      // 拖到列表两端时自动滚动，让屏幕外的播放器也能拖进来。
+      const rect = strip.getBoundingClientRect();
+      if (event.clientX < rect.left + 28) strip.scrollLeft -= 12;
+      else if (event.clientX > rect.right - 28) strip.scrollLeft += 12;
+    }
+    this._applyChipDragTransform();
+    const others = Array.from(
+      strip?.querySelectorAll?.(".hm-entity-chip") || []
+    ).filter((el) => el !== drag.chip);
+    const target = dropIndexFromRects(
+      others.map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { left: rect.left, width: rect.width };
+      }),
+      event.clientX
+    );
+    if (target !== drag.index) this._reorderChipDrag(drag, others, target);
+  }
+
+  _applyChipDragTransform() {
+    const drag = this._chipDrag;
+    if (!drag) return;
+    const chip = drag.chip;
+    // 布局变化（DOM 重排、自动滚动）后会改变 offset，这里始终以“视觉位置不变”为基准重算位移。
+    const layoutLeft = chip.getBoundingClientRect().left - drag.translate;
+    const desired = drag.startLeft + (drag.lastX - drag.startX);
+    const next = Math.round(desired - layoutLeft);
+    drag.translate = next;
+    chip.style.transition = "transform 0s";
+    chip.style.transform = `translateX(${next}px)`;
+  }
+
+  _reorderChipDrag(drag, others, target) {
+    const strip = drag.chip.parentElement;
+    if (!strip) return;
+    const chips = Array.from(strip.querySelectorAll(".hm-entity-chip"));
+    const before = new Map(
+      chips.map((el) => [el, el.getBoundingClientRect().left])
+    );
+    strip.insertBefore(drag.chip, others[target] || null);
+    drag.index = target;
+    // FLIP：其余胶囊先回到旧位置，再在 0.18s 内滑回新槽位，形成磁吸感。
+    const moved = chips.filter((el) => el !== drag.chip);
+    for (const el of moved) {
+      const old = before.get(el);
+      if (old == null) continue;
+      const delta = old - el.getBoundingClientRect().left;
+      if (Math.abs(delta) < 0.5) continue;
+      el.style.transition = "transform 0s";
+      el.style.transform = `translateX(${Math.round(delta)}px)`;
+    }
+    for (const el of moved) {
+      const old = before.get(el);
+      if (old == null || !el.style.transform) continue;
+      void el.getBoundingClientRect();
+      el.style.transition = "";
+      el.style.transform = "";
+    }
+    this._applyChipDragTransform();
+  }
+
+  _onChipPointerUp(event) {
+    if (this._chipDrag) {
+      if (event.pointerId !== this._chipDrag.pointerId) return;
+      this._endChipDrag();
+      return;
+    }
+    if (this._chipPress && event.pointerId === this._chipPress.pointerId) {
+      this._cancelChipPress();
+    }
+  }
+
+  _onChipPointerLeave() {
+    // 还没进入拖动就离开列表，说明用户只是划过，取消长按避免误触发。
+    if (!this._chipDrag) this._cancelChipPress();
+  }
+
+  _endChipDrag() {
+    const drag = this._chipDrag;
+    if (!drag) return;
+    this._chipDrag = null;
+    this._chipDragEndAt = Date.now();
+    const chip = drag.chip;
+    const strip = chip.parentElement;
+    strip?.classList.remove("hm-dragging");
+    this.renderRoot?.querySelector?.(".hm-entities-wrap")?.classList.remove("hm-dragging");
+    delete chip.dataset.drag;
+    // 松手后磁吸回位：胶囊带着 0.26s 的缓动滑入当前槽位。
+    chip.style.transition = "transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)";
+    chip.style.transform = "";
+    setTimeout(() => {
+      chip.style.transition = "";
+      chip.style.transform = "";
+    }, 340);
+    try {
+      chip.releasePointerCapture(drag.pointerId);
+    } catch {
+      /* 已释放时忽略 */
+    }
+    this._vibrate(8);
+    const ordered = Array.from(
+      strip?.querySelectorAll?.(".hm-entity-chip") || []
+    )
+      .map((el) => el.dataset.entityId)
+      .filter(Boolean);
+    if (!ordered.length || ordered.length !== drag.order.length) return;
+    if (ordered.every((id, index) => id === drag.order[index])) return;
+    this._commitEntityOrder(ordered);
+  }
+
+  async _commitEntityOrder(next) {
+    if (this._cardBusy) return;
+    this._cardBusy = true;
+    try {
+      await this._saveCardEntities(next);
+    } catch (error) {
+      this._notify(error?.message || String(error));
+    } finally {
+      this._cardBusy = false;
+      this.requestUpdate();
+    }
+  }
+
+  _scrollEntities(direction) {
+    const strip = this.renderRoot?.querySelector?.(".hm-entities");
+    if (!strip) return;
+    const step = Math.max(96, Math.round(strip.clientWidth * 0.72));
+    strip.scrollBy({ left: direction * step, behavior: "smooth" });
+  }
+
+  _syncEntitiesNav() {
+    const wrap = this.renderRoot?.querySelector?.(".hm-entities-wrap");
+    const strip = wrap?.querySelector?.(".hm-entities");
+    if (!wrap || !strip) return;
+    const overflow = strip.scrollWidth - strip.clientWidth > 4;
+    wrap.dataset.overflow = overflow ? "true" : "false";
+    if (!overflow) return;
+    const atStart = strip.scrollLeft <= 2;
+    const atEnd = strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 2;
+    const prev = wrap.querySelector('[data-dir="prev"]');
+    const next = wrap.querySelector('[data-dir="next"]');
+    if (prev) prev.disabled = atStart;
+    if (next) next.disabled = atEnd;
+  }
+
   _switchEntity(entityId, manual = false) {
     if (entityId === this._activeEntity) return;
     if (manual) this._manualSwitchAt = Date.now();
@@ -3383,10 +3633,14 @@ class HaMusicCard extends LitElement {
 
   /* ---------------- 渲染辅助 ---------------- */
 
+  shouldUpdate() {
+    // 拖动胶囊期间暂停重绘，避免 hass 状态刷新把拖出来的临时 DOM 顺序冲掉。
+    return !this._chipDrag;
+  }
+
   updated() {
     const card = this.renderRoot?.querySelector?.(".hm-card");
-    if (!card) return;
-    // 缩略预览：清掉任何残留的背景大图，避免整张封面被解码后常驻内存。
+    if (!card) return;    // 缩略预览：清掉任何残留的背景大图，避免整张封面被解码后常驻内存。
     if (this._thumbMode()) {
       card.querySelectorAll(".hm-bg-art").forEach((layer) => {
         if (layer.style.backgroundImage) layer.style.backgroundImage = "";
@@ -3402,6 +3656,7 @@ class HaMusicCard extends LitElement {
       }
     });
     this._safeEffect("range", () => this._syncRangeValues());
+    this._safeEffect("entities-nav", () => this._syncEntitiesNav());
     this._safeEffect("studio", () => this._syncStudioQueue());
     this._safeEffect("panel", () => {
       this._syncPanelFlag();
@@ -4659,7 +4914,25 @@ class HaMusicCard extends LitElement {
 
           ${entities.length > 1
             ? html`
-                <div class="hm-entities">
+                <div class="hm-entities-wrap" data-overflow="false">
+                  <button
+                    class="hm-entities-nav"
+                    data-dir="prev"
+                    data-role="entities-prev"
+                    aria-label=${t("entitiesScrollPrev")}
+                    title=${t("entitiesScrollPrev")}
+                    @click=${() => this._scrollEntities(-1)}
+                  >
+                    ${icon("chevronLeft", 14)}
+                  </button>
+                  <div
+                    class="hm-entities"
+                    @pointermove=${(event) => this._onChipPointerMove(event)}
+                    @pointerup=${(event) => this._onChipPointerUp(event)}
+                    @pointercancel=${(event) => this._onChipPointerUp(event)}
+                    @pointerleave=${(event) => this._onChipPointerLeave(event)}
+                    @scroll=${() => this._syncEntitiesNav()}
+                  >
                   ${entities.map((id) => {
                     const item = hass.states?.[id];
                     // 选中项的封面优先用卡片已解析的 blob，避免 HTTPS 页面直接加载
@@ -4672,12 +4945,15 @@ class HaMusicCard extends LitElement {
                       item?.state === "playing" || item?.state === "buffering";
                     return html`<button
                       class="hm-entity-chip"
+                      data-entity-id=${id}
                       data-active=${id === entityId ? "true" : "false"}
                       data-playing=${itemPlaying ? "true" : "false"}
                       aria-label=${itemPlaying
                         ? `${friendlyName(hass, id, id)} ${t("playing")}`
                         : friendlyName(hass, id, id)}
-                      @click=${() => this._switchEntity(id, true)}
+                      @pointerdown=${(event) => this._onChipPointerDown(event, id)}
+                      @click=${() => this._onChipClick(id)}
+                      @contextmenu=${(event) => this._onChipContextMenu(event)}
                     >
                       <span
                         class="hm-entity-dot"
@@ -4691,6 +4967,17 @@ class HaMusicCard extends LitElement {
                         : nothing}
                     </button>`;
                   })}
+                  </div>
+                  <button
+                    class="hm-entities-nav"
+                    data-dir="next"
+                    data-role="entities-next"
+                    aria-label=${t("entitiesScrollNext")}
+                    title=${t("entitiesScrollNext")}
+                    @click=${() => this._scrollEntities(1)}
+                  >
+                    ${icon("chevronRight", 14)}
+                  </button>
                 </div>`
             : nothing}
 

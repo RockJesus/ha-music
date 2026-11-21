@@ -4281,8 +4281,13 @@ class HaMusicCard extends LitElement {
                           <div class="hm-player-text">
                             <span class="hm-player-name">${player.name}</span>
                             <span class="hm-player-sub">
-                              ${member ? t("groupMember") : player.state || t("idle")}
-                              ${player.group_members?.length ? ` · ${player.group_members.length} ${t("groupUnits")}` : ""}
+                              ${isLeader
+                                ? `${player.group_members?.length || 1} ${t("groupUnits")}`
+                                : `${member ? t("groupMember") : player.state || t("idle")}${
+                                    player.group_members?.length
+                                      ? ` · ${player.group_members.length} ${t("groupUnits")}`
+                                      : ""
+                                  }`}
                             </span>
                           </div>
                         </div>
@@ -4298,7 +4303,7 @@ class HaMusicCard extends LitElement {
                               >
                                 ${t("selectDevice")}
                               </button>`}
-                          ${!isLeader && entityId && player.can_group_with?.length !== 0
+                          ${!isLeader && entityId && (member || player.can_group_with?.length !== 0)
                             ? html`<button
                                 class="hm-player-btn"
                                 data-role="group"

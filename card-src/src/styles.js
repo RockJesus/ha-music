@@ -998,6 +998,44 @@ export const cardStyles = css`
     background: rgba(var(--hm-a1-rgb), 0.14);
   }
 
+  .hm-web-player-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background: linear-gradient(
+      135deg,
+      rgba(var(--hm-ctl-a1-rgb), 0.1),
+      rgba(var(--hm-ctl-a2-rgb), 0.06)
+    );
+    margin-bottom: 4px;
+  }
+
+  .hm-web-icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    color: #fff;
+    border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.26);
+    background: linear-gradient(
+      135deg,
+      rgba(var(--hm-ctl-a1-rgb), 0.2),
+      rgba(var(--hm-ctl-a2-rgb), 0.16)
+    );
+  }
+
+  .hm-web-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.84);
+    border: 1px solid rgba(var(--hm-ctl-a1-rgb), 0.3);
+    background: rgba(var(--hm-ctl-a1-rgb), 0.12);
+  }
+
   .hm-player-main {
     display: flex;
     align-items: center;

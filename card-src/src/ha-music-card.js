@@ -41,6 +41,7 @@ import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallD
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
+import { WebPlayer, webPlayerName } from "./web-player.js";
 
 const MOBILE_MEDIA =
   "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)";
@@ -194,6 +195,19 @@ class HaMusicCard extends LitElement {
     this._playersOpen = false;
     this._maPlayers = [];
     this._playersBusy = false;
+    this._webPlayer = null;
+    this._webTicket = "";
+    this._webTicketUrl = "/api/ha_music_studio/sendspin";
+    this._webTicketAt = 0;
+    this._webTicketTtl = 300;
+    this._webTicketLoading = null;
+    this._webBusy = false;
+    this._webPlayerId = "";
+    this._webEntity = "";
+    this._webReturnEntity = "";
+    this._webName = webPlayerName();
+    this._webPlayerState = null;
+    this._webEntityTimer = null;
     this._themeOverride = this._loadThemeOverride();
     this._themeOpen = false;
     this._sfxKey = this._loadSfx();
@@ -454,6 +468,10 @@ class HaMusicCard extends LitElement {
     document.removeEventListener("fullscreenchange", this._onFullscreenChange);
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
+    if (this._webEntityTimer) clearTimeout(this._webEntityTimer);
+    this._webEntityTimer = null;
+    this._webPlayer?.disconnect();
+    this._webPlayer = null;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
     this._seekSettleTimer = null;
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
@@ -1782,12 +1800,230 @@ class HaMusicCard extends LitElement {
   async _openPlayers() {
     this._playersOpen = true;
     this.requestUpdate();
+    // Ticket minting is cheap and authenticated. Preparing it before the
+    // click lets connect() call unlock() as the first awaited work inside
+    // the user gesture, which mobile browsers require for audio.
+    this._ensureWebTicket().catch(() => {});
     await this._loadPlayers();
   }
 
   _closePlayers() {
     this._playersOpen = false;
     this.requestUpdate();
+  }
+
+  async _ensureWebTicket() {
+    const age = Date.now() - this._webTicketAt;
+    if (this._webTicket && age < (this._webTicketTtl - 15) * 1000) {
+      return {
+        ticket: this._webTicket,
+        url: this._webTicketUrl,
+        ttl: this._webTicketTtl,
+      };
+    }
+    if (this._webTicketLoading) return this._webTicketLoading;
+    const loading = (async () => {
+      const response = await this._hass.connection.sendMessagePromise({
+        type: "ha_music_studio/web_player_ticket",
+      });
+      this._webTicket = String(response?.ticket || "");
+      this._webTicketUrl = String(response?.url || "/api/ha_music_studio/sendspin");
+      this._webTicketTtl = Number(response?.ttl) || 300;
+      this._webTicketAt = Date.now();
+      return {
+        ticket: this._webTicket,
+        url: this._webTicketUrl,
+        ttl: this._webTicketTtl,
+      };
+    })();
+    this._webTicketLoading = loading;
+    try {
+      return await loading;
+    } finally {
+      if (this._webTicketLoading === loading) this._webTicketLoading = null;
+    }
+  }
+
+  _findWebPlayer(freshIds = null) {
+    if (this._webPlayerId) {
+      const exact = this._maPlayers.find(
+        (player) => player.player_id === this._webPlayerId
+      );
+      if (exact) return exact;
+    }
+    const clientId = this._webPlayer?.clientId || "";
+    const named = this._maPlayers.filter(
+      (player) =>
+        (clientId &&
+          (player.player_id === clientId || player.player_id.endsWith(clientId))) ||
+        (this._webName && player.name === this._webName)
+    );
+    if (freshIds) {
+      const fresh = named.find((player) => !freshIds.has(player.player_id));
+      if (fresh) return fresh;
+    }
+    return named[0] || null;
+  }
+
+  async _connectWebPlayer() {
+    if (this._webBusy || this._webPlayer?.connected) return;
+    this._webBusy = true;
+    const beforeIds = new Set(this._maPlayers.map((player) => player.player_id));
+    this.requestUpdate();
+    try {
+      let info;
+      const age = Date.now() - this._webTicketAt;
+      if (this._webTicket && age < (this._webTicketTtl - 15) * 1000) {
+        info = {
+          ticket: this._webTicket,
+          url: this._webTicketUrl,
+          ttl: this._webTicketTtl,
+        };
+      } else {
+        info = await this._ensureWebTicket();
+      }
+      if (!info?.ticket) throw new Error(translator(this._hass?.language)("webPlayerFailed"));
+      const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+      const url = `${scheme}://${window.location.host}${info.url}?ticket=${encodeURIComponent(info.ticket)}`;
+      this._webTicket = "";
+      this._webTicketAt = 0;
+      const player = new WebPlayer({
+        url,
+        name: this._webName,
+        version: CARD_VERSION,
+        onState: (state) => {
+          this._webPlayerState = state;
+        },
+      });
+      this._webPlayer = player;
+      // unlock() is the first await inside WebPlayer.connect().
+      await player.connect();
+      this._notify(translator(this._hass?.language)("webPlayerConnected"));
+      this._webBusy = false;
+      this.requestUpdate();
+      await this._waitForWebPlayer(beforeIds);
+    } catch (error) {
+      this._webBusy = false;
+      this._webPlayer?.disconnect();
+      this._webPlayer = null;
+      this._notify(
+        `${translator(this._hass?.language)("webPlayerFailed")}: ${
+          error?.message || String(error)
+        }`.slice(0, 180)
+      );
+      this.requestUpdate();
+    }
+  }
+
+  async _waitForWebPlayer(beforeIds = new Set()) {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await this._loadPlayers();
+      const player = this._findWebPlayer(beforeIds);
+      if (player) {
+        this._webPlayerId = player.player_id;
+        const entityId = this._entityForMaPlayer(player);
+        if (entityId) {
+          this._webEntity = entityId;
+          if (entityId !== this._activeEntity) {
+            this._webReturnEntity = this._activeEntity;
+            this._switchEntity(entityId, true);
+          }
+          this.requestUpdate();
+          this._closePlayers();
+          return;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    this._webPlayerId = this._webPlayerId || this._findWebPlayer()?.player_id || "";
+    this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
+    this.requestUpdate();
+  }
+
+  _playOnWebPlayer() {
+    const player = this._findWebPlayer();
+    if (!player) {
+      this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
+      return;
+    }
+    const entityId = this._entityForMaPlayer(player);
+    if (!entityId) {
+      this._notify(translator(this._hass?.language)("deviceUnavailable"));
+      return;
+    }
+    this._webPlayerId = player.player_id;
+    this._webEntity = entityId;
+    if (entityId !== this._activeEntity) {
+      this._webReturnEntity = this._activeEntity;
+      this._switchEntity(entityId, true);
+    }
+    this._closePlayers();
+  }
+
+  _disconnectWebPlayer() {
+    const webEntity = this._webEntity;
+    this._webPlayer?.disconnect();
+    this._webPlayer = null;
+    this._webPlayerId = "";
+    this._webEntity = "";
+    this._webPlayerState = null;
+    if (webEntity && this._activeEntity === webEntity && this._webReturnEntity) {
+      this._switchEntity(this._webReturnEntity, true);
+      this._webReturnEntity = "";
+    }
+    this.requestUpdate();
+  }
+
+  _renderWebPlayerRow(t) {
+    const connected = Boolean(this._webPlayer?.connected);
+    const current = Boolean(this._webEntity && this._activeEntity === this._webEntity);
+    const canPlay = connected && Boolean(this._entityForMaPlayer(this._findWebPlayer()));
+    return html`<div class="hm-player-row hm-web-player-row" data-current=${current ? "true" : "false"}>
+      <div class="hm-player-main">
+        <span class="hm-web-icon">${icon("speaker", 16)}</span>
+        <div class="hm-player-text">
+          <span class="hm-player-name">
+            ${this._webName}
+            <span class="hm-web-badge">${t("webPlayer")}</span>
+          </span>
+          <span class="hm-player-sub">
+            ${connected
+              ? this._webPlayerId
+                ? t("webPlayerConnected")
+                : t("webPlayerWaitEntity")
+              : t("webPlayerHint")}
+          </span>
+        </div>
+      </div>
+      <div class="hm-player-actions">
+        ${connected
+          ? html`${canPlay
+                ? html`<button
+                    class="hm-player-btn"
+                    data-on=${current ? "true" : "false"}
+                    @click=${() => this._playOnWebPlayer()}
+                  >
+                    ${t("webPlayerPlayHere")}
+                  </button>`
+                : nothing}
+              <button
+                class="hm-player-btn"
+                data-role="web-disconnect"
+                @click=${() => this._disconnectWebPlayer()}
+              >
+                ${t("webPlayerDisconnect")}
+              </button>`
+          : html`<button
+              class="hm-player-btn"
+              data-role="web-connect"
+              data-disabled=${this._webBusy ? "true" : "false"}
+              ?disabled=${this._webBusy}
+              @click=${() => this._connectWebPlayer()}
+            >
+              ${this._webBusy ? t("webPlayerConnecting") : t("webPlayerConnect")}
+            </button>`}
+      </div>
+    </div>`;
   }
 
   async _loadPlayers() {
@@ -1807,7 +2043,14 @@ class HaMusicCard extends LitElement {
 
   _playersForPanel() {
     const leaderId = this._currentMaPlayer()?.player_id || "";
-    return [...this._maPlayers].sort((a, b) => {
+    return [...this._maPlayers]
+      .filter((player) => {
+        // 隐藏历史测试或已关闭浏览器留下的离线 Web 播放器，避免设备列表重名。
+        const isWeb = String(player?.name || "").startsWith("Web (");
+        const isCurrentWeb = player?.player_id && player.player_id === this._webPlayerId;
+        return !isWeb || player.available || isCurrentWeb;
+      })
+      .sort((a, b) => {
       const la = a.player_id === leaderId ? 1 : 0;
       const lb = b.player_id === leaderId ? 1 : 0;
       if (la !== lb) return lb - la;
@@ -4561,6 +4804,7 @@ class HaMusicCard extends LitElement {
                 </button>
               </div>
               <div class="hm-players-body">
+                ${this._renderWebPlayerRow(t)}
                 ${this._maPlayers.length
                   ? this._playersForPanel().map((player) => {
                       const current = this._currentMaPlayer();

@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.16.9";
+export const CARD_VERSION = "2.17.1";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -183,6 +183,15 @@ const EN = {
   groupLeaderMissing: "Select a Music Assistant player first",
   deviceUnavailable: "No Home Assistant entity for this player",
   playersEmpty: "No players available",
+  webPlayer: "This device",
+  webPlayerHint: "Play audio in this browser",
+  webPlayerConnect: "Connect",
+  webPlayerDisconnect: "Disconnect",
+  webPlayerPlayHere: "Play here",
+  webPlayerConnecting: "Connecting…",
+  webPlayerConnected: "This browser is ready to play",
+  webPlayerWaitEntity: "Player connected; waiting for Home Assistant entity",
+  webPlayerFailed: "Could not start the browser player",
   themeTitle: "Theme",
   soundFx: "Sound effects",
   soundFxHint: "Applies to the playing track",
@@ -269,6 +278,15 @@ const ZH = {
   groupLeaderMissing: "请先选择 Music Assistant 播放器",
   deviceUnavailable: "该播放器没有对应的 Home Assistant 实体",
   playersEmpty: "没有可用播放器",
+  webPlayer: "此设备",
+  webPlayerHint: "在这台设备的浏览器里播放",
+  webPlayerConnect: "连接",
+  webPlayerDisconnect: "断开",
+  webPlayerPlayHere: "在本机播放",
+  webPlayerConnecting: "正在连接…",
+  webPlayerConnected: "本机浏览器已可播放",
+  webPlayerWaitEntity: "播放器已连接，正在等待 Home Assistant 实体",
+  webPlayerFailed: "本机浏览器播放器启动失败",
   themeTitle: "主题",
   soundFx: "音效",
   soundFxHint: "作用于正在播放的音乐",

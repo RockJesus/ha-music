@@ -1,7 +1,7 @@
 {
   "name": "ha-music-card-src",
   "private": true,
-  "version": "2.16.9",
+  "version": "2.17.1",
   "type": "module",
   "description": "Source for the HA Music Lovelace card",
   "scripts": {
@@ -9,23 +9,10 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@sendspin/sendspin-js": "^6.0.0",
     "lit": "^3.3.3"
   },
   "devDependencies": {
     "esbuild": "^0.24.2"
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

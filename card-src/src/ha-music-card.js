@@ -225,6 +225,7 @@ class HaMusicCard extends LitElement {
     this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
     this._lyricsActive = -1;
     this._lyricsScrolled = -2;
+    this._lyricsScrollRaf = null;
     this._lyricsScrollObserver = null;
     this._lyricsScrollObserved = null;
     this._lyricsOffset = this._loadLyricsOffset();
@@ -496,6 +497,10 @@ class HaMusicCard extends LitElement {
     this._lyricsScrollObserver?.disconnect();
     this._lyricsScrollObserver = null;
     this._lyricsScrollObserved = null;
+    if (this._lyricsScrollRaf && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this._lyricsScrollRaf);
+    }
+    this._lyricsScrollRaf = null;
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
     this._fitPanelRaf = null;
     if (this._toastTimer) clearTimeout(this._toastTimer);
@@ -3683,23 +3688,29 @@ class HaMusicCard extends LitElement {
             lineRect.height / 2;
           return Math.max(0, top);
         };
-        scroll.scrollTo({ top: target(), behavior: "smooth" });
-        // 平滑滚动结束或布局二次变化（面板高度/封面尺寸）后再校正一次，
-        // 保证高亮句最终精确落在滚动区域垂直中线。
-        const settle = () => {
-          const current = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
-          if (current !== scroll) return;
-          const active = this.renderRoot?.querySelector?.(
-            '.hm-lyrics-line[data-active="true"]'
-          );
-          if (active !== line) return;
-          scroll.scrollTop = target();
-        };
-        if ("onscrollend" in scroll) {
-          scroll.addEventListener("scrollend", settle, { once: true });
-        } else {
-          setTimeout(settle, 420);
+        const from = scroll.scrollTop;
+        const to = target();
+        const distance = Math.abs(to - from);
+        if (distance < 1.5) return;
+        // 自己用缓动动画滚动，避免原生 smooth 结束后再硬跳一次。
+        // 句子越远，过渡稍长，但上限 720ms，保持柔和而不拖沓。
+        const duration = Math.min(720, Math.max(320, distance * 0.9));
+        const started = performance.now();
+        if (this._lyricsScrollRaf && typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(this._lyricsScrollRaf);
         }
+        const step = (now) => {
+          if (!scroll.isConnected) return;
+          const k = Math.min(1, (now - started) / duration);
+          const ease = 1 - Math.pow(1 - k, 3);
+          scroll.scrollTop = from + (to - from) * ease;
+          if (k < 1) {
+            this._lyricsScrollRaf = requestAnimationFrame(step);
+          } else {
+            this._lyricsScrollRaf = null;
+          }
+        };
+        this._lyricsScrollRaf = requestAnimationFrame(step);
       });
     };
     run();
@@ -3745,6 +3756,7 @@ class HaMusicCard extends LitElement {
         (line, index) => html`<button
           class="hm-lyrics-line"
           data-active=${index === active ? "true" : "false"}
+          data-distance=${active >= 0 ? Math.min(4, Math.abs(index - active)) : 0}
           data-time=${line.time}
           style=${`--hm-line-progress:${index === active ? Math.round(lineProgress * 100) : 0}%`}
           @click=${() => {

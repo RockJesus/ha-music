@@ -2574,15 +2574,19 @@ export const cardStyles = css`
     mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      #000 14px,
-      #000 calc(100% - 16px),
+      rgba(0, 0, 0, 0.08) 10%,
+      #000 28%,
+      #000 72%,
+      rgba(0, 0, 0, 0.08) 90%,
       transparent 100%
     );
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      #000 14px,
-      #000 calc(100% - 16px),
+      rgba(0, 0, 0, 0.08) 10%,
+      #000 28%,
+      #000 72%,
+      rgba(0, 0, 0, 0.08) 90%,
       transparent 100%
     );
   }
@@ -2711,15 +2715,19 @@ export const cardStyles = css`
     mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      #000 20px,
-      #000 calc(100% - 26px),
+      rgba(0, 0, 0, 0.06) 8%,
+      #000 24%,
+      #000 76%,
+      rgba(0, 0, 0, 0.06) 92%,
       transparent 100%
     );
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      #000 20px,
-      #000 calc(100% - 26px),
+      rgba(0, 0, 0, 0.06) 8%,
+      #000 24%,
+      #000 76%,
+      rgba(0, 0, 0, 0.06) 92%,
       transparent 100%
     );
   }
@@ -2740,53 +2748,120 @@ export const cardStyles = css`
     border: 0;
     border-radius: 12px;
     background: transparent;
-    color: rgba(246, 248, 255, 0.48);
+    color: rgba(246, 248, 255, 0.44);
     font: inherit;
     font-size: clamp(14px, 2.5cqi, 21px);
     line-height: 1.38;
     text-align: center;
     cursor: pointer;
+    opacity: 0.18;
+    filter: blur(0.7px);
     transition:
-      color 0.25s ease,
-      background 0.25s ease,
-      transform 0.25s ease;
+      color 0.32s ease,
+      opacity 0.38s ease,
+      filter 0.38s ease,
+      transform 0.32s ease,
+      background 0.32s ease;
+  }
+
+  /* 离高亮句越远越淡、越软，只保留高亮条附近的歌词清晰 */
+  .hm-lyrics-line[data-distance="0"] {
+    opacity: 1;
+    filter: none;
+  }
+
+  .hm-lyrics-line[data-distance="1"] {
+    opacity: 0.58;
+    filter: blur(0.25px);
+  }
+
+  .hm-lyrics-line[data-distance="2"] {
+    opacity: 0.3;
+    filter: blur(0.55px);
+  }
+
+  .hm-lyrics-line[data-distance="3"],
+  .hm-lyrics-line[data-distance="4"] {
+    opacity: 0.12;
+    filter: blur(1px);
   }
 
   .hm-lyrics-line:hover {
-    color: rgba(246, 248, 255, 0.82);
-    background: rgba(255, 255, 255, 0.055);
+    opacity: 0.86;
+    filter: none;
+    color: rgba(246, 248, 255, 0.9);
+    background: rgba(255, 255, 255, 0.05);
   }
 
-  .hm-lyrics-line[data-active="true"] {
+  .hm-lyrics-line[data-active="true"],
+  .hm-lyrics-line[data-active="true"]:hover {
     color: #fff;
     font-weight: 650;
-    background: radial-gradient(
-      120% 140% at 50% 50%,
-      rgba(var(--hm-a1-rgb), 0.2),
-      rgba(var(--hm-a2-rgb), 0.07) 62%,
-      transparent
-    );
-    box-shadow: 0 0 0 1px rgba(var(--hm-a1-rgb), 0.22);
+    background: transparent;
+    box-shadow: none;
+    opacity: 1;
+    filter: none;
+    transform: translateY(-1px);
   }
 
-  /* 进度条改成居中向两侧展开，跟居中的文字对齐 */
+  /* 主题色高亮条：横向流光底片，宽度覆盖整句，缓慢扫光 */
+  .hm-lyrics-line[data-active="true"]::before {
+    content: "";
+    position: absolute;
+    left: 5%;
+    right: 5%;
+    top: 50%;
+    z-index: 0;
+    height: calc(100% - 8px);
+    border-radius: 10px;
+    background: linear-gradient(
+      100deg,
+      transparent 0%,
+      rgba(var(--hm-a2-rgb), 0.13) 18%,
+      rgba(var(--hm-a1-rgb), 0.27) 46%,
+      rgba(var(--hm-a2-rgb), 0.17) 74%,
+      transparent 100%
+    );
+    background-size: 180% 100%;
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--hm-a1-rgb), 0.14),
+      0 0 22px -8px rgba(var(--hm-a1-rgb), 0.55);
+    transform: translateY(-50%);
+    animation: hmLyricSheen 3.8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* 主题色进度细线：从中间向两侧柔和展开 */
   .hm-lyrics-line[data-active="true"]::after {
     content: "";
     position: absolute;
-    top: 0;
-    bottom: 0;
+    bottom: 4px;
     left: 50%;
     z-index: 0;
-    width: calc(var(--hm-line-progress, 0%) * 0.5);
-    border-radius: inherit;
+    width: calc(var(--hm-line-progress, 0%) * 0.86);
+    height: 2px;
+    border-radius: 999px;
     background: linear-gradient(
       90deg,
-      rgba(var(--hm-a2-rgb), 0.16),
-      rgba(var(--hm-a1-rgb), 0.28)
+      rgba(var(--hm-a2-rgb), 0.9),
+      rgba(var(--hm-a1-rgb), 0.9)
     );
+    box-shadow: 0 0 9px -1px rgba(var(--hm-a1-rgb), 0.75);
     transform: translateX(-50%);
     pointer-events: none;
-    transition: width 0.36s linear;
+    transition: width 0.28s linear;
+  }
+
+  @keyframes hmLyricSheen {
+    0%,
+    100% {
+      background-position: 0% 50%;
+      opacity: 0.78;
+    }
+    50% {
+      background-position: 100% 50%;
+      opacity: 1;
+    }
   }
 
   .hm-lyrics-text {
@@ -2795,9 +2870,17 @@ export const cardStyles = css`
     display: block;
   }
 
+  .hm-lyrics-line[data-active="true"] .hm-lyrics-text {
+    text-shadow:
+      0 0 18px rgba(var(--hm-a1-rgb), 0.38),
+      0 0 6px rgba(var(--hm-a2-rgb), 0.22);
+  }
+
   .hm-lyrics-line[data-static="true"] {
     cursor: default;
     color: rgba(246, 248, 255, 0.66);
+    opacity: 0.74;
+    filter: none;
   }
 
   .hm-lyrics-line[data-static="true"]:hover {

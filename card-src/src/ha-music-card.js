@@ -1182,6 +1182,62 @@ class HaMusicCard extends LitElement {
       } else if (key === "laser") {
         tone(1250, 320, 0.18, "sawtooth", 0.08);
         tone(900, 260, 0.16, "square", 0.035);
+      } else if (key === "hifi") {
+        // 模拟 Hifi 环绕：左右声道错时 + 宽声场 + 短延迟尾音，合成一次空间感提示音
+        const space = ctx.createGain();
+        space.gain.setValueAtTime(0.0001, at);
+        space.gain.exponentialRampToValueAtTime(0.13, at + 0.04);
+        space.gain.exponentialRampToValueAtTime(0.0001, at + 0.62);
+        space.connect(ctx.destination);
+        const echo = ctx.createDelay(0.2);
+        echo.delayTime.setValueAtTime(0.06, at);
+        const echoGain = ctx.createGain();
+        echoGain.gain.setValueAtTime(0.0001, at);
+        echoGain.gain.exponentialRampToValueAtTime(0.055, at + 0.06);
+        echoGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
+        echo.connect(echoGain);
+        echoGain.connect(ctx.destination);
+        const voice = (freq, endFreq, duration, type, volume, pan, delayMs = 0) => {
+          const osc = ctx.createOscillator();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, at);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), at + duration);
+          const env = ctx.createGain();
+          env.gain.setValueAtTime(0.0001, at);
+          env.gain.exponentialRampToValueAtTime(volume, at + 0.03);
+          env.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+          osc.connect(env);
+          let tail = env;
+          const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+          if (panner) {
+            panner.pan.setValueAtTime(pan, at);
+            env.connect(panner);
+            tail = panner;
+          }
+          if (delayMs > 0) {
+            const hop = ctx.createDelay(0.2);
+            hop.delayTime.setValueAtTime(delayMs, at);
+            tail.connect(hop);
+            tail = hop;
+          }
+          tail.connect(space);
+          tail.connect(echo);
+          osc.start(at);
+          osc.stop(at + duration + 0.02);
+        };
+        voice(246, 262, 0.46, "sine", 0.075, -0.9);
+        voice(330, 349, 0.44, "sine", 0.065, 0.9, 0.024);
+        voice(523, 587, 0.34, "triangle", 0.045, -0.25, 0.012);
+        voice(1046, 1174, 0.22, "sine", 0.022, 0.55, 0.04);
+        setTimeout(() => {
+          try {
+            space.disconnect();
+            echo.disconnect();
+            echoGain.disconnect();
+          } catch {
+            /* ignore */
+          }
+        }, 900);
       }
       setTimeout(() => {
         try {

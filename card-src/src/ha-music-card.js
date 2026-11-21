@@ -251,6 +251,7 @@ class HaMusicCard extends LitElement {
     this._coverPress = null;
     this._coverGesture = "";
     this._coverGestureTimer = null;
+    this._coverPending = null;
     this._coverSuppressClick = false;
     this._coverSuppressTimer = null;
     this._progressRaf = null;
@@ -511,6 +512,7 @@ class HaMusicCard extends LitElement {
     this._coverGestureTimer = null;
     this._coverSuppressTimer = null;
     this._coverPress = null;
+    this._coverPending = null;
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
     this._lyricsScrollObserver?.disconnect();
@@ -1479,8 +1481,30 @@ class HaMusicCard extends LitElement {
   }
 
   _coverSwipe(direction) {
-    this._coverCue(direction);
-    this._skip(direction);
+    // 纯渐隐切歌：先让封面与环形音柱淡出，再切曲并淡入新封面。
+    // 不放位移/回弹动画，避免滑动后封面左右晃一下。
+    if (this._coverPending) {
+      this._skip(this._coverPending);
+      this._coverPending = null;
+    }
+    this._coverPending = direction;
+    this._coverGesture = "out";
+    this.requestUpdate();
+    if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    this._coverGestureTimer = setTimeout(() => {
+      if (this._coverPending) {
+        this._skip(this._coverPending);
+        this._coverPending = null;
+      }
+      this._coverGesture = "in";
+      this.requestUpdate();
+      this._coverGestureTimer = setTimeout(() => {
+        if (this._coverGesture === "in") {
+          this._coverGesture = "";
+          this.requestUpdate();
+        }
+      }, 340);
+    }, 240);
   }
 
   _onCoverPointerDown(event) {

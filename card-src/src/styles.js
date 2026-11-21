@@ -416,47 +416,29 @@ export const cardStyles = css`
   }
 
 
-  .hm-cover[data-gesture="next"] {
-    animation: hmCoverNext 0.4s ease-out both;
+  /* 滑动切歌：纯渐隐，无位移、无回弹；淡出后换封面再淡入。 */
+  .hm-cover[data-gesture="out"] {
+    opacity: 0;
+    transform: scale(0.96);
+    transition:
+      opacity 0.22s ease,
+      transform 0.24s ease;
   }
 
-  .hm-cover[data-gesture="prev"] {
-    animation: hmCoverPrev 0.4s ease-out both;
+  .hm-cover[data-gesture="in"] {
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      opacity 0.34s ease,
+      transform 0.3s ease;
+  }
+
+  .hm-cover-wrap:has(.hm-cover[data-gesture="out"]) .hm-cover-eq {
+    opacity: 0;
   }
 
   .hm-cover[data-gesture="tap"] {
     animation: hmCoverTap 0.3s ease-out;
-  }
-
-  /* 滑动切歌只做渐隐，不做位移回弹：透明度收干后换封面再淡入。 */
-  @keyframes hmCoverNext {
-    0% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    55% {
-      transform: scale(0.96);
-      opacity: 0.52;
-    }
-    100% {
-      transform: scale(1);
-      opacity: 0;
-    }
-  }
-
-  @keyframes hmCoverPrev {
-    0% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    55% {
-      transform: scale(0.96);
-      opacity: 0.52;
-    }
-    100% {
-      transform: scale(1);
-      opacity: 0;
-    }
   }
 
   @keyframes hmCoverTap {

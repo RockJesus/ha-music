@@ -2056,7 +2056,16 @@ class HaMusicCard extends LitElement {
     const queueId =
       this._queueQueueId || this._state()?.attributes?.active_queue || "";
     if (!queueId) throw new Error(translator(this._hass?.language)("queueEmpty"));
-    const event = await this._subscribeQueue(queueId);
+    let event = null;
+    try {
+      event = await this._subscribeQueue(queueId);
+    } catch (error) {
+      const response = await this._queueCommand("snapshot");
+      event = response?.result?.queue || response?.queue || null;
+      if (!event) throw error;
+      this._queueSnapshot = event;
+      this._applyQueueSnapshot(event);
+    }
     if (
       token !== this._queueLoadToken ||
       !this._drawer?.open ||

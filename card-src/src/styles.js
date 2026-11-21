@@ -1408,6 +1408,17 @@ export const cardStyles = css`
     max-height: none;
   }
 
+  .hm-theme-menu {
+    top: 52px;
+    right: 12px;
+    left: auto;
+    bottom: auto;
+    min-width: 180px;
+    max-width: min(248px, 76%);
+    max-height: min(320px, calc(100% - 64px));
+    overflow-y: auto;
+  }
+
   .hm-menu-head {
     padding: 6px 10px 4px;
     font-size: 9.5px;

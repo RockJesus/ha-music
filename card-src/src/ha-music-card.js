@@ -194,7 +194,8 @@ class HaMusicCard extends LitElement {
     this._playersOpen = false;
     this._maPlayers = [];
     this._playersBusy = false;
-    this._themeOverride = null;
+    this._themeOverride = this._loadThemeOverride();
+    this._themeOpen = false;
     this._sfxKey = this._loadSfx();
     this._sfxOpen = false;
     this._sfxCtx = null;
@@ -341,7 +342,17 @@ class HaMusicCard extends LitElement {
     if (!list.length) {
       throw new Error("ha-music: 需要配置 entity（media_player.*）或 entities 列表");
     }
+    const prevTheme = this._config?.theme;
     this._config = { ...config };
+    // 卡片设置（编辑器 / YAML）里的 theme 变更时，清掉运行时选择，回到设置值
+    if (prevTheme !== undefined && prevTheme !== config.theme && this._themeOverride) {
+      this._themeOverride = null;
+      try {
+        window.localStorage?.removeItem("ha-music-theme");
+      } catch {
+        /* ignore */
+      }
+    }
     if (!list.includes(this._activeEntity)) {
       this._activeEntity = list[0];
       this._palette = null;
@@ -372,7 +383,10 @@ class HaMusicCard extends LitElement {
     this._onKeyDown = (event) => {
       if (event.key !== "Escape") return;
       if (this._drawer.open) this._closeDrawer();
-      else if (this._sfxOpen) {
+      else if (this._themeOpen) {
+        this._themeOpen = false;
+        this.requestUpdate();
+      } else if (this._sfxOpen) {
         this._sfxOpen = false;
         this.requestUpdate();
       } else if (this._menu) {
@@ -1111,15 +1125,40 @@ class HaMusicCard extends LitElement {
     return theme && THEMES[theme] ? theme : DEFAULT_THEME;
   }
 
-  _randomTheme() {
-    const keys = Object.keys(THEMES).filter((key) => key !== this._themeKey());
-    if (!keys.length) return;
-    const next = keys[Math.floor(Math.random() * keys.length)];
-    this._themeOverride = next;
-    const label = THEMES[next]?.label;
-    this._notify(
-      label ? (String(this._hass?.language || "").startsWith("zh") ? label.zh : label.en) : next
-    );
+  _loadThemeOverride() {
+    try {
+      const stored = window.localStorage?.getItem("ha-music-theme");
+      return stored && THEMES[stored] ? stored : null;
+    } catch {
+      return null;
+    }
+  }
+
+  _themeLabel(key) {
+    const label = THEMES[key]?.label;
+    if (!label) return key;
+    return String(this._hass?.language || "").startsWith("zh") ? label.zh : label.en;
+  }
+
+  _toggleThemeMenu() {
+    this._themeOpen = !this._themeOpen;
+    if (this._themeOpen) {
+      this._sfxOpen = false;
+      this._menu = null;
+    }
+    this.requestUpdate();
+  }
+
+  _setTheme(key) {
+    if (!THEMES[key]) return;
+    this._themeOverride = key;
+    this._themeOpen = false;
+    try {
+      window.localStorage?.setItem("ha-music-theme", key);
+    } catch {
+      /* localStorage 不可用时仅当前会话生效 */
+    }
+    this._notify(this._themeLabel(key));
     this.requestUpdate();
   }
 
@@ -1253,6 +1292,7 @@ class HaMusicCard extends LitElement {
 
   _toggleSfxMenu() {
     this._sfxOpen = !this._sfxOpen;
+    if (this._sfxOpen) this._themeOpen = false;
     this.requestUpdate();
   }
 
@@ -2245,6 +2285,14 @@ class HaMusicCard extends LitElement {
         this.requestUpdate();
       }
     }
+    if (this._themeOpen) {
+      const insideTheme = path.some((node) => node?.classList?.contains?.("hm-theme-menu"));
+      const onThemeButton = path.some((node) => node?.dataset?.role === "theme");
+      if (!insideTheme && !onThemeButton) {
+        this._themeOpen = false;
+        this.requestUpdate();
+      }
+    }
     if (!this._menu) return;
     const insideMenu = path.some(
       (node) =>
@@ -2490,7 +2538,8 @@ class HaMusicCard extends LitElement {
     this._playersOpen = false;
     this._maPlayers = [];
     this._playersBusy = false;
-    this._themeOverride = null;
+    this._themeOverride = this._loadThemeOverride();
+    this._themeOpen = false;
     this._sfxKey = this._loadSfx();
     this._sfxOpen = false;
     this._sfxCtx = null;
@@ -3998,9 +4047,10 @@ class HaMusicCard extends LitElement {
               <button
                 class="hm-icon-btn hm-theme-btn"
                 data-role="theme"
-                aria-label=${t("randomTheme")}
-                title=${t("randomTheme")}
-                @click=${() => this._randomTheme()}
+                aria-label=${t("themeTitle")}
+                title=${t("themeTitle")}
+                data-on=${this._themeOpen ? "true" : "false"}
+                @click=${() => this._toggleThemeMenu()}
               >
                 ${icon("palette", 16)}
               </button>
@@ -4087,6 +4137,23 @@ class HaMusicCard extends LitElement {
               </button>
             </div>
           </header>
+
+          ${this._themeOpen
+            ? html`<div class="hm-menu hm-theme-menu">
+                <div class="hm-menu-head">${t("themeTitle")}</div>
+                ${Object.keys(THEMES).map(
+                  (key) => html`<button
+                    class="hm-menu-item"
+                    data-no-sfx="true"
+                    data-active=${this._themeKey() === key ? "true" : "false"}
+                    @click=${() => this._setTheme(key)}
+                  >
+                    <span>${this._themeLabel(key)}</span>
+                    <span class="hm-menu-check">${icon("check", 13)}</span>
+                  </button>`
+                )}
+              </div>`
+            : nothing}
 
           ${this._sfxOpen
             ? html`<div class="hm-menu hm-sfx-menu">

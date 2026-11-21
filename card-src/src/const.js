@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.16.0";
+export const CARD_VERSION = "2.16.1";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -183,7 +183,7 @@ const EN = {
   groupLeaderMissing: "Select a Music Assistant player first",
   deviceUnavailable: "No Home Assistant entity for this player",
   playersEmpty: "No players available",
-  randomTheme: "Random theme",
+  themeTitle: "Theme",
   soundFx: "Sound effects",
   sfxOff: "Off",
   sfxClick: "Crisp",
@@ -269,7 +269,7 @@ const ZH = {
   groupLeaderMissing: "请先选择 Music Assistant 播放器",
   deviceUnavailable: "该播放器没有对应的 Home Assistant 实体",
   playersEmpty: "没有可用播放器",
-  randomTheme: "随机主题",
+  themeTitle: "主题",
   soundFx: "音效",
   sfxOff: "关闭",
   sfxClick: "清脆",

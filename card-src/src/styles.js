@@ -2822,62 +2822,43 @@ export const cardStyles = css`
     transform: translateY(-1px);
   }
 
-  /* 主题色高亮条：横向流光底片，宽度覆盖整句，缓慢扫光 */
+  /* 主题色高亮：无边框、无胶囊，左右两端柔和渐隐 */
   .hm-lyrics-line[data-active="true"]::before {
     content: "";
     position: absolute;
-    left: 5%;
-    right: 5%;
+    left: 0;
+    right: 0;
     top: 50%;
     z-index: 0;
-    height: calc(100% - 8px);
-    border-radius: 10px;
-    background: linear-gradient(
-      100deg,
-      transparent 0%,
-      rgba(var(--hm-ctl-a2-rgb), 0.13) 18%,
-      rgba(var(--hm-ctl-a1-rgb), 0.27) 46%,
-      rgba(var(--hm-ctl-a2-rgb), 0.17) 74%,
-      transparent 100%
-    );
-    background-size: 180% 100%;
-    box-shadow:
-      inset 0 0 0 1px rgba(var(--hm-ctl-a1-rgb), 0.14),
-      0 0 22px -8px rgba(var(--hm-ctl-a1-rgb), 0.55);
-    transform: translateY(-50%);
-    animation: hmLyricSheen 3.8s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  /* 主题色进度细线：从中间向两侧柔和展开 */
-  .hm-lyrics-line[data-active="true"]::after {
-    content: "";
-    position: absolute;
-    bottom: 4px;
-    left: 50%;
-    z-index: 0;
-    width: calc(var(--hm-line-progress, 0%) * 0.86);
-    height: 2px;
-    border-radius: 999px;
+    height: calc(100% - 6px);
+    border-radius: 0;
     background: linear-gradient(
       90deg,
-      rgba(var(--hm-ctl-a2-rgb), 0.9),
-      rgba(var(--hm-ctl-a1-rgb), 0.9)
+      transparent 0%,
+      rgba(var(--hm-ctl-a2-rgb), 0.1) 10%,
+      rgba(var(--hm-ctl-a1-rgb), 0.26) 38%,
+      rgba(var(--hm-ctl-a1-rgb), 0.26) 62%,
+      rgba(var(--hm-ctl-a2-rgb), 0.1) 90%,
+      transparent 100%
     );
-    box-shadow: 0 0 9px -1px rgba(var(--hm-ctl-a1-rgb), 0.75);
-    transform: translateX(-50%);
+    box-shadow: none;
+    transform: translateY(-50%);
+    animation: hmLyricBreathe 4.2s ease-in-out infinite;
     pointer-events: none;
-    transition: width 0.28s linear;
   }
 
-  @keyframes hmLyricSheen {
+  /* 高亮句下方不再显示彩色进度条 */
+  .hm-lyrics-line[data-active="true"]::after {
+    content: none;
+    display: none;
+  }
+
+  @keyframes hmLyricBreathe {
     0%,
     100% {
-      background-position: 0% 50%;
-      opacity: 0.78;
+      opacity: 0.82;
     }
     50% {
-      background-position: 100% 50%;
       opacity: 1;
     }
   }

@@ -210,6 +210,11 @@ class HaMusicCard extends LitElement {
     this._webName = webPlayerName();
     this._webPlayerState = null;
     this._webEntityTimer = null;
+    this._localWebEntity = "";
+    this._localWebSyncTimer = null;
+    this._localWebSyncBusy = false;
+    this._localWebSyncKey = "";
+    this._localWebSyncAt = 0;
     this._themeOverride = this._loadThemeOverride();
     this._themeOpen = false;
     this._sfxKey = this._loadSfx();
@@ -396,6 +401,7 @@ class HaMusicCard extends LitElement {
       this._audioSpecAt = 0;
       this._loadAudioSpec(this._trackKey(state));
     }
+    this._queueLocalWebEntitySync(700);
   }
 
   connectedCallback() {
@@ -476,6 +482,8 @@ class HaMusicCard extends LitElement {
     window.removeEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
     if (this._webEntityTimer) clearTimeout(this._webEntityTimer);
     this._webEntityTimer = null;
+    if (this._localWebSyncTimer) clearTimeout(this._localWebSyncTimer);
+    this._localWebSyncTimer = null;
     this._webPlayer?.disconnect();
     this._webPlayer = null;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
@@ -1958,6 +1966,8 @@ class HaMusicCard extends LitElement {
         const entityId = this._entityForMaPlayer(player);
         if (entityId) {
           this._webEntity = entityId;
+          this._localWebEntity = entityId;
+          this._queueLocalWebEntitySync(250);
           if (entityId !== this._activeEntity) {
             this._webReturnEntity = this._activeEntity;
             this._switchEntity(entityId, true);
@@ -2001,6 +2011,8 @@ class HaMusicCard extends LitElement {
     this._webPlayerId = "";
     this._webEntity = "";
     this._webPlayerState = null;
+    this._localWebEntity = "";
+    this._queueLocalWebEntitySync(1500);
     if (webEntity && this._activeEntity === webEntity && this._webReturnEntity) {
       this._switchEntity(this._webReturnEntity, true);
       this._webReturnEntity = "";
@@ -2073,6 +2085,82 @@ class HaMusicCard extends LitElement {
       this._maPlayers = [];
     }
     this.requestUpdate();
+    this._queueLocalWebEntitySync(300);
+  }
+
+  _queueLocalWebEntitySync(delay = 500) {
+    if (this._localWebSyncTimer) return;
+    this._localWebSyncTimer = setTimeout(() => {
+      this._localWebSyncTimer = null;
+      this._syncLocalWebEntity();
+    }, delay);
+  }
+
+  _isLocalWebEntity(entityId) {
+    if (!entityId) return false;
+    if (entityId === this._localWebEntity || entityId === this._webEntity) return true;
+    const state = this._hass?.states?.[entityId];
+    if (!state) return false;
+    const friendly = String(state.attributes?.friendly_name || "").trim();
+    return Boolean(this._webName) && friendly === this._webName;
+  }
+
+  _localWebStateAvailable(entityId) {
+    const state = this._hass?.states?.[entityId];
+    return Boolean(state) && state.state !== "unavailable" && state.state !== "unknown";
+  }
+
+  _currentLocalWebEntity() {
+    if (this._webEntity && this._localWebStateAvailable(this._webEntity)) {
+      return this._webEntity;
+    }
+    const player = this._findWebPlayer();
+    if (player && player.available !== false) {
+      const entityId = this._entityForMaPlayer(player);
+      if (this._localWebStateAvailable(entityId)) return entityId;
+    }
+    const name = String(this._webName || "").trim();
+    if (!name) return "";
+    for (const [entityId, state] of Object.entries(this._hass?.states || {})) {
+      if (!entityId.startsWith("media_player.")) continue;
+      if (state.state === "unavailable" || state.state === "unknown") continue;
+      if (String(state.attributes?.friendly_name || "").trim() === name) return entityId;
+    }
+    return "";
+  }
+
+  async _syncLocalWebEntity() {
+    if (this._localWebSyncBusy || !this._hass?.callWS || this._isPreviewContext()) return;
+    const current = this._entities();
+    if (!current.length) return;
+    const target = this._currentLocalWebEntity();
+    if (target) this._localWebEntity = target;
+    const webIds = current.filter((id) => this._isLocalWebEntity(id));
+    let next = null;
+    if (target) {
+      const extras = webIds.filter((id) => id !== target);
+      if (!current.includes(target) || extras.length) {
+        next = current.filter((id) => id !== target && !extras.includes(id));
+        next.push(target);
+      }
+    } else if (webIds.length) {
+      next = current.filter((id) => !webIds.includes(id));
+    }
+    if (!next || !next.length) return;
+    if (next.length === current.length && next.every((id, index) => id === current[index])) return;
+    const key = next.join("|");
+    if (key === this._localWebSyncKey && Date.now() - this._localWebSyncAt < 8000) return;
+    this._localWebSyncBusy = true;
+    try {
+      await this._saveCardEntities(next);
+      this._localWebSyncKey = key;
+      this._localWebSyncAt = Date.now();
+      if (!target) this._localWebEntity = "";
+    } catch {
+      /* 自动同步失败时保留原卡片配置，不打断播放 */
+    } finally {
+      this._localWebSyncBusy = false;
+    }
   }
 
   _playersForPanel() {
@@ -3294,6 +3382,7 @@ class HaMusicCard extends LitElement {
     };
     this.requestUpdate();
     this._fetchBrowse();
+    this._queueLocalWebEntitySync();
   }
 
   /* ---------------- 渲染辅助 ---------------- */

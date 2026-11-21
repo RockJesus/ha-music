@@ -1628,14 +1628,22 @@ class HaMusicCard extends LitElement {
 
   _currentMaPlayer() {
     const queueId = this._studioQueue();
-    return (
+    const direct =
       this._maPlayers.find(
         (player) => player.active_source === queueId || player.active_queue === queueId
       ) ||
-      this._maPlayers.find((player) => player.player_id === this._state()?.attributes?.ma_player_id)
-      ||
-      null
-    );
+      this._maPlayers.find(
+        (player) => player.player_id === this._state()?.attributes?.ma_player_id
+      ) ||
+      null;
+    if (!direct) return null;
+    // 成员机通过 synced_to / active_group 指向组 leader，分组操作必须落在 leader 上。
+    const groupId = direct.active_group || direct.synced_to;
+    if (groupId) {
+      const leader = this._maPlayers.find((player) => player.player_id === groupId);
+      if (leader) return leader;
+    }
+    return direct;
   }
 
   _entityForMaPlayer(player) {

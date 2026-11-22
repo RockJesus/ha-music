@@ -10,7 +10,6 @@ import {
   SFX_PRESETS,
   THEMES,
   DEFAULT_THEME,
-  COVER_STAGES,
   translator,
   mediaClassLabel,
 } from "./const.js";
@@ -4866,10 +4865,6 @@ class HaMusicCard extends LitElement {
     const visualizerKind =
       fusionMode === "ring" ? "none" : fusionMode || (fusionRequested ? "bars" : visualizer);
     const coverMode = config.cover || "ambient";
-    const coverStage =
-      layout === "full" && !this._thumbMode() && config.coverStage && COVER_STAGES[config.coverStage]
-        ? config.coverStage
-        : "none";
     const duration = media.duration;
     const position = this._seekPreview ?? media.position;
     const percent = duration ? clamp((position / duration) * 100, 0, 100) : 0;
@@ -4917,7 +4912,6 @@ class HaMusicCard extends LitElement {
         data-thumb=${this._thumbMode() ? this._thumbTier() : "false"}
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
-        data-cover-stage=${coverStage}
         data-tight=${this._tight() ? "true" : "false"}
         data-short=${this._short() ? "true" : "false"}
         data-micro=${this._micro() ? "true" : "false"}
@@ -4933,9 +4927,6 @@ class HaMusicCard extends LitElement {
           <div class="hm-noise"></div>
           <div class="hm-sheen"></div>
         </div>
-        ${coverStage !== "none"
-          ? html`<div class="hm-stage-bg" data-stage=${coverStage} aria-hidden="true"></div>`
-          : nothing}
 
         <div class="hm-body">
           <header class="hm-top">
@@ -5146,7 +5137,6 @@ class HaMusicCard extends LitElement {
               data-ringseek=${fusionMode === "ring" ? "true" : "false"}
               data-fusion-linear=${fusionMode === "rail" || fusionMode === "dual" ? "true" : "false"}
             >
-              ${coverStage !== "none" ? this._renderCoverStage(coverStage, coverUrl) : nothing}
               ${this._thumbMode()
                 ? nothing
                 : html`<canvas class="hm-cover-eq" aria-hidden="true"></canvas>`}
@@ -5196,7 +5186,6 @@ class HaMusicCard extends LitElement {
                     />`
                   : html`<span class="hm-cover-ph">${icon("music", 40)}</span>`}
               </button>
-              ${coverStage !== "none" ? this._renderCoverStageOverlay(coverStage) : nothing}
             </div>
 
             <div class="hm-info" data-side-lyrics=${sideLyrics ? "true" : "false"}>
@@ -5703,70 +5692,6 @@ class HaMusicCard extends LitElement {
         <span data-role="fusion-start">${formatTime(position)}</span>
         <span data-role="fusion-end">${formatTime(duration)}</span>
       </div>
-    </div>`;
-  }
-
-  _renderCoverStage(stage, coverUrl) {
-    const art = coverUrl ? `url("${coverUrl}")` : "none";
-    if (stage === "contact") {
-      return html`<div class="hm-stage hm-stage-contact" aria-hidden="true">
-        <div class="hm-stage-contact-panel">
-          <span class="hm-stage-thumb" style=${styleMap({ left: "7px", top: "9px", "background-image": art })}></span>
-          <span class="hm-stage-thumb" style=${styleMap({ right: "7px", top: "9px", "background-image": art })}></span>
-          <span class="hm-stage-thumb" style=${styleMap({ left: "7px", bottom: "9px", "background-image": art })}></span>
-          <span class="hm-stage-thumb" style=${styleMap({ right: "7px", bottom: "9px", "background-image": art })}></span>
-          <span class="hm-stage-frame-no">12A</span>
-        </div>
-        <div class="hm-stage-ghost" style=${styleMap({ "background-image": art })}></div>
-        <div class="hm-stage-sprocket hm-stage-spin-rev"></div>
-        <div class="hm-stage-grease"></div>
-      </div>`;
-    }
-    if (stage === "dj") {
-      return html`<div class="hm-stage hm-stage-dj" aria-hidden="true">
-        <div class="hm-stage-dj-panel">
-          <span class="hm-stage-screw" style="left:7px;top:7px"></span>
-          <span class="hm-stage-screw" style="right:7px;top:7px"></span>
-          <span class="hm-stage-screw" style="left:7px;bottom:7px"></span>
-          <span class="hm-stage-screw" style="right:7px;bottom:7px"></span>
-          <span class="hm-stage-engrave top">DIRECT DRIVE / PRO DECK</span>
-          <span class="hm-stage-engrave bottom">33⅓ · STROBE · PITCH ±8</span>
-        </div>
-        <div class="hm-stage-platter"></div>
-        <div class="hm-stage-strobe hm-stage-spin-rev"></div>
-        <div class="hm-stage-cue"><span>CUE</span></div>
-      </div>`;
-    }
-    if (stage === "paper") {
-      return html`<div class="hm-stage hm-stage-paper" aria-hidden="true">
-        <div class="hm-stage-paper-sheet">
-          <span class="hm-stage-big33">33</span>
-          <span class="hm-stage-issue">POST MODERN<br />ISSUE 07</span>
-          <span class="hm-stage-barcode"></span>
-          <span class="hm-stage-shelf">SHELF 07 · ARCHIVE COPY</span>
-        </div>
-        <div class="hm-stage-ghostring"></div>
-      </div>`;
-    }
-    if (stage === "flash") {
-      return html`<div class="hm-stage hm-stage-flash" aria-hidden="true">
-        <div class="hm-stage-halo"></div>
-        <div class="hm-stage-ghost" style=${styleMap({ "background-image": art, "--stage-ghost-rotate": "12deg" })}></div>
-        <div class="hm-stage-ghost hm-stage-ghost2" style=${styleMap({ "background-image": art })}></div>
-        <div class="hm-stage-arc"></div>
-        <div class="hm-stage-chrome hm-stage-spin"></div>
-        <div class="hm-stage-specular"></div>
-        <span class="hm-stage-filmno">FRAME 36 / 36<em>DIRECT FLASH · 35MM</em></span>
-      </div>`;
-    }
-    return nothing;
-  }
-
-  _renderCoverStageOverlay(stage) {
-    if (stage !== "paper") return nothing;
-    return html`<div class="hm-stage-overlay hm-stage-overlay-paper" aria-hidden="true">
-      <span class="hm-stage-sticker">MASTER</span>
-      <span class="hm-stage-tape"></span>
     </div>`;
   }
 

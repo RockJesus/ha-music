@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.20.8";
+export const CARD_VERSION = "2.20.7";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -48,14 +48,6 @@ export const COVER_MODES = {
   art: { en: "Cover fill", zh: "封面铺满" },
   palette: { en: "Palette only", zh: "纯色彩" },
   none: { en: "Plain", zh: "无背景" },
-};
-
-export const COVER_STAGES = {
-  none: { en: "Off", zh: "关闭" },
-  contact: { en: "35mm contact sheet", zh: "接触印相" },
-  dj: { en: "Direct drive deck", zh: "直驱转盘" },
-  paper: { en: "Print insert", zh: "纸刊插页" },
-  flash: { en: "Direct flash film", zh: "直闪胶片" },
 };
 
 export const VISUALIZERS = {

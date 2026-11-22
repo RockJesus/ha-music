@@ -4,7 +4,6 @@ import {
   DEFAULT_THEME,
   LAYOUTS,
   COVER_MODES,
-  COVER_STAGES,
   VISUALIZERS,
   isChinese,
 } from "./const.js";
@@ -491,20 +490,6 @@ class HaMusicEditor extends LitElement {
                   (key) =>
                     html`<option value=${key} ?selected=${config.cover === key}>
                       ${this._optionLabel(COVER_MODES[key])}
-                    </option>`
-                )}
-              </select>
-            </label>
-            <label class="field">
-              <span class="label">${this._zh ? "封面舞台" : "Cover stage"}</span>
-              <select
-                .value=${config.coverStage || "none"}
-                @change=${(e) => this._update({ coverStage: e.target.value })}
-              >
-                ${Object.keys(COVER_STAGES).map(
-                  (key) =>
-                    html`<option value=${key} ?selected=${config.coverStage === key}>
-                      ${this._optionLabel(COVER_STAGES[key])}
                     </option>`
                 )}
               </select>

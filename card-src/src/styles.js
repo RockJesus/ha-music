@@ -1187,8 +1187,10 @@ export const cardStyles = css`
   .hm-transport {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: clamp(4px, 1.6cqi, 12px);
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
   }
 
   .hm-btn {
@@ -2006,6 +2008,24 @@ export const cardStyles = css`
 
     .hm-card[data-layout="full"] .hm-transport {
       justify-content: center;
+      width: 100%;
+      min-width: 0;
+      gap: clamp(2px, 1cqi, 6px);
+    }
+
+    .hm-card[data-layout="full"] .hm-transport .hm-btn {
+      flex: 1 1 0;
+      width: auto;
+      min-width: 0;
+      max-width: clamp(34px, 10.5cqi, 46px);
+      height: auto;
+      aspect-ratio: 1;
+    }
+
+    .hm-card[data-layout="full"] .hm-transport .hm-play {
+      flex: 0 0 auto;
+      width: clamp(52px, 15cqi, 70px);
+      height: clamp(52px, 15cqi, 70px);
     }
 
     .hm-card[data-layout="full"] .hm-volume {
@@ -4370,14 +4390,6 @@ export const cardStyles = css`
   }
 
   /* 极小卡片：只保留必要按钮，收紧控件，避免顶栏与播放键溢出 */
-  /* 窄竖卡片：随机/循环键会让播放键挤出卡边，先隐藏这两个次要键 */
-  @container (max-width: 380px) {
-    .hm-transport .hm-btn[data-role="shuffle"],
-    .hm-transport .hm-btn[data-role="repeat"] {
-      display: none;
-    }
-  }
-
   @container (max-width: 330px) {
     .hm-card[data-layout="compact"] .hm-top .hm-status-text,
     .hm-card[data-layout="compact"] .hm-top .hm-kicker-sep {

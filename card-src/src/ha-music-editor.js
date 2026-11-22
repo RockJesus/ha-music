@@ -648,15 +648,15 @@ class HaMusicEditor extends LitElement {
           <div class="section-title">${this._zh ? "全局迷你播放器" : "Global mini players"}</div>
           <div class="hint">
             ${this._zh
-              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；单击播放/暂停，双击折叠或展开。顶部只可左右移动、侧边栏只可上下移动；右下角长按后可任意拖动，但不能进入侧边栏和顶栏。"
+              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；单击播放/暂停，双击折叠或展开。顶栏只可左右移动、侧边栏只可上下移动；自由播放器长按后可任意拖动，但不能进入侧边栏和顶栏。"
               : "Each position can use its own entity; click to play/pause, double-click to fold, long-press to drag."}
           </div>
           ${(() => {
             const dockThemes = this._dockThemes();
             return [
-            ["top", this._zh ? "顶部播放器" : "Top bar"],
+            ["top", this._zh ? "顶栏播放器" : "Top bar player"],
             ["sidebar", this._zh ? "侧边栏播放器" : "Sidebar"],
-            ["fab", this._zh ? "右下角播放器" : "Bottom-right"],
+            ["fab", this._zh ? "自由播放器" : "Free player"],
           ].map(([mode, label]) => {
             const enabled = dockModes.includes(mode);
             const entity = dockEntities[mode] || this._mainEntity();

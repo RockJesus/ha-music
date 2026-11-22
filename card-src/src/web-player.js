@@ -1,4 +1,4 @@
-import { SendspinPlayer } from "@sendspin/sendspin-js";
+import { SendspinPlayer, loadSendspinClientIdentity } from "@sendspin/sendspin-js";
 
 function detectBrowser() {
   const ua = navigator.userAgent || "";
@@ -24,6 +24,17 @@ export function webPlayerName() {
   return `Web (${detectBrowser()} on ${detectPlatform()})`;
 }
 
+// Read the persisted Sendspin identity before creating the player.  Music
+// Assistant needs this client_id in its proxy auth frame to whitelist the
+// browser web player; a player built later on localStorage adopts it.
+export function webPlayerClientId() {
+  try {
+    return loadSendspinClientIdentity().clientId || "";
+  } catch {
+    return "";
+  }
+}
+
 export class WebPlayer {
   constructor({ url, name, version, onState }) {
     this.url = url;
@@ -38,9 +49,15 @@ export class WebPlayer {
     const player = new SendspinPlayer({
       url: this.url,
       clientName: this.name,
-      productName: "HA Music Card",
-      manufacturer: "RockJesus",
-      softwareVersion: this.version,
+      // Music Assistant recognizes its built-in browser player by this exact
+      // product name; anything else is treated as a third-party client that
+      // needs manual pairing and never auto-appears as a playable web player.
+      productName: "Web Player",
+      manufacturer: navigator.vendor || "Unknown",
+      softwareVersion: navigator.userAgent || this.version,
+      codecs: ["opus", "flac"],
+      requiredLeadTimeMs: 250,
+      minBufferMs: 500,
       correctionMode: "sync",
       onStateChange: (state) => {
         this.onState?.(state, this);
@@ -57,6 +74,10 @@ export class WebPlayer {
 
   get clientId() {
     return this.player?.clientId || "";
+  }
+
+  get pairingToken() {
+    return this.player?.pairingToken || "";
   }
 
   disconnect() {

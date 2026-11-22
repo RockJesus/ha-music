@@ -1,4 +1,4 @@
-// 全局迷你播放器：顶部 / 侧边栏 / 右下角三种位置，直接控制当前播放器。
+// 全局迷你播放器：顶栏 / 侧边栏 / 自由播放器三种位置，直接控制当前播放器。
 // 通过卡片传入 hass 与当前实体；也支持模块 URL 的 dock=top|sidebar|fab + dock_entity。
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
@@ -869,6 +869,8 @@ const STYLE = `
 `;
 
 export function normalizeDockModes(value) {
+  // 未显式配置时默认三个位置全开；显式 none / false / 空串仍表示关闭。
+  if (value === undefined || value === null) return [...MODES];
   if (value === true || value === "1") return ["top"];
   if (Array.isArray(value)) {
     return [...new Set(value.map((item) => String(item)).filter((item) => MODES.has(item)))];
@@ -1395,7 +1397,8 @@ class HaMusicMini extends HTMLElement {
       const positions = loadDockPositions();
       const pos = mobile ? null : positions.fab;
       const defaultX = constraints.vw - width - (mobile ? 12 : 24);
-      const defaultY = constraints.vh - height - (mobile ? 14 : 24);
+      // 自由播放器首次安装默认贴网页最右侧、垂直居中。
+      const defaultY = (constraints.vh - height) / 2;
       const target = clampFabPosition(
         pos && Number.isFinite(pos.x) ? pos.x * window.innerWidth : defaultX,
         pos && Number.isFinite(pos.y) ? pos.y * window.innerHeight : defaultY,
@@ -1424,9 +1427,10 @@ class HaMusicMini extends HTMLElement {
         mini.style.removeProperty("max-height");
         delete mini.dataset.compact;
         const addRect = findTopBarAddRect(bounds);
+        // 顶栏默认贴在 + 号左侧；识别不到时给右侧 HA 操作区留出约 190px。
         const defaultX = addRect
           ? addRect.left - 8 - size
-          : bounds.right - size - 80;
+          : bounds.right - size - 190;
         const x = mobile
           ? bounds.left + margin
           : clampNumber(
@@ -1450,9 +1454,10 @@ class HaMusicMini extends HTMLElement {
       mini.style.removeProperty("max-height");
       delete mini.dataset.compact;
       const addRect = findTopBarAddRect(bounds);
+      // 顶栏默认贴在 + 号左侧；识别不到时给右侧 HA 操作区留出约 190px。
       const defaultX = addRect
         ? addRect.left - 8 - w
-        : bounds.right - w - 80;
+        : bounds.right - w - 190;
       const x = mobile
         ? bounds.left + margin
         : clampNumber(
@@ -1687,8 +1692,8 @@ class HaMusicMini extends HTMLElement {
   _dockModeLabel() {
     const zh = !this._hass?.language || String(this._hass.language).startsWith("zh");
     const labels = zh
-      ? { top: "顶部", sidebar: "侧边栏", fab: "右下角" }
-      : { top: "top", sidebar: "sidebar", fab: "bottom-right" };
+      ? { top: "顶栏", sidebar: "侧边栏", fab: "自由播放器" }
+      : { top: "top bar", sidebar: "sidebar", fab: "free player" };
     return labels[this._mode] || this._mode;
   }
 

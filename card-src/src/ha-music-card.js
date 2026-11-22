@@ -43,7 +43,7 @@ import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallD
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
-import { WebPlayer, webPlayerName } from "./web-player.js";
+import { WebPlayer, webPlayerClientId, webPlayerName } from "./web-player.js";
 
 const MOBILE_MEDIA =
   "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)";
@@ -208,6 +208,7 @@ class HaMusicCard extends LitElement {
     this._webEntity = "";
     this._webReturnEntity = "";
     this._webName = webPlayerName();
+    this._webClientId = webPlayerClientId();
     this._webPlayerState = null;
     this._webEntityTimer = null;
     this._localWebEntity = "";
@@ -270,6 +271,8 @@ class HaMusicCard extends LitElement {
     this._spectrumCssH = 0;
     this._spectrumDpr = 1;
     this._spectrumLevels = [];
+    this._spectrumZoneGrads = null;
+    this._spectrumZoneGradKey = "";
     this._bandLevels = Object.assign([0.18, 0.14, 0.1], { live: false });
     this._spectrumLast = 0;
     this._spectrumKey = "";
@@ -277,6 +280,8 @@ class HaMusicCard extends LitElement {
     this._positionClock = null;
     // HA Music Studio：服务端 30fps 48 段真实频谱。
     this._studioBands = null;
+    this._studioZones = null;
+    this._studioSplit = null;
     this._studioPeak = 0;
     this._studioRms = 0;
     this._studioFrames = 0;
@@ -1960,8 +1965,10 @@ class HaMusicCard extends LitElement {
     }
     if (this._webTicketLoading) return this._webTicketLoading;
     const loading = (async () => {
+      if (!this._webClientId) this._webClientId = webPlayerClientId();
       const response = await this._hass.connection.sendMessagePromise({
         type: "ha_music_studio/web_player_ticket",
+        client_id: this._webClientId,
       });
       this._webTicket = String(response?.ticket || "");
       this._webTicketUrl = String(response?.url || "/api/ha_music_studio/sendspin");
@@ -2035,9 +2042,18 @@ class HaMusicCard extends LitElement {
       this._webPlayer = player;
       // unlock() is the first await inside WebPlayer.connect().
       await player.connect();
+      // Music Assistant auto-pairs its built-in web player only when the
+      // browser hands over the Sendspin pairing token. Without this the
+      // server keeps the player unpaired and it never becomes playable.
+      try {
+        await this._registerWebPlayerPairing();
+      } catch (error) {
+        console.warn("HA Music: web player pairing failed", error);
+      }
       this._notify(translator(this._hass?.language)("webPlayerConnected"));
       this._webBusy = false;
       this.requestUpdate();
+      await this._exposeWebPlayer();
       await this._waitForWebPlayer(beforeIds);
     } catch (error) {
       this._webBusy = false;
@@ -2052,6 +2068,38 @@ class HaMusicCard extends LitElement {
     }
   }
 
+  async _registerWebPlayerPairing() {
+    const pairingToken = this._webPlayer?.pairingToken || "";
+    if (!pairingToken) return;
+    await this._hass.connection.sendMessagePromise({
+      type: "ha_music_studio/web_player_pair",
+      pairing_token: pairingToken,
+      client_id: this._webClientId || this._webPlayer?.clientId || "",
+    });
+  }
+
+  async _exposeWebPlayer() {
+    // 配对后先让 Sendspin 会话稳定，再单独请求“暴露给 HA”。
+    // 后端不会在配对流程里做 config/players/save，避免重注册踢掉刚连上的会话。
+    const clientId = this._webClientId || this._webPlayer?.clientId || "";
+    if (!clientId) return;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      if (!this._webPlayer?.connected) return;
+      try {
+        await this._hass.connection.sendMessagePromise({
+          type: "ha_music_studio/web_player_expose",
+          client_id: clientId,
+        });
+        return;
+      } catch (error) {
+        if (attempt === 2) {
+          console.warn("HA Music: web player expose failed", error);
+        }
+      }
+    }
+  }
+
   async _waitForWebPlayer(beforeIds = new Set()) {
     for (let attempt = 0; attempt < 40; attempt += 1) {
       await this._loadPlayers();
@@ -2062,7 +2110,7 @@ class HaMusicCard extends LitElement {
         if (entityId) {
           this._webEntity = entityId;
           this._localWebEntity = entityId;
-          this._queueLocalWebEntitySync(250);
+          await this._syncLocalWebEntity(entityId);
           if (entityId !== this._activeEntity) {
             this._webReturnEntity = this._activeEntity;
             this._switchEntity(entityId, true);
@@ -2092,6 +2140,9 @@ class HaMusicCard extends LitElement {
     }
     this._webPlayerId = player.player_id;
     this._webEntity = entityId;
+    this._localWebEntity = entityId;
+    // 用户点“在本机播放”时也确保 Web 实体已在卡片列表里。
+    this._syncLocalWebEntity(entityId);
     if (entityId !== this._activeEntity) {
       this._webReturnEntity = this._activeEntity;
       this._switchEntity(entityId, true);
@@ -2100,14 +2151,15 @@ class HaMusicCard extends LitElement {
   }
 
   _disconnectWebPlayer() {
-    const webEntity = this._webEntity;
+    const webEntity = this._webEntity || this._localWebEntity;
     this._webPlayer?.disconnect();
     this._webPlayer = null;
     this._webPlayerId = "";
     this._webEntity = "";
     this._webPlayerState = null;
     this._localWebEntity = "";
-    this._queueLocalWebEntitySync(1500);
+    // 主动断开时立即把本机 Web 实体移出卡片，不等状态轮询。
+    if (webEntity) this._syncLocalWebEntity("", webEntity);
     if (webEntity && this._activeEntity === webEntity && this._webReturnEntity) {
       this._switchEntity(this._webReturnEntity, true);
       this._webReturnEntity = "";
@@ -2224,28 +2276,49 @@ class HaMusicCard extends LitElement {
     return "";
   }
 
-  async _syncLocalWebEntity() {
-    if (this._localWebSyncBusy || !this._hass?.callWS || this._isPreviewContext()) return;
+  async _syncLocalWebEntity(preferredTarget = "", removeEntity = "") {
+    if (this._localWebSyncBusy) {
+      // 正在保存时把最新意图排队，保存结束后再执行，避免连接/断开瞬间的
+      // 自动加入被前一次同步吞掉。
+      this._webSyncPending = { target: preferredTarget, remove: removeEntity };
+      return;
+    }
+    if (!this._hass?.callWS || this._isPreviewContext()) return;
     const current = this._entities();
     if (!current.length) return;
-    const target = this._currentLocalWebEntity();
+    const target = removeEntity ? "" : preferredTarget || this._currentLocalWebEntity();
     if (target) this._localWebEntity = target;
     const webIds = current.filter((id) => this._isLocalWebEntity(id));
     let next = null;
     if (target) {
+      // 连接成功后直接把本机 Web 实体追加到卡片，不等 HA 状态刷新。
       const extras = webIds.filter((id) => id !== target);
       if (!current.includes(target) || extras.length) {
         next = current.filter((id) => id !== target && !extras.includes(id));
         next.push(target);
       }
-    } else if (webIds.length) {
-      next = current.filter((id) => !webIds.includes(id));
+    } else if (
+      (removeEntity || !this._webPlayer?.connected) &&
+      (removeEntity ? current.includes(removeEntity) : webIds.length)
+    ) {
+      // 只在主动断开、或播放器确实已断开时移除；连接期间 HA 实体短暂
+      // unavailable 不能把刚加入的 Web 播放器又删掉。
+      const removeIds = removeEntity ? [removeEntity] : webIds;
+      next = current.filter((id) => !removeIds.includes(id));
+      if (!next.length) return;
     }
     if (!next || !next.length) return;
     if (next.length === current.length && next.every((id, index) => id === current[index])) return;
     const key = next.join("|");
     if (key === this._localWebSyncKey && Date.now() - this._localWebSyncAt < 8000) return;
     this._localWebSyncBusy = true;
+    const previous = { ...(this._config || {}) };
+    // 先乐观更新 UI，Lovelace 保存失败时再回滚，避免要刷新页面才看到 Web 胶囊。
+    this._config =
+      next.length > 1
+        ? { ...previous, entities: next, entity: undefined }
+        : { ...previous, entity: next[0], entities: undefined };
+    this.requestUpdate();
     try {
       await this._saveCardEntities(next);
       this._localWebSyncKey = key;
@@ -2253,8 +2326,13 @@ class HaMusicCard extends LitElement {
       if (!target) this._localWebEntity = "";
     } catch {
       /* 自动同步失败时保留原卡片配置，不打断播放 */
+      this._config = previous;
+      this.requestUpdate();
     } finally {
       this._localWebSyncBusy = false;
+      const pending = this._webSyncPending;
+      this._webSyncPending = null;
+      if (pending) this._syncLocalWebEntity(pending.target, pending.remove);
     }
   }
 
@@ -5319,41 +5397,20 @@ class HaMusicCard extends LitElement {
           ${(duration > 0 || previewUi) && !fusionMode
             ? html`<section class="hm-progress">
                 <span class="hm-time">${formatTime(position)}</span>
-                ${waveBars.length
-                  ? html`<div
-                      class="hm-wave"
-                      data-role="seek"
-                      data-disabled=${!canSeek ? "true" : "false"}
-                      role="slider"
-                      tabindex="0"
-                      aria-label=${t("seek")}
-                      aria-valuemin="0"
-                      aria-valuemax=${duration}
-                      aria-valuenow=${position}
-                      @click=${(event) => this._onWaveformClick(event)}
-                    >
-                      ${waveBars.map(
-                        (bar, index) => html`<span
-                          class="hm-wave-bar"
-                          data-past=${index / waveBars.length <= percent / 100 ? "true" : "false"}
-                          style=${styleMap({ "--h": `${Math.round(6 + bar * 94)}%` })}
-                        ></span>`
-                      )}
-                    </div>`
-                  : html`<input
-                      class="hm-range"
-                      data-role="seek"
-                      type="range"
-                      min="0"
-                      max=${duration}
-                      step="0.01"
-                      .value=${String(position)}
-                      data-disabled=${!canSeek ? "true" : "false"}
-                      style=${styleMap({ "--pct": `${percent}%` })}
-                      @input=${this._onSeekInput}
-                      @change=${this._onSeekCommit}
-                      aria-label=${t("seek")}
-                    />`}
+                <input
+                  class="hm-range"
+                  data-role="seek"
+                  type="range"
+                  min="0"
+                  max=${duration}
+                  step="0.01"
+                  .value=${String(position)}
+                  data-disabled=${!canSeek ? "true" : "false"}
+                  style=${styleMap({ "--pct": `${percent}%` })}
+                  @input=${this._onSeekInput}
+                  @change=${this._onSeekCommit}
+                  aria-label=${t("seek")}
+                />
                 <span
                   class="hm-time end hoverable"
                   title=${t("remaining")}
@@ -5771,6 +5828,13 @@ class HaMusicCard extends LitElement {
   }
 
   _studioBandTriplet() {
+    if (
+      Array.isArray(this._studioZones) &&
+      this._studioZones.length === 3 &&
+      this._studioZones.every((value) => Number.isFinite(Number(value)))
+    ) {
+      return this._studioZones.map((value) => clamp(Number(value) || 0, 0, 1));
+    }
     const bands = this._studioBands;
     if (!bands?.length) return null;
     const third = bands.length / 3;
@@ -5785,6 +5849,18 @@ class HaMusicCard extends LitElement {
       }
       return n ? sum / n : 0;
     });
+  }
+
+  // 真实频段分界由集成按 250Hz / 2000Hz 给出；缩放到当前 canvas 柱数。
+  _spectrumZoneSplit(count) {
+    const bands = this._studioBands?.length || 0;
+    const raw = this._studioSplit;
+    if (!bands || !Array.isArray(raw) || raw.length !== 2) {
+      return [Math.round(count / 3), Math.round((count * 2) / 3)];
+    }
+    const low = clamp(Math.round((Number(raw[0]) / bands) * count), 1, count - 2);
+    const mid = clamp(Math.round((Number(raw[1]) / bands) * count), low + 1, count - 1);
+    return [low, mid];
   }
 
   _ensureStudioSpectrum() {
@@ -5825,6 +5901,16 @@ class HaMusicCard extends LitElement {
           }
           this._studioProtocolError = false;
           this._studioBands = event.bands.map((value) => clamp(Number(value) || 0, 0, 1.6));
+          this._studioZones = Array.isArray(event.zones)
+            ? event.zones.slice(0, 3).map((value) => clamp(Number(value) || 0, 0, 1))
+            : event.zones && typeof event.zones === "object"
+              ? ["low", "mid", "high"].map((key) =>
+                  clamp(Number(event.zones[key]) || 0, 0, 1)
+                )
+              : null;
+          this._studioSplit = Array.isArray(event.zone_split)
+            ? event.zone_split.slice(0, 2).map((value) => Number(value) || 0)
+            : null;
           this._studioPeak = Number(event.peak) || 0;
           this._studioRms = Number(event.rms) || 0;
           this._studioFrames = Number(event.frames) || 0;
@@ -5960,7 +6046,10 @@ class HaMusicCard extends LitElement {
     } catch {
       nextCtx = null;
     }
-    if (nextCtx !== this._spectrumCtx) this._spectrumGrad = null;
+    if (nextCtx !== this._spectrumCtx) {
+      this._spectrumGrad = null;
+      this._spectrumZoneGrads = null;
+    }
     this._spectrumCtx = nextCtx;
     this._spectrumCssW = width;
     this._spectrumCssH = height;
@@ -5974,6 +6063,44 @@ class HaMusicCard extends LitElement {
     return true;
   }
 
+  _spectrumZoneGradients(width, split, count, zoneGap) {
+    const accent = this._spectrumAccent();
+    const key = `${accent[0]}|${accent[1]}|${width}|${count}|${split[0]}|${split[1]}|${zoneGap}`;
+    if (this._spectrumZoneGrads && this._spectrumZoneGradKey === key) {
+      return this._spectrumZoneGrads;
+    }
+    const ctx = this._spectrumCtx;
+    if (!ctx) return null;
+    const a0 = hexToHsl(accent[0]);
+    const a1 = hexToHsl(accent[1]);
+    const m1 = mixHsl(a0, a1, 0.28);
+    const m2 = mixHsl(a0, a1, 0.72);
+    const cell = (width - zoneGap * 2) / count;
+    const spans = [
+      [0, split[0]],
+      [split[0], split[1]],
+      [split[1], count],
+    ].map(([from, to], zone) => {
+      const x0 = zoneGap * zone;
+      const x1 = x0 + (to - from) * cell;
+      return [x0, Math.max(x0 + 1, x1)];
+    });
+    const stops = [
+      [accent[0], m1.css],
+      [m1.css, m2.css],
+      [m2.css, accent[1]],
+    ];
+    const grads = spans.map(([x0, x1], zone) => {
+      const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+      grad.addColorStop(0, stops[zone][0]);
+      grad.addColorStop(1, stops[zone][1]);
+      return grad;
+    });
+    this._spectrumZoneGrads = grads;
+    this._spectrumZoneGradKey = key;
+    return grads;
+  }
+
   _drawSpectrum(levels, idle = false) {
     const ctx = this._spectrumCtx;
     const width = this._spectrumCssW;
@@ -5983,34 +6110,46 @@ class HaMusicCard extends LitElement {
     if (!ctx || !width || !height || !count) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    const cell = width / count;
-    const gap = Math.min(2.4, Math.max(1.2, cell * 0.34));
+    // 频谱进度模式下不切开频段，保持与 seek 位置逐柱对齐。
+    const fusion = this._fusionLayout() === "rail";
+    const split = this._spectrumZoneSplit(count);
+    // 三块之间留出窄缝，低频/中频/高频一眼可分组。
+    const zoneGap = fusion ? 0 : Math.min(14, Math.max(5, width * 0.009));
+    const usableWidth = Math.max(1, width - zoneGap * 2);
+    const cell = usableWidth / count;
+    const gap = Math.min(2.4, Math.max(1.1, cell * 0.34));
     const barWidth = Math.max(1, cell - gap);
     const radius = Math.min(1.5, barWidth / 2);
     const accent = this._spectrumAccent();
     const mobile = this._isMobileUi();
-    const gradKey = `${accent[0]}|${accent[1]}|${width}`;
-    if (!this._spectrumGrad || this._spectrumGradKey !== gradKey) {
+    const labelH = !fusion && height >= 34 ? 11 : 0;
+    const barArea = Math.max(4, height - labelH);
+    const grads = this._spectrumZoneGradients(width, split, count, zoneGap);
+    const fallbackKey = `${accent[0]}|${accent[1]}|${width}`;
+    if (!grads && (!this._spectrumGrad || this._spectrumGradKey !== fallbackKey)) {
       const grad = ctx.createLinearGradient(0, 0, width, 0);
       grad.addColorStop(0, accent[0]);
       grad.addColorStop(1, accent[1]);
       this._spectrumGrad = grad;
-      this._spectrumGradKey = gradKey;
+      this._spectrumGradKey = fallbackKey;
     }
     // 频谱进度模式下：已播放区域亮色跟随频谱，未播放区域压成暗色轮廓，
     // 让一根频谱条同时承担“实时响应 + 播放进度”两种语义。
-    const fusionMode = this._fusionLayout();
-    const fusion = fusionMode === "rail";
     const progress = fusion ? this._fusionPercent() : -1;
     const dimColor = "rgba(126, 108, 160, 0.55)";
+    const zoneStarts = [0, split[0], split[1], count];
     for (let index = 0; index < count; index += 1) {
+      const zone = index < split[0] ? 0 : index < split[1] ? 1 : 2;
+      const zoneIndex = index - zoneStarts[zone];
       const level = clamp(Number(levels[index]) || 0, 0.02, 1);
-      const barHeight = Math.max(2, level * height);
-      const x = index * cell + (cell - barWidth) / 2;
+      const barHeight = Math.max(2, level * barArea);
+      const x = zoneGap * zone + zoneIndex * cell + (cell - barWidth) / 2;
       const y = height - barHeight;
       const played =
         progress < 0 || index / Math.max(1, count - 1) <= progress + 0.002;
-      ctx.fillStyle = played ? this._spectrumGrad : dimColor;
+      ctx.fillStyle = played
+        ? grads?.[zone] || this._spectrumGrad || accent[0]
+        : dimColor;
       if (mobile) ctx.globalAlpha = played ? (idle ? 0.5 : 0.84) : 0.18;
       if (!mobile) ctx.globalAlpha = played
         ? idle ? 0.5 : 0.58 + level * 0.36
@@ -6024,7 +6163,22 @@ class HaMusicCard extends LitElement {
       }
     }
     ctx.globalAlpha = 1;
+    if (labelH) {
+      const labels = String(this._hass?.language || "").toLowerCase().startsWith("zh")
+        ? ["低频", "中频", "高频"]
+        : ["LOW", "MID", "HIGH"];
+      ctx.font = '600 7.5px "Segoe UI", "PingFang SC", system-ui, sans-serif';
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.46)";
+      for (let zone = 0; zone < 3; zone += 1) {
+        const span = zoneStarts[zone + 1] - zoneStarts[zone];
+        if (span * cell < 34) continue;
+        const x = zoneGap * zone + 2;
+        ctx.fillText(labels[zone], x, 0.5);
+      }
+    }
   }
+
 
   _syncSpectrum() {
     const canvas = this.renderRoot?.querySelector?.(".hm-spectrum");
@@ -6157,7 +6311,8 @@ class HaMusicCard extends LitElement {
       let target;
       if (studioTargets) {
         target = studioTargets[index];
-        const zone = index < count / 3 ? 0 : index < (count * 2) / 3 ? 1 : 2;
+        const zoneSplit = this._spectrumZoneSplit(count);
+        const zone = index < zoneSplit[0] ? 0 : index < zoneSplit[1] ? 1 : 2;
         const drive = this._bandLevels[zone] || 0;
         // 左/中/右三块用低频/中频/高频能量做增益，保留逐柱细节，避免整段被推到天花板。
         target = clamp(target * (0.58 + drive * 0.48), 0.03, 1);

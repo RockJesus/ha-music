@@ -589,10 +589,8 @@ class HaMusicLyric extends HTMLElement {
     let defaultX;
     let defaultY;
     if (topbar) {
-      const addRect = findTopBarAddRect(topbar);
-      defaultX = addRect
-        ? addRect.left - width - 8
-        : topbar.left + (topbar.width - width) / 2;
+      // 首次安装默认落在顶栏水平居中，不抢占右侧的 HA 操作按钮。
+      defaultX = topbar.left + (topbar.width - width) / 2;
       defaultY = topbar.top + (topbar.height - height) / 2;
     } else {
       defaultX = vw - width - 16;

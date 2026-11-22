@@ -54,17 +54,16 @@ function paint(canvas, bars, glow) {
 
   for (let i = 0; i < barCount; i += 1) {
     const v = clamp(bars[i] || 0, 0, 1);
-    // 环形频谱进度：已播放的一侧保持彩色律动，未播放一侧压暗成轮廓。
+    // 音柱只负责实时频谱，不按进度压暗；进度由内圈细弧单独表达。
     // 进度从 12 点方向顺时针增长，与圆形拖动方向一致。
-    const played = progress < 0 || i / barCount <= progress + 0.0008;
-    ctx.shadowBlur = played && glowOn ? 5 + glow * 7 : 0;
+    ctx.shadowBlur = glowOn ? 5 + glow * 7 : 0;
     const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
     const len = 3.2 + Math.pow(v, 1.05) * maxLen;
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = Math.abs(Math.sin(angle));
     const color = blend(accent[0], accent[1], t);
-    const alpha = (0.5 + v * 0.48) * (played ? 1 : 0.26);
+    const alpha = 0.5 + v * 0.48;
     // 柱底保留少量 alpha，让每一根柱都从根部可见；若从 0 渐入，
     // 短柱只剩外端几个像素，整圈会退化成虚线，看起来像音柱缺失。
     const x0 = R + c * r0;
@@ -77,9 +76,7 @@ function paint(canvas, bars, glow) {
     grad.addColorStop(0.46, rgba(color, alpha * 0.62));
     grad.addColorStop(1, rgba(color, alpha));
     ctx.strokeStyle = grad;
-    ctx.shadowColor = played
-      ? rgba(color, 0.12 + glow * 0.26)
-      : "rgba(0, 0, 0, 0)";
+    ctx.shadowColor = rgba(color, 0.12 + glow * 0.26);
     ctx.lineWidth = state.lineWidth || 3;
     ctx.beginPath();
     ctx.moveTo(x0, y0);
@@ -87,7 +84,7 @@ function paint(canvas, bars, glow) {
     ctx.stroke();
 
     // 上半环加一道近白亮芯，让紫色一端在深色背景上仍能读出柱长。
-    const core = played ? clamp((t - 0.3) / 0.45, 0, 1) : 0;
+    const core = clamp((t - 0.3) / 0.45, 0, 1);
     if (core > 0.01) {
       ctx.shadowBlur = 0;
       ctx.strokeStyle = `rgba(255, 255, 255, ${((0.05 + v * 0.24) * core).toFixed(2)})`;

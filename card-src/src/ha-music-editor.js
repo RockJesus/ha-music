@@ -497,7 +497,7 @@ class HaMusicEditor extends LitElement {
             <label class="field">
               <span class="label">${this._zh ? "频谱动效" : "Visualizer"}</span>
               <select
-                .value=${config.visualizer || "bars"}
+                .value=${VISUALIZERS[config.visualizer] ? config.visualizer : "bars"}
                 @change=${(e) => this._update({ visualizer: e.target.value })}
               >
                 ${Object.keys(VISUALIZERS).map(

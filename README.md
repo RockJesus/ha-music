@@ -31,8 +31,8 @@
 - **圆角方形封面**：主卡片和全局迷你播放器的歌曲封面统一为 18px 圆角方形，完整显示专辑图，不做圆形裁切；外圈频谱环与光晕保留。
 - **无封面默认图**：播放器不可用、曲目无封面或封面加载失败时，主卡片与三个迷你播放器统一显示主题化默认唱片封面，不再出现空白/broken image。
 - **三种背景模式**：`ambient` 环境模糊、`art` 封面铺满、`palette` 纯色彩、`none` 无背景。
-- **频谱动效**：`bars` 柱状、`wave` 波形、`orbit` 光环；`bars` 优先使用 MA 能量波形，未接桥接服务时按「歌名+歌手+专辑」和 `media_position` 做逐帧律动。
-- **频谱与进度合一**（可选）：`ring` 把封面外圈音柱兼作进度，拖动外圈任意角度快进；`rail` 把横向频谱条直接当进度条；`dual` 用细轨负责精确拖动、上层频谱柱负责实时律动。选中后隐藏原来的独立进度行，只保留融合控件。
+- **频谱动效**：`bars` 柱状、`ring` 环形频谱进度、`rail` 频谱进度条；`bars` 优先使用 MA 能量波形，未接桥接服务时按「歌名+歌手+专辑」和 `media_position` 做逐帧律动。
+- **频谱与进度合一**（可选）：`ring` 把封面外圈音柱兼作进度，拖动外圈任意角度快进；`rail` 把横向频谱条直接当进度条。选中后隐藏原来的独立进度行，只保留融合控件。
 - **完整播放控制**：播放/暂停、上一首/下一首、进度拖动、音量拖动与静音、随机、循环（关/列表/单曲）、电源开关。
 - **音源与声音模式**：读取 `source_list` / `sound_mode_list`，点击 chip 直接切换。
 - **当前播放列表**：原生播放器读取 `queue` 属性；Music Assistant 播放器经 HA Supervisor Ingress 直连 MA API 读取完整队列，抽屉内点击任意曲目精确切歌，无需安装 Mass Queue。非管理员、外部 MA 服务器或读取失败时，自动回退到当前/下一首，并保留「在 Music Assistant 查看全部」入口。
@@ -115,7 +115,7 @@ entity: media_player.living_room
 | `accent` | hex color | — | 覆盖主题主色，如 `"#ff5fa2"` |
 | `palette` | bool | `true` | 是否从封面取色（`false` 则固定主题色） |
 | `cover` | `ambient` \| `art` \| `palette` \| `none` | `ambient` | 背景模式 |
-| `visualizer` | `bars` \| `wave` \| `orbit` \| `ring` \| `rail` \| `dual` \| `none` | `bars` | 频谱动效；`bars` 实时频谱，`wave` 波形，`orbit` 光环；`ring`/`rail`/`dual` 为频谱与进度合一的三种可选样式 |
+| `visualizer` | `bars` \| `ring` \| `rail` \| `none` | `bars` | 频谱动效；`bars` 实时频谱，`ring` 环形频谱进度，`rail` 频谱进度条 |
 | `volume_entity` | string | — | 用独立实体控制音量（如 `media_player.amplifier`） |
 | `show_volume` | bool | `true` | 显示音量条 |
 | `show_lyrics` | bool | `true` | 自动识别并显示歌词；关闭后不请求歌词接口 |
@@ -172,14 +172,14 @@ entity: media_player.living_room
 theme: cyber
 ```
 
-**液态玻璃 + 封面铺满 + 波形**
+**液态玻璃 + 封面铺满 + 频谱进度条**
 
 ```yaml
 type: custom:ha-music
 entity: media_player.study
 theme: liquid
 cover: art
-visualizer: wave
+visualizer: rail
 accent: "#a9d8ff"
 ```
 

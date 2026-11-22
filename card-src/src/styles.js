@@ -660,95 +660,6 @@ export const cardStyles = css`
     );
   }
 
-  .hm-wave-wrap {
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
-  }
-
-  .hm-wave-wrap svg {
-    height: 100%;
-    width: 200%;
-    display: block;
-    animation: hmWave 6s linear infinite;
-    animation-play-state: var(--run, running);
-  }
-
-  .hm-vis[data-playing="false"] .hm-wave-wrap svg {
-    --run: paused;
-  }
-
-  .hm-vis[data-style="orbit"] {
-    height: clamp(38px, 9.5cqi, 60px);
-  }
-
-  .hm-orbit-wrap {
-    position: relative;
-    height: 100%;
-    width: 100%;
-  }
-
-  .hm-orbit-wrap::before {
-    content: "";
-    position: absolute;
-    left: 12%;
-    right: 12%;
-    top: 50%;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(var(--hm-a1-rgb), 0.22) 22%,
-      rgba(var(--hm-a2-rgb), 0.22) 78%,
-      transparent
-    );
-  }
-
-  .hm-orbit-ring {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    translate: -50% -50%;
-    height: 88%;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    border: 1px solid rgba(var(--hm-a1-rgb), 0.65);
-    border-width: calc(
-      1px + var(--react, 0.5) * var(--drive, 0.5) * 1.2px
-    );
-    box-shadow:
-      0 0 calc(16px + var(--react, 0.5) * var(--drive, 0.5) * 16px) -6px
-        rgba(var(--hm-a1-rgb), 0.55),
-      inset 0 0 calc(14px + var(--react, 0.5) * var(--drive, 0.5) * 12px)
-        -8px rgba(var(--hm-a1-rgb), 0.6);
-    animation: hmOrbit 3.4s ease-out infinite;
-    animation-play-state: var(--run, running);
-    filter: brightness(
-      calc(0.72 + var(--react, 0.5) * var(--drive, 0.5) * 0.62)
-    );
-    transition: filter 0.35s ease;
-  }
-
-  .hm-orbit-ring:nth-child(1) {
-    height: 96%;
-  }
-
-  .hm-orbit-ring:nth-child(2) {
-    height: 68%;
-    border-color: rgba(var(--hm-a2-rgb), 0.6);
-    animation-delay: 1.1s;
-  }
-
-  .hm-orbit-ring:nth-child(3) {
-    height: 42%;
-    border-color: rgba(var(--hm-a1-rgb), 0.45);
-    animation-delay: 2.2s;
-  }
-
-  .hm-vis[data-playing="false"] .hm-orbit-ring {
-    --run: paused;
-  }
-
   /* ---------- 进度 ---------- */
   .hm-progress {
     display: flex;
@@ -855,8 +766,7 @@ export const cardStyles = css`
   }
 
   /* ---------- 频谱进度合一（可选动效） ---------- */
-  .hm-vis[data-style="rail"],
-  .hm-vis[data-style="dual"] {
+  .hm-vis[data-style="rail"] {
     height: clamp(56px, 12cqi, 76px);
     overflow: visible;
     opacity: 1;
@@ -887,13 +797,6 @@ export const cardStyles = css`
     height: 4px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.13);
-  }
-
-  .hm-fusion[data-kind="dual"] .hm-fusion-track {
-    bottom: 22px;
-    height: 10px;
-    background: rgba(255, 255, 255, 0.10);
-    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .hm-fusion-fill {
@@ -927,11 +830,6 @@ export const cardStyles = css`
     );
     box-shadow: 0 0 14px rgba(var(--hm-ctl-a1-rgb), 0.65);
     pointer-events: none;
-  }
-
-  .hm-fusion[data-kind="dual"] .hm-fusion-knob {
-    width: 20px;
-    height: 20px;
   }
 
   .hm-fusion-range {
@@ -1882,10 +1780,6 @@ export const cardStyles = css`
     opacity: 0.75;
   }
 
-  .hm-card[data-layout="compact"] .hm-vis[data-style="orbit"] {
-    display: none;
-  }
-
   .hm-card[data-layout="compact"] .hm-controls {
     justify-content: flex-start;
     gap: 12px;
@@ -2498,15 +2392,6 @@ export const cardStyles = css`
     }
   }
 
-  @keyframes hmWave {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-25%);
-    }
-  }
-
   @keyframes hmSpin {
     to {
       transform: rotate(360deg);
@@ -2519,23 +2404,6 @@ export const cardStyles = css`
     }
     to {
       background-position: 34px 34px, 34px 34px;
-    }
-  }
-
-  @keyframes hmOrbit {
-    0% {
-      transform: scale(0.62);
-      opacity: 0;
-    }
-    35% {
-      opacity: 0.95;
-    }
-    85% {
-      opacity: 0.18;
-    }
-    100% {
-      transform: scale(1.18);
-      opacity: 0;
     }
   }
 
@@ -4369,8 +4237,6 @@ export const cardStyles = css`
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hm-wave-wrap svg,
-    .hm-orbit-ring,
     .hm-grid,
     .hm-cover::before,
     .hm-cover-eq-glow,

@@ -110,19 +110,6 @@ function fireEvent(node, type, detail) {
   return event;
 }
 
-function wavePath(width, height, wavelength, amplitude, phase) {
-  const points = [];
-  for (let x = 0; x <= width; x += 4) {
-    const y =
-      height / 2 +
-      Math.sin((x / wavelength) * Math.PI * 2 + phase) * amplitude +
-      Math.sin((x / (wavelength / 2)) * Math.PI * 2 + phase * 1.7) *
-        (amplitude * 0.32);
-    points.push(`${x.toFixed(1)},${y.toFixed(2)}`);
-  }
-  return `M${points.join(" L")}`;
-}
-
 function formatEntityState(state) {
   switch (state) {
     case "playing":
@@ -4858,10 +4845,12 @@ class HaMusicCard extends LitElement {
       (queue.length > 0 ||
         (maPlayer && (Boolean(state.attributes?.active_queue) || studioQueueReady)));
     const showLibrary = config.show_library !== false && canBrowse;
-    const visualizer = config.visualizer || "bars";
+    const visualizerValue = config.visualizer || "bars";
+    const visualizer = ["bars", "ring", "rail", "none"].includes(visualizerValue)
+      ? visualizerValue
+      : "bars";
     const fusionMode = this._fusionLayout();
-    const fusionRequested =
-      visualizer === "ring" || visualizer === "rail" || visualizer === "dual";
+    const fusionRequested = visualizer === "ring" || visualizer === "rail";
     const visualizerKind =
       fusionMode === "ring" ? "none" : fusionMode || (fusionRequested ? "bars" : visualizer);
     const coverMode = config.cover || "ambient";
@@ -5135,7 +5124,7 @@ class HaMusicCard extends LitElement {
             <div
               class="hm-cover-wrap"
               data-ringseek=${fusionMode === "ring" ? "true" : "false"}
-              data-fusion-linear=${fusionMode === "rail" || fusionMode === "dual" ? "true" : "false"}
+              data-fusion-linear=${fusionMode === "rail" ? "true" : "false"}
             >
               ${this._thumbMode()
                 ? nothing
@@ -5642,7 +5631,7 @@ class HaMusicCard extends LitElement {
 
   _fusionLayout() {
     const value = this._config?.visualizer || "bars";
-    if (value !== "ring" && value !== "rail" && value !== "dual") return "";
+    if (value !== "ring" && value !== "rail") return "";
     if (this._layoutKey() !== "full" || this._thumbPreview) return "";
     return value;
   }
@@ -5696,60 +5685,8 @@ class HaMusicCard extends LitElement {
   }
 
   _renderVisualizer(kind, media) {
-    if (kind === "rail" || kind === "dual") return this._renderFusionSeek(kind);
+    if (kind === "rail") return this._renderFusionSeek(kind);
     if (kind === "ring") return nothing;
-    const frame = visualizerFrame(media);
-    if (kind === "wave") {
-      const amp1 = 7 + frame.energy * 6 + frame.low * 7;
-      const amp2 = 4.5 + frame.pulse * 5.5;
-      const amp3 = 2.2 + frame.pulse * 3.2;
-      const phase = frame.phase;
-      const duration = `${(frame.period * 2.4).toFixed(2)}s`;
-      return html`<div class="hm-wave-wrap">
-        <svg
-          viewBox="0 0 600 40"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-          style=${styleMap({ animationDuration: duration })}
-        >
-          <path
-            d=${wavePath(600, 40, 150, amp1, phase)}
-            fill="none"
-            stroke="rgba(var(--hm-a1-rgb), 0.85)"
-            stroke-width="1.4"
-          ></path>
-          <path
-            d=${wavePath(600, 40, 150, amp2, phase * 1.35 + 1.9)}
-            fill="none"
-            stroke="rgba(var(--hm-a2-rgb), 0.6)"
-            stroke-width="1.2"
-          ></path>
-          <path
-            d=${wavePath(600, 40, 75, amp3, phase * 1.7 + 3.2)}
-            fill="none"
-            stroke="rgba(var(--hm-a1-rgb), 0.35)"
-            stroke-width="0.9"
-          ></path>
-        </svg>
-      </div>`;
-    }
-    if (kind === "orbit") {
-      const reactors = [1, 0.58, 0.34];
-      return html`<div class="hm-orbit-wrap">
-        ${reactors.map((react, index) => {
-          const drive = index === 0 ? frame.low : frame.pulse;
-          return html`<span
-            class="hm-orbit-ring"
-            style=${styleMap({
-              "--react": String(react),
-              "--drive": drive.toFixed(3),
-              animationDuration: `${(frame.period * (1.8 + index * 0.25)).toFixed(2)}s`,
-              animationDelay: `${(index * frame.period * 0.55).toFixed(2)}s`,
-            })}
-          ></span>`;
-        })}
-      </div>`;
-    }
     // 缩略预览只用静态渐变条：不创建 canvas、不跑 rAF，内存与合成层都归零。
     if (this._thumbMode()) {
       return html`<div class="hm-spectrum hm-spectrum-flat" aria-hidden="true"></div>`;
@@ -6062,7 +5999,7 @@ class HaMusicCard extends LitElement {
     // 频谱进度模式下：已播放区域亮色跟随频谱，未播放区域压成暗色轮廓，
     // 让一根频谱条同时承担“实时响应 + 播放进度”两种语义。
     const fusionMode = this._fusionLayout();
-    const fusion = fusionMode === "rail" || fusionMode === "dual";
+    const fusion = fusionMode === "rail";
     const progress = fusion ? this._fusionPercent() : -1;
     const dimColor = "rgba(126, 108, 160, 0.55)";
     for (let index = 0; index < count; index += 1) {
@@ -6093,7 +6030,7 @@ class HaMusicCard extends LitElement {
     if (
       !canvas ||
       this._thumbPreview ||
-      !["bars", "rail", "dual"].includes(this._config?.visualizer || "bars")
+      !["bars", "rail"].includes(this._config?.visualizer || "bars")
     ) {
       this._spectrumCanvas = null;
       this._spectrumCtx = null;

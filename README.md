@@ -115,6 +115,7 @@ entity: media_player.living_room
 | `accent` | hex color | — | 覆盖主题主色，如 `"#ff5fa2"` |
 | `palette` | bool | `true` | 是否从封面取色（`false` 则固定主题色） |
 | `cover` | `ambient` \| `art` \| `palette` \| `none` | `ambient` | 背景模式 |
+| `coverStage` | `none` \| `contact` \| `dj` \| `paper` \| `flash` | `none` | 封面旋转舞台，仅 `full` 布局生效：`contact` 35mm 接触印相、`dj` 直驱转盘、`paper` 纸刊插页、`flash` 直闪胶片 |
 | `visualizer` | `bars` \| `wave` \| `orbit` \| `ring` \| `rail` \| `dual` \| `none` | `bars` | 频谱动效；`bars` 实时频谱，`wave` 波形，`orbit` 光环；`ring`/`rail`/`dual` 为频谱与进度合一的三种可选样式 |
 | `volume_entity` | string | — | 用独立实体控制音量（如 `media_player.amplifier`） |
 | `show_volume` | bool | `true` | 显示音量条 |
@@ -179,6 +180,7 @@ type: custom:ha-music
 entity: media_player.study
 theme: liquid
 cover: art
+coverStage: contact
 visualizer: wave
 accent: "#a9d8ff"
 ```

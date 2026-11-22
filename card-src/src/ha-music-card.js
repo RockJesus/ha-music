@@ -4901,6 +4901,7 @@ class HaMusicCard extends LitElement {
         data-thumb=${this._thumbMode() ? this._thumbTier() : "false"}
         data-playing=${playing ? "true" : "false"}
         data-cover=${coverMode}
+        data-ringseek=${fusionMode === "ring" ? "true" : "false"}
         data-tight=${this._tight() ? "true" : "false"}
         data-short=${this._short() ? "true" : "false"}
         data-micro=${this._micro() ? "true" : "false"}

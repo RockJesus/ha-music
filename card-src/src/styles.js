@@ -294,6 +294,11 @@ export const cardStyles = css`
     flex: 0 0 auto;
   }
 
+  /* 环形音柱会向封面外扩；给右侧信息区留出外扩宽度，且让信息区压在特效之上。 */
+  .hm-card[data-ringseek="true"] .hm-main {
+    gap: max(22px, calc(var(--hm-ring-pad, 48px) / 2 + 2px));
+  }
+
   .hm-cover {
     position: relative;
     z-index: 2;
@@ -457,6 +462,8 @@ export const cardStyles = css`
   }
 
   .hm-info {
+    position: relative;
+    z-index: 6;
     display: flex;
     flex-direction: column;
     gap: 5px;

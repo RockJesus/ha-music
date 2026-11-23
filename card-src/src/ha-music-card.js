@@ -2041,18 +2041,30 @@ class HaMusicCard extends LitElement {
   }
 
   _findWebPlayer(freshIds = null) {
+    // 浏览器自己的 clientId 才是权威身份；_webPlayerId 可能仍是上一次会话
+    // 或旧设备名对应的播放器，先匹配它会误选已离线的 Web 播放器。
+    const clientId = this._webClientId || this._webPlayer?.clientId || "";
+    if (clientId) {
+      const own = this._maPlayers.find(
+        (player) =>
+          player.available !== false &&
+          (player.player_id === clientId || player.player_id.endsWith(clientId))
+      );
+      if (own) return own;
+    }
     if (this._webPlayerId) {
       const exact = this._maPlayers.find(
-        (player) => player.player_id === this._webPlayerId
+        (player) =>
+          player.available !== false && player.player_id === this._webPlayerId
       );
       if (exact) return exact;
     }
-    const clientId = this._webPlayer?.clientId || "";
     const named = this._maPlayers.filter(
       (player) =>
-        (clientId &&
+        player.available !== false &&
+        ((clientId &&
           (player.player_id === clientId || player.player_id.endsWith(clientId))) ||
-        (this._webName && player.name === this._webName)
+          (this._webName && player.name === this._webName))
     );
     if (freshIds) {
       const fresh = named.find((player) => !freshIds.has(player.player_id));

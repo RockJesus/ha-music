@@ -119,23 +119,40 @@ function paint(canvas, bars, glow) {
       const hot = state.hoverHead === true;
       const cs = Math.cos(end);
       const sn = Math.sin(end);
-      const lift = hot ? 6 : 0;
-      const ax = R + cs * (arcR + lift);
-      const ay = R + sn * (arcR + lift);
-      const knob = hot ? Math.max(4.4, ctx.lineWidth * 2) : Math.max(1.6, ctx.lineWidth * 0.9);
+      const accentRgb = parseHex(accent[1]);
       if (hot) {
+        // 悬停时换成贴着弧线的细长把手（沿切线方向），比大圆点更像可抓的滑块。
+        const ax = R + cs * (arcR + 3.5);
+        const ay = R + sn * (arcR + 3.5);
+        ctx.save();
+        ctx.translate(ax, ay);
+        ctx.rotate(end + Math.PI / 2);
+        ctx.lineCap = "round";
         ctx.shadowBlur = 0;
-        ctx.fillStyle = rgba(parseHex(accent[1]), 0.3);
+        ctx.strokeStyle = "rgba(9, 11, 18, 0.92)";
+        ctx.lineWidth = 6.4;
         ctx.beginPath();
-        ctx.arc(ax, ay, knob + 4.5, 0, Math.PI * 2);
+        ctx.moveTo(-5, 0);
+        ctx.lineTo(5, 0);
+        ctx.stroke();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 3.4;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = rgba(accentRgb, 0.8);
+        ctx.beginPath();
+        ctx.moveTo(-5, 0);
+        ctx.lineTo(5, 0);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // 平时只留一颗小点做位置指示，不抢频谱的视觉。
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = rgba(accentRgb, 0.45);
+        ctx.beginPath();
+        ctx.arc(R + cs * arcR, R + sn * arcR, Math.max(1.6, ctx.lineWidth * 0.9), 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = "#ffffff";
-      ctx.shadowBlur = hot ? 18 : 10;
-      if (hot) ctx.shadowColor = "rgba(255,255,255,0.65)";
-      ctx.beginPath();
-      ctx.arc(ax, ay, knob, 0, Math.PI * 2);
-      ctx.fill();
     }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;

@@ -121,28 +121,22 @@ function paint(canvas, bars, glow) {
       const sn = Math.sin(end);
       const accentRgb = parseHex(accent[1]);
       if (hot) {
-        // 悬停时换成贴着弧线的细长把手（沿切线方向），比大圆点更像可抓的滑块。
-        const ax = R + cs * (arcR + 3.5);
-        const ay = R + sn * (arcR + 3.5);
+        // 悬停时换成细白环 + 实心点的定位标，贴着弧线，干净不糊。
+        const ax = R + cs * (arcR + 1.5);
+        const ay = R + sn * (arcR + 1.5);
         ctx.save();
-        ctx.translate(ax, ay);
-        ctx.rotate(end + Math.PI / 2);
-        ctx.lineCap = "round";
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = "rgba(9, 11, 18, 0.92)";
-        ctx.lineWidth = 6.4;
-        ctx.beginPath();
-        ctx.moveTo(-5, 0);
-        ctx.lineTo(5, 0);
-        ctx.stroke();
+        ctx.shadowBlur = 9;
+        ctx.shadowColor = rgba(accentRgb, 0.6);
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 3.4;
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = rgba(accentRgb, 0.8);
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.moveTo(-5, 0);
-        ctx.lineTo(5, 0);
+        ctx.arc(ax, ay, 6.6, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
       } else {
         // 平时只留一颗小点做位置指示，不抢频谱的视觉。

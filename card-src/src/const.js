@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.24.1";
+export const CARD_VERSION = "2.24.2";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -197,6 +197,8 @@ const EN = {
   webPlayerConnecting: "Connecting…",
   webPlayerConnected: "This browser is ready to play",
   webPlayerWaitEntity: "Player connected; waiting for Home Assistant entity",
+  webPlayerExposeFailed: "Connected, but registering with Home Assistant failed",
+  webPlayerExposePending: "Connected; registering with Home Assistant…",
   webPlayerFailed: "Could not start the browser player",
   webPlayerAutoFailed: "Automatic browser player connection failed",
   webPlayerRetry: "Retry",
@@ -302,6 +304,8 @@ const ZH = {
   webPlayerConnecting: "正在连接…",
   webPlayerConnected: "本机浏览器已可播放",
   webPlayerWaitEntity: "播放器已连接，正在等待 Home Assistant 实体",
+  webPlayerExposeFailed: "已连接，但注册到 Home Assistant 失败",
+  webPlayerExposePending: "已连接，正在注册到 Home Assistant…",
   webPlayerFailed: "本机浏览器播放器启动失败",
   webPlayerAutoFailed: "本机浏览器播放器自动连接失败",
   webPlayerRetry: "重试",

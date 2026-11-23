@@ -45,7 +45,6 @@ import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq, setFabEqHover } from "./fab-eq.js";
 import {
   WebPlayer,
-  rememberWebPlayerId,
   webPlayerClientId,
   webPlayerName,
 } from "./web-player.js";
@@ -222,10 +221,13 @@ class HaMusicCard extends LitElement {
     this._webAutoOwner = null;
     this._webLastState = "";
     this._webPlayerId = "";
+    this._webExposeError = "";
+    this._webRetryTimer = null;
+    this._webRegisterRound = 0;
     this._webEntity = "";
     this._webReturnEntity = "";
     this._webName = webPlayerName();
-    this._webClientId = rememberWebPlayerId(webPlayerClientId());
+    this._webClientId = webPlayerClientId();
     this._webPlayerState = null;
     this._webEntityTimer = null;
     this._localWebEntity = "";
@@ -2102,7 +2104,7 @@ class HaMusicCard extends LitElement {
     if (this._webTicketLoading) return this._webTicketLoading;
     const loading = (async () => {
       if (!this._webClientId) {
-        this._webClientId = rememberWebPlayerId(webPlayerClientId());
+        this._webClientId = webPlayerClientId();
       }
       const response = await this._hass.connection.sendMessagePromise({
         type: "ha_music_studio/web_player_ticket",
@@ -2218,9 +2220,15 @@ class HaMusicCard extends LitElement {
           });
         },
         onReconnected: () => {
-          this._registerWebPlayerPairing().catch((error) => {
-            console.warn("HA Music: web player re-pair failed", error);
-          });
+          // 配置保存/配对会让 MA 主动断开 socket，客户端用同一 URL 重连；
+          // 重连后补一次配对，并在还没有实体时补一次曝光，避免停在半路。
+          this._registerWebPlayerPairing()
+            .then(() => {
+              if (!this._webEntity) this._exposeWebPlayer().catch(() => {});
+            })
+            .catch((error) => {
+              console.warn("HA Music: web player re-pair failed", error);
+            });
         },
       });
       this._webPlayer = player;
@@ -2263,34 +2271,65 @@ class HaMusicCard extends LitElement {
 
   async _registerWebPlayerPairing() {
     const pairingToken = this._webPlayer?.pairingToken || "";
-    if (!pairingToken) return;
-    await this._hass.connection.sendMessagePromise({
-      type: "ha_music_studio/web_player_pair",
-      pairing_token: pairingToken,
-      client_id: this._webClientId || this._webPlayer?.clientId || "",
-    });
+    if (!pairingToken) {
+      this._webExposeError = "no pairing token";
+      return;
+    }
+    try {
+      await this._hass.connection.sendMessagePromise({
+        type: "ha_music_studio/web_player_pair",
+        pairing_token: pairingToken,
+        client_id: this._webClientId || this._webPlayer?.clientId || "",
+      });
+    } catch (error) {
+      this._webExposeError = `pair: ${error?.message || String(error)}`.slice(0, 120);
+      throw error;
+    }
   }
 
   async _exposeWebPlayer() {
     // 配对后先让 Sendspin 会话稳定，再单独请求“暴露给 HA”。
     // 后端不会在配对流程里做 config/players/save，避免重注册踢掉刚连上的会话。
     const clientId = this._webClientId || this._webPlayer?.clientId || "";
-    if (!clientId) return;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!clientId) {
+      this._webExposeError = "no client id";
+      return;
+    }
+    await this._loadPlayers().catch(() => {});
+    for (let attempt = 0; attempt < 4; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 900));
       if (!this._webPlayer?.connected) return;
+      // 会话注册后 Music Assistant 才把它挂到 player 上；优先用列表里真实存在的
+      // player_id（有些 App WebView 会把它和 client id 分开），否则退回 client id。
+      const known = this._findWebPlayer()?.player_id || "";
       try {
         await this._hass.connection.sendMessagePromise({
           type: "ha_music_studio/web_player_expose",
-          client_id: clientId,
+          client_id: known || clientId,
         });
+        this._webExposeError = "";
         return;
       } catch (error) {
-        if (attempt === 2) {
+        this._webExposeError = `expose: ${error?.message || String(error)}`.slice(0, 120);
+        if (attempt === 3) {
           console.warn("HA Music: web player expose failed", error);
         }
       }
     }
+  }
+
+  async _retryWebRegistration() {
+    this._clearWebRegisterRetry();
+    this._webExposeError = "";
+    this.requestUpdate();
+    try {
+      await this._registerWebPlayerPairing();
+    } catch (error) {
+      console.warn("HA Music: web player re-pair failed", error);
+    }
+    await this._exposeWebPlayer().catch(() => {});
+    await this._waitForWebPlayer(new Set(), { auto: true }).catch(() => {});
+    this.requestUpdate();
   }
 
   async _waitForWebPlayer(beforeIds = new Set(), options = {}) {
@@ -2300,6 +2339,8 @@ class HaMusicCard extends LitElement {
       const player = this._findWebPlayer(beforeIds);
       if (player) {
         this._webPlayerId = player.player_id;
+        this._webExposeError = "";
+        this._clearWebRegisterRetry();
         const entityId = this._entityForMaPlayer(player);
         if (entityId) {
           this._webEntity = entityId;
@@ -2324,8 +2365,44 @@ class HaMusicCard extends LitElement {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     this._webPlayerId = this._webPlayerId || this._findWebPlayer()?.player_id || "";
-    if (!auto) this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
+    if (!this._webEntity && this._webPlayer?.connected && !this._webRetryTimer) {
+      // 会话已连上但一直拿不到实体：再配对/曝光一轮。Web 播放器是会话级的，
+      // App WebView 里首次注册可能被后台挂起或配置保存打断，静默失败后不会自己恢复。
+      this._scheduleWebRegisterRetry();
+    }
+    if (!auto && !this._webEntity) {
+      this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
+    }
     this.requestUpdate();
+  }
+
+  _scheduleWebRegisterRetry() {
+    if (this._webRetryTimer) return;
+    if (this._webRegisterRound >= 2) return;
+    this._webRetryTimer = setTimeout(async () => {
+      this._webRetryTimer = null;
+      if (!this._webPlayer?.connected || this._webEntity) return;
+      this._webRegisterRound += 1;
+      this._webExposeError = "";
+      try {
+        await this._registerWebPlayerPairing();
+      } catch (error) {
+        console.warn("HA Music: web player re-pair failed", error);
+      }
+      await this._exposeWebPlayer().catch(() => {});
+      if (this._webPlayer?.connected && !this._webEntity) {
+        await this._waitForWebPlayer(new Set(), {
+          auto: !this._playersOpen,
+          round: this._webRegisterRound,
+        }).catch(() => {});
+      }
+    }, 6000);
+  }
+
+  _clearWebRegisterRetry() {
+    if (this._webRetryTimer) clearTimeout(this._webRetryTimer);
+    this._webRetryTimer = null;
+    this._webRegisterRound = 0;
   }
 
   _pinLocalWebEntityFromStates() {
@@ -2432,6 +2509,8 @@ class HaMusicCard extends LitElement {
   }
 
   _disconnectWebPlayer(silent = false) {
+    this._clearWebRegisterRetry();
+    this._webExposeError = "";
     const webEntity = this._webEntity || this._localWebEntity;
     this._webPlayer?.disconnect();
     this._webPlayer = null;
@@ -2466,7 +2545,9 @@ class HaMusicCard extends LitElement {
             ${connected
               ? this._webPlayerId
                 ? t("webPlayerConnected")
-                : t("webPlayerWaitEntity")
+                : this._webExposeError
+                  ? t("webPlayerExposeFailed")
+                  : t("webPlayerExposePending")
               : this._webAutoFailed
                 ? t("webPlayerAutoFailed")
                 : t("webPlayerConnecting")}
@@ -2483,7 +2564,14 @@ class HaMusicCard extends LitElement {
                   >
                     ${t("webPlayerPlayHere")}
                   </button>`
-                : nothing}
+                : this._webPlayerId
+                  ? nothing
+                  : html`<button
+                      class="hm-player-btn"
+                      @click=${() => this._retryWebRegistration()}
+                    >
+                      ${t("webPlayerRetry")}
+                    </button>`}
               <button
                 class="hm-player-btn"
                 data-role="web-disconnect"

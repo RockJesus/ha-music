@@ -1,8 +1,30 @@
 import { SendspinPlayer, loadSendspinClientIdentity } from "@sendspin/sendspin-js";
 
-const WEBPLAYER_ID_KEY = "sendspin_webplayer_id";
 const SYNC_DELAY_KEY = "sendspin_static_delay_v2";
 const VOLUME_KEY = "frontend.settings.sendspin_volume";
+
+// The card keeps its own Sendspin identity instead of reusing the frontend's
+// shared one.  Music Assistant's own web player stores its Noise identity in
+// localStorage under fixed keys; on a phone the HA app and the Music Assistant
+// panel share one origin, so reading those keys handed the card the identity of
+// MA's player.  The server then saw two sessions for one client id, never
+// registered a separate player, and exposing it to Home Assistant silently
+// failed (card stuck on "waiting for entity").  A namespaced storage gives the
+// card a distinct client id (and PSKs) that never collide with MA's player.
+const STORAGE_NAMESPACE = "ha-music:";
+
+function cardStorage() {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage : null;
+    if (!raw) return null;
+    return {
+      getItem: (key) => raw.getItem(STORAGE_NAMESPACE + key),
+      setItem: (key, value) => raw.setItem(STORAGE_NAMESPACE + key, String(value)),
+    };
+  } catch {
+    return null;
+  }
+}
 
 function detectBrowser() {
   const ua = navigator.userAgent || "";
@@ -30,8 +52,8 @@ export function webPlayerName() {
 
 function readNumber(key) {
   try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return undefined;
+    const raw = cardStorage()?.getItem(key);
+    if (raw === undefined || raw === null) return undefined;
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : undefined;
   } catch {
@@ -41,34 +63,21 @@ function readNumber(key) {
 
 function writeNumber(key, value) {
   try {
-    if (Number.isFinite(value)) localStorage.setItem(key, String(value));
+    if (Number.isFinite(value)) cardStorage()?.setItem(key, value);
   } catch {
     // ignore storage errors
   }
 }
 
-// Read the persisted Sendspin identity before creating the player.  Music
-// Assistant needs this client_id in its proxy auth frame to whitelist the
-// browser web player; a player built later on localStorage adopts it.
+// Read the card's persisted Sendspin identity before creating the player.
+// Music Assistant needs this client_id in its proxy auth frame to whitelist the
+// browser web player; a player built later on the same storage adopts it.
 export function webPlayerClientId() {
   try {
-    return loadSendspinClientIdentity().clientId || "";
+    return loadSendspinClientIdentity(cardStorage()).clientId || "";
   } catch {
     return "";
   }
-}
-
-// Music Assistant's built-in player uses this exact localStorage key to find
-// the tab that owns playback.  Mirror the Sendspin identity into it before the
-// socket is created, exactly like the official frontend does.
-export function rememberWebPlayerId(clientId) {
-  if (!clientId) return clientId;
-  try {
-    localStorage.setItem(WEBPLAYER_ID_KEY, clientId);
-  } catch {
-    // ignore storage errors
-  }
-  return clientId;
 }
 
 export class WebPlayer {
@@ -84,14 +93,14 @@ export class WebPlayer {
   }
 
   async connect() {
-    // The official player mirrors the Sendspin Noise public key into this
-    // fixed key; the proxy auth and pairing both resolve the same client id.
-    rememberWebPlayerId(webPlayerClientId());
     const savedDelay = readNumber(SYNC_DELAY_KEY);
     const savedVolume = readNumber(VOLUME_KEY);
     const player = new SendspinPlayer({
       url: this.url,
       clientName: this.name,
+      // Everything the SDK persists (Noise identity, pairing PSKs) stays in the
+      // card's namespace so it never shares a client id with the frontend player.
+      storage: cardStorage(),
       // Music Assistant recognizes its built-in browser player by this exact
       // product name; anything else is treated as a third-party client that
       // needs manual pairing and never auto-appears as a playable web player.

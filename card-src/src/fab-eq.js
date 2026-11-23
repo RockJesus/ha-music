@@ -37,6 +37,7 @@ function paint(canvas, bars, glow) {
   const state = states.get(canvas);
   if (!state?.ctx) return;
   const { ctx } = state;
+  state.lastLevels = bars;
   const size = state.size || SIZE;
   const r0 = state.r0 || 33.5;
   const dpr = state.dpr || DPR;
@@ -111,14 +112,28 @@ function paint(canvas, bars, glow) {
     ctx.beginPath();
     ctx.arc(R, R, arcR, start, end);
     ctx.stroke();
-    // 弧尾加一颗亮点，拖动时能明确看到当前播放位置。
+    // 弧尾加一颗亮点，拖动时能明确看到当前播放位置；鼠标在环上时
+    // 手柄放大并沿半径外弹，提示这里可以直接拽。
     if (progress > 0.002) {
-      const ax = R + Math.cos(end) * arcR;
-      const ay = R + Math.sin(end) * arcR;
+      const hot = state.hoverHead === true;
+      const cs = Math.cos(end);
+      const sn = Math.sin(end);
+      const lift = hot ? 6 : 0;
+      const ax = R + cs * (arcR + lift);
+      const ay = R + sn * (arcR + lift);
+      const knob = hot ? Math.max(4.4, ctx.lineWidth * 2) : Math.max(1.6, ctx.lineWidth * 0.9);
+      if (hot) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = rgba(parseHex(accent[1]), 0.3);
+        ctx.beginPath();
+        ctx.arc(ax, ay, knob + 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.fillStyle = "#ffffff";
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = hot ? 18 : 10;
+      if (hot) ctx.shadowColor = "rgba(255,255,255,0.65)";
       ctx.beginPath();
-      ctx.arc(ax, ay, Math.max(1.6, ctx.lineWidth * 0.9), 0, Math.PI * 2);
+      ctx.arc(ax, ay, knob, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.shadowBlur = 0;
@@ -293,6 +308,8 @@ export function syncFabEq(canvas, root, media = {}) {
       bands: null,
       progress: -1,
       persist: false,
+      hoverHead: false,
+      lastLevels: null,
       accent: FALLBACK_ACCENT,
       smooth: new Array(MAX_BARS).fill(0),
       barCount: BARS,
@@ -324,6 +341,7 @@ export function syncFabEq(canvas, root, media = {}) {
   const progress = Number(media.progress);
   state.progress = Number.isFinite(progress) ? clamp(progress, 0, 1) : -1;
   state.persist = media.persist === true;
+  state.hoverHead = media.hoverHead === true;
   state.applyShadow = media.applyShadow !== false;
   state.maxFps = Math.max(0, Number(media.maxFps) || 0);
   const dpr = Math.min(2, Math.max(1, Number(media.dpr) || DPR));
@@ -374,4 +392,19 @@ export function syncFabEq(canvas, root, media = {}) {
     state.lastPaint = 0;
     state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
   }
+}
+
+/**
+ * 进度头手柄的 hover 状态。暂停（persist）时没有动画帧，需要手动补一帧，
+ * 否则放大/弹起要等下一次状态更新才可见。
+ */
+export function setFabEqHover(canvas, hover) {
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const state = states.get(canvas);
+  if (!state) return;
+  const next = hover === true;
+  if (state.hoverHead === next) return;
+  state.hoverHead = next;
+  const levels = state.lastLevels || new Array(state.barCount || BARS).fill(0);
+  paint(canvas, levels, state.playing ? 0.4 : 0.28);
 }

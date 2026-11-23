@@ -324,8 +324,9 @@ export const cardStyles = css`
       transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  .hm-cover:hover {
-    transform: translateY(-2px) scale(1.008);
+  /* 鼠标移进环带时，光标提示这里可以直接拖进度；封面本体不再上浮。 */
+  .hm-cover-wrap[data-ringhover="true"] {
+    cursor: grab;
   }
 
   .hm-cover img {

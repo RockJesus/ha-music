@@ -42,7 +42,7 @@ import { fallbackCover } from "./fallback-cover.js";
 import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes, normalizeDockFollow, DOCK_REMOVE_EVENT } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
-import { syncFabEq } from "./fab-eq.js";
+import { syncFabEq, setFabEqHover } from "./fab-eq.js";
 import {
   WebPlayer,
   rememberWebPlayerId,
@@ -174,6 +174,7 @@ class HaMusicCard extends LitElement {
     this._ringSeekValue = null;
     this._ringSeekCx = null;
     this._ringSeekCy = null;
+    this._ringHover = false;
     this._ringSeekWinBound = false;
     this._ringSeekWinMove = null;
     this._ringSeekWinUp = null;
@@ -1061,6 +1062,7 @@ class HaMusicCard extends LitElement {
       accent,
       progress: this._fusionLayout() === "ring" ? this._fusionPercent() : -1,
       persist: this._fusionLayout() === "ring",
+      hoverHead: this._ringHover === true,
       title: first(media.title),
       artist: first(media.artist),
       album: first(media.album),
@@ -1795,12 +1797,17 @@ class HaMusicCard extends LitElement {
     this._ringSeekId = event.pointerId ?? 1;
     this._ringSeekCx = band.cx;
     this._ringSeekCy = band.cy;
+    this._setRingHover(true);
     this._bindRingSeekWindow();
     this._applyRingSeek(event);
   }
 
   _onRingSeekMove(event) {
-    if (!this._ringSeeking) return;
+    if (!this._ringSeeking) {
+      // 不在拖动时，pointermove 只用来判断鼠标是否落在环形进度带上。
+      this._setRingHover(Boolean(this._ringBand(event)));
+      return;
+    }
     if (event.pointerId != null && this._ringSeekId != null && event.pointerId !== this._ringSeekId) return;
     event.preventDefault();
     this._applyRingSeek(event);
@@ -1813,6 +1820,7 @@ class HaMusicCard extends LitElement {
     event.stopPropagation();
     this._ringSeeking = false;
     this._unbindRingSeekWindow();
+    this._setRingHover(false);
     const value = this._ringSeekValue;
     this._ringSeekValue = null;
     if (value != null) this._commitSeekValue(value);
@@ -1852,6 +1860,18 @@ class HaMusicCard extends LitElement {
     this._stopProgressTicker();
     this._syncRingReadout(value);
     this._syncCoverEq();
+  }
+
+  _setRingHover(on) {
+    const next = on === true;
+    if (this._ringHover === next) return;
+    this._ringHover = next;
+    const canvas = this.renderRoot?.querySelector?.(".hm-cover-eq");
+    if (canvas) {
+      setFabEqHover(canvas, next);
+      const wrap = canvas.parentElement;
+      if (wrap?.dataset) wrap.dataset.ringhover = next ? "true" : "false";
+    }
   }
 
   _syncRingReadout(value) {
@@ -5483,6 +5503,7 @@ class HaMusicCard extends LitElement {
                 @pointermove=${(event) => this._onRingSeekMove(event)}
                 @pointerup=${(event) => this._onRingSeekUp(event)}
                 @pointercancel=${(event) => this._onRingSeekCancel(event)}
+                @pointerleave=${() => this._setRingHover(false)}
               >
             <div
               class="hm-cover-wrap"

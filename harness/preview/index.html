@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--pink:#ff3fd8;--cyan:#3fe8ff;--purple:#8b5cff;--bg:#120a1e;--dim:#5d4a78}
+*{box-sizing:border-box}
+body{margin:0;background:#07050c;font-family:"Segoe UI",Inter,system-ui,sans-serif;color:#fff}
+.wrap{display:flex;gap:28px;padding:28px;flex-wrap:wrap}
+.card{position:relative;width:560px;height:520px;border-radius:34px;overflow:hidden;
+ background:
+  radial-gradient(120% 90% at 78% 2%,rgba(255,63,216,.22),transparent 55%),
+  radial-gradient(100% 80% at 8% 100%,rgba(63,232,255,.16),transparent 60%),
+  linear-gradient(150deg,#2a1236 0%,#170d27 45%,#0b0815 100%);
+ border:1px solid rgba(255,255,255,.10);
+ box-shadow:0 30px 80px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.10);}
+.card:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;
+ background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+ background-size:56px 56px}
+.head{position:absolute;top:26px;left:34px;display:flex;align-items:center;gap:10px;font-size:15px;letter-spacing:.12em;color:#e8d9ff}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--pink);box-shadow:0 0 14px var(--pink)}
+.head b{font-weight:700}
+.tag{font-size:12px;letter-spacing:.18em;color:#c9a6ff;text-transform:uppercase}
+.title{position:absolute;left:320px;top:184px}
+.title .now{font-size:14px;letter-spacing:.16em;color:var(--pink);font-weight:700}
+.title h1{margin:10px 0 8px;font-size:42px;line-height:1.02;letter-spacing:-.02em;text-shadow:0 2px 24px rgba(255,63,216,.35)}
+.title .artist{font-size:19px;color:#a99bbd}
+.cover{position:absolute;left:70px;top:156px;width:200px;height:200px;border-radius:50%;
+ background:
+  radial-gradient(circle at 35% 30%,#3c3150,#171220 70%),
+  conic-gradient(from 210deg,#f43fa8,#6d3cff,#20c9ff,#f43fa8);
+ background-blend-mode:normal;
+ box-shadow:0 0 60px rgba(255,63,216,.18), inset 0 0 0 10px rgba(0,0,0,.35);}
+.cover:after{content:"EV";position:absolute;inset:0;display:grid;place-items:center;font-size:38px;font-weight:800;letter-spacing:.04em;color:#fff;text-shadow:0 4px 24px rgba(255,255,255,.35)}
+.cover .sub{position:absolute;left:0;right:0;bottom:52px;text-align:center;font-size:9px;letter-spacing:.2em;color:rgba(255,255,255,.55)}
+.ringwrap{position:absolute;left:170px;top:256px;width:0;height:0;z-index:2}
+.ring{position:absolute;left:0;top:0;width:0;height:0}
+.arc{position:absolute;left:0;top:0;transform:translate(-50%,-50%);pointer-events:none}
+.ring .b{position:absolute;left:0;top:0;width:3px;border-radius:3px;transform-origin:50% 0;
+ background:linear-gradient(180deg,var(--cyan),var(--purple));box-shadow:0 0 6px rgba(63,232,255,.55)}
+.ring2 .b{background:linear-gradient(180deg,rgba(255,63,216,.9),rgba(139,92,255,.6))}
+.ring .b[data-past="0"]{background:linear-gradient(180deg,rgba(120,96,160,.45),rgba(70,52,100,.25));box-shadow:none}
+.seeknote{position:absolute;left:34px;bottom:34px;font-size:11px;letter-spacing:.08em;color:#b9a7d8;display:flex;gap:14px;align-items:center}
+.seeknote i{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;background:rgba(255,255,255,.07);font-style:normal;color:#fff}
+/* option 2 rail */
+.rail{position:absolute;left:36px;right:36px;bottom:62px;height:80px}
+.rail .bars{position:absolute;inset:0 0 14px 0;display:flex;align-items:flex-end;gap:3px}
+.rail .bar{flex:1;border-radius:3px 3px 1px 1px;background:linear-gradient(180deg,var(--pink),var(--purple) 55%,var(--cyan));opacity:.95;box-shadow:0 0 10px rgba(255,63,216,.35)}
+.rail .bar[data-past="0"]{background:linear-gradient(180deg,#4a3765,#2b1e3f);box-shadow:none;opacity:.7}
+.track{position:absolute;left:0;right:0;bottom:0;height:4px;border-radius:4px;background:rgba(255,255,255,.12)}
+.track .fill{position:absolute;left:0;top:0;bottom:0;width:42%;border-radius:4px;background:linear-gradient(90deg,var(--pink),var(--purple),var(--cyan));box-shadow:0 0 16px rgba(255,63,216,.6)}
+.knob{position:absolute;left:42%;top:50%;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);
+ background:radial-gradient(circle at 35% 30%,#fff,#ff7ce8 40%,#7b4bff 100%);box-shadow:0 0 22px rgba(255,63,216,.8)}
+.rail .times{position:absolute;bottom:-26px;left:0;right:0;display:flex;justify-content:space-between;font-size:12px;color:#c9b8e6}
+/* option 3 dual */
+.dual{position:absolute;left:36px;right:36px;bottom:54px}
+.dual .bars{position:absolute;left:0;right:0;bottom:20px;height:64px;display:flex;align-items:flex-end;gap:3px;opacity:.72}
+.dual .bar{flex:1;border-radius:2px;background:linear-gradient(180deg,var(--cyan),var(--purple));}
+.dual .bar[data-past="0"]{background:linear-gradient(180deg,#3c2e55,#241a36);opacity:.5}
+.dual .track{position:relative;height:10px;border-radius:99px;background:rgba(255,255,255,.10);overflow:visible;border:1px solid rgba(255,255,255,.08)}
+.dual .fill{width:42%;border-radius:99px;background:linear-gradient(90deg,#ff3fd8,#8b5cff 45%,#3fe8ff);box-shadow:0 0 18px rgba(255,63,216,.45)}
+.dual .knob{width:22px;height:22px}
+.dual .times{display:flex;justify-content:space-between;font-size:12px;color:#c9b8e6;margin-top:12px}
+.badge{position:absolute;top:26px;right:30px;font-size:11px;letter-spacing:.1em;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);color:#d9c7ff;background:rgba(20,10,32,.55)}
+.hint{position:absolute;left:34px;right:34px;bottom:26px;font-size:11px;line-height:1.5;color:#9d8ab9}
+</style></head><body><div class="wrap" id="wrap"></div>
+<script>
+const T=(fn)=>{};
+function bars(n,cls){let s='';const past=Math.round(n*0.42);for(let i=0;i<n;i++){const h=8+Math.abs(Math.sin(i*0.9+1.2))*30; s+=`<span class="${cls}" data-past="${i<past?1:0}" style="height:${h}px;transform:translateX(-50%) rotate(${(i/n)*360}deg) translateY(-105px) scaleY(${0.5+Math.random()*0.8})"></span>`;}return s;}
+function railBars(n,cls){let s='';for(let i=0;i<n;i++){const h=10+Math.abs(Math.sin(i*0.55+2))*62; s+=`<span class="${cls}" data-past="${i<Math.round(n*0.42)?1:0}" style="height:${h}px"></span>`;}return s;}
+function card(opt,label){return `<div class="card">
+ <div class="head"><span class="dot"></span><b>MAPC</b><span style="opacity:.7">· 正在播放</span></div><div class="badge">${label}</div>
+ ${opt===1?`<div class="ringwrap"><div class="ring">${bars(68,'b')}</div><svg class="arc" width="238" height="238" viewBox="0 0 238 238"><circle cx="119" cy="119" r="112" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="2"/><circle cx="119" cy="119" r="112" fill="none" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${2*Math.PI*112*0.42} ${2*Math.PI*112}" transform="rotate(-90 119 119)" style="filter:drop-shadow(0 0 6px #ff3fd8)"/><defs><linearGradient id="g1"><stop offset="0" stop-color="#ff3fd8"/><stop offset="1" stop-color="#3fe8ff"/></linearGradient></defs></svg></div>`:''}
+ <div class="cover"><span class="sub">COLDPLAY</span></div>
+ <div class="title"><div class="now">正在播放</div><h1>Everglow</h1><div class="artist">Coldplay</div></div>
+ ${opt===2?`<div class="rail"><div class="bars">${railBars(58,'bar')}</div><div class="track"><div class="fill"></div><span class="knob"></span></div><div class="times"><span>1:52</span><span>4:31</span></div></div>`:''}
+ ${opt===3?`<div class="dual"><div class="bars">${railBars(58,'bar')}</div><div class="track"><div class="fill"></div><span class="knob"></span></div><div class="times"><span>1:52</span><span>4:31</span></div></div>`:''}
+ ${opt===1?`<div class="seeknote"><i>⟲</i><span>1:52 / 4:31 · 环形频谱即进度，拖动任意角度快进</span></div>`:''}
+ ${opt===2||opt===3?'':''}
+</div>`}
+document.getElementById('wrap').innerHTML=card(1,'方案 1 · 环形频谱进度')+card(2,'方案 2 · 频谱进度条')+card(3,'方案 3 · 细轨+频谱叠层');
+</script></body></html>

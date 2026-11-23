@@ -146,6 +146,16 @@ export class WebPlayer {
     return this.player?.clientId || "";
   }
 
+  // 底层 Sendspin 会话是否真的连着；后台期间可能被浏览器/网络掐断，
+  // 回到前台据此决定是否需要重建。
+  get isConnected() {
+    try {
+      return Boolean(this.player?.isConnected);
+    } catch {
+      return false;
+    }
+  }
+
   get pairingToken() {
     return this.player?.pairingToken || "";
   }

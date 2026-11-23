@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>cover stages</title>
+<style>
+body{margin:0;background:#07070a;display:flex;flex-wrap:wrap;gap:36px;padding:36px;width:1240px;font-family:sans-serif}
+ha-music{display:block;width:560px;height:520px}
+</style></head><body>
+<script type="module">
+import './ha-music.js';
+const id='media_player.mapc';
+const arts=['http://127.0.0.1:8899/premium/rot/art1.jpg','http://127.0.0.1:8899/premium/rot/art2.jpg','http://127.0.0.1:8899/premium/rot/art3.jpg','http://127.0.0.1:8899/premium/rot/art4.jpg'];
+const stages=['contact','dj','paper','flash'];
+const states={}; states[id]={entity_id:id,state:'playing',attributes:{friendly_name:'MAPC',media_title:'Everglow',media_artist:'Coldplay',media_duration:271,media_position:112,media_position_updated_at:new Date().toISOString(),supported_features:16399,volume_level:.4,is_volume_muted:false,entity_picture:arts[0]},last_changed:new Date().toISOString(),last_updated:new Date().toISOString()};
+const hass={language:'zh-Hans',states,user:{id:'test',name:'Test'},callWS:async()=>({}),callService:async(d,svc,data)=>{(window.__calls||=[]).push({d,svc,data})},connection:{sendMessagePromise:async()=>({}),subscribeMessage:async()=>()=>{}},localize:k=>k,
+hassUrl:p=>p,fetchWithAuth:async()=>({ok:false})};
+stages.forEach((stage,i)=>{
+  const card=document.createElement('ha-music');
+  document.body.appendChild(card);
+  const st=structuredClone(states[id]);
+  st.attributes.entity_picture=arts[i];
+  card.setConfig({type:'custom:ha-music',entities:[id],coverStage:stage,theme:'cyber',visualizer:'bars'});
+  card.hass={...hass,states:{[id]:st}};
+});
+</script></body></html>

@@ -1,0 +1,10 @@
+import puppeteer from 'puppeteer-core';
+const browser = await puppeteer.launch({ executablePath: '/usr/local/bin/chromium', headless: true, args: ['--no-sandbox','--disable-gpu'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 900, height: 1000, deviceScaleFactor: 2 });
+await page.goto('http://127.0.0.1:8899/index.html', { waitUntil: 'networkidle0' });
+await new Promise(r=>setTimeout(r,1200));
+const card = await page.evaluate(()=>{const c=document.getElementById('card'); const r=c.getBoundingClientRect(); return {x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)};});
+console.log(card);
+await page.screenshot({path:'/home/user/hm-dev/harness/current.png', clip: card});
+await browser.close();

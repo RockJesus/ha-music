@@ -470,14 +470,22 @@ class HaMusicCard extends LitElement {
     window.addEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
     this._onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        // 页面不再使用时断开本机 Web 播放器并移出胶囊，避免后台空耗。
-        this._webAutoScheduled = false;
-        if (this._webAutoTimer) clearTimeout(this._webAutoTimer);
-        this._webAutoTimer = null;
-        if (this._webPlayer) this._disconnectWebPlayer(true);
+        // 切后台不再主动断开：Sendspin 会话继续保持，实体不会变 unavailable。
+        // 只有页面被销毁（disconnectedCallback）或用户手动断开才真正断连。
         return;
       }
       this._webAutoScheduled = false;
+      // 后台期间若被浏览器回收/网络掐断，回到前台时静默重建会话。
+      if (this._webPlayer && !this._webPlayer.isConnected) {
+        const keepEntity = this._webEntity || this._localWebEntity;
+        this._webPlayer.disconnect();
+        this._webPlayer = null;
+        this._webPlayerId = "";
+        this._webPlayerState = null;
+        this._webAutoStarted = false;
+        this._webEntity = keepEntity;
+        this.requestUpdate();
+      }
       this._scheduleAutoWebPlayer();
     };
     document.addEventListener("visibilitychange", this._onVisibilityChange);

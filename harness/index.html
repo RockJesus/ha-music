@@ -1,0 +1,64 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>ha-music drag harness</title>
+<style>
+  body{margin:0;background:#0b0713;display:flex;justify-content:center;padding:40px;font-family:-apple-system,Segoe UI,sans-serif}
+  #stage{width:560px}
+  ha-music{display:block;width:560px;height:520px}
+  #log{color:#8f8;font:12px monospace;margin-top:20px;white-space:pre-wrap}
+</style></head>
+<body>
+<div id="stage"><ha-music id="card"></ha-music></div>
+<div id="log"></div>
+<script type="module">
+  import './ha-music.js';
+  const names = ['MApc','HASS','iMac','ROCKJESUSPC','Web (Chrome on Windows)','飞牛音乐-Lite','客厅电视','ROCKJESUSPC DE PC'];
+  const ids = ['media_player.mapc','media_player.hass','media_player.imac','media_player.rockjesuspc','media_player.web_chrome_on_windows','media_player.fei_niu_yin_le_lite','media_player.ke_ting_dian_shi_3','media_player.rockjesuspc_de_pc'];
+  const states = {};
+  ids.forEach((id, i) => {
+    states[id] = {
+      entity_id: id,
+      state: i === 0 ? 'playing' : 'idle',
+      attributes: {
+        friendly_name: names[i],
+        media_title: i === 0 ? 'Everglow' : 'Standby',
+        media_artist: i === 0 ? 'Coldplay' : '',
+        media_duration: i === 0 ? 271 : 0,
+        media_position: i === 0 ? 112 : 0,
+        media_position_updated_at: new Date().toISOString(),
+        supported_features: i === 0 ? 16399 : 0,
+        volume_level: 0.4,
+        is_volume_muted: false,
+        mass_player_type: i === 0 ? 'player' : undefined,
+      },
+      last_changed: new Date().toISOString(),
+      last_updated: new Date().toISOString(),
+    };
+  });
+  window.__lovelace = { views: [{ url_path: 'index.html', cards: [{ type: 'custom:ha-music', entities: ids }] }] };
+  const hass = {
+    language: 'zh-Hans',
+    states,
+    user: { id: 'test', name: 'Test' },
+    callWS: async (msg) => {
+      if (msg.type === 'lovelace/config') return JSON.parse(JSON.stringify(window.__lovelace));
+      if (msg.type === 'lovelace/config/save') { window.__lovelace = JSON.parse(JSON.stringify(msg.config)); return null; }
+      return {};
+    },
+    callService: async (d,svc,data) => { (window.__calls ||= []).push({d,svc,data}); },
+    connection: { sendMessagePromise: async () => ({}), subscribeMessage: async () => () => {} },
+    localize: (k) => k,
+  };
+  const card = document.getElementById('card');
+  card.setConfig({ type: 'custom:ha-music', entities: ids });
+  card.hass = hass;
+  window.__card = card;
+  window.__ids = ids;
+  const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
+  window.addEventListener('error', (e) => log('ERROR ' + e.message));
+  setTimeout(() => {
+    const strip = card.shadowRoot.querySelector('.hm-entities');
+    const wrap = card.shadowRoot.querySelector('.hm-entities-wrap');
+    log('chips=' + strip.querySelectorAll('.hm-entity-chip').length + ' overflow=' + wrap.dataset.overflow + ' scrollW=' + strip.scrollWidth + ' clientW=' + strip.clientWidth);
+  }, 1500);
+</script>
+</body></html>

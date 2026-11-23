@@ -43,7 +43,12 @@ import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallD
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
-import { WebPlayer, webPlayerClientId, webPlayerName } from "./web-player.js";
+import {
+  WebPlayer,
+  rememberWebPlayerId,
+  webPlayerClientId,
+  webPlayerName,
+} from "./web-player.js";
 
 const MOBILE_MEDIA =
   "(pointer: coarse) and (max-width: 600px), (pointer: coarse) and (max-height: 500px)";
@@ -208,7 +213,7 @@ class HaMusicCard extends LitElement {
     this._webEntity = "";
     this._webReturnEntity = "";
     this._webName = webPlayerName();
-    this._webClientId = webPlayerClientId();
+    this._webClientId = rememberWebPlayerId(webPlayerClientId());
     this._webPlayerState = null;
     this._webEntityTimer = null;
     this._localWebEntity = "";
@@ -1965,7 +1970,9 @@ class HaMusicCard extends LitElement {
     }
     if (this._webTicketLoading) return this._webTicketLoading;
     const loading = (async () => {
-      if (!this._webClientId) this._webClientId = webPlayerClientId();
+      if (!this._webClientId) {
+        this._webClientId = rememberWebPlayerId(webPlayerClientId());
+      }
       const response = await this._hass.connection.sendMessagePromise({
         type: "ha_music_studio/web_player_ticket",
         client_id: this._webClientId,
@@ -2038,9 +2045,21 @@ class HaMusicCard extends LitElement {
         onState: (state) => {
           this._webPlayerState = state;
         },
+        onPairing: () => {
+          this._registerWebPlayerPairing().catch((error) => {
+            console.warn("HA Music: web player pairing failed", error);
+          });
+        },
+        onReconnected: () => {
+          this._registerWebPlayerPairing().catch((error) => {
+            console.warn("HA Music: web player re-pair failed", error);
+          });
+        },
       });
       this._webPlayer = player;
-      // unlock() is the first await inside WebPlayer.connect().
+      // The WebPlayer opens the Sendspin socket directly.  It deliberately
+      // does not resume an AudioContext here: desktop browsers reject that
+      // outside a user gesture and abort the handshake.
       await player.connect();
       // Music Assistant auto-pairs its built-in web player only when the
       // browser hands over the Sendspin pairing token. Without this the

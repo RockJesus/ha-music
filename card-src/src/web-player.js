@@ -1,5 +1,9 @@
 import { SendspinPlayer, loadSendspinClientIdentity } from "@sendspin/sendspin-js";
 
+const WEBPLAYER_ID_KEY = "sendspin_webplayer_id";
+const SYNC_DELAY_KEY = "sendspin_static_delay_v2";
+const VOLUME_KEY = "frontend.settings.sendspin_volume";
+
 function detectBrowser() {
   const ua = navigator.userAgent || "";
   if (/Edg\//.test(ua)) return "Edge";
@@ -24,6 +28,25 @@ export function webPlayerName() {
   return `Web (${detectBrowser()} on ${detectPlatform()})`;
 }
 
+function readNumber(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return undefined;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeNumber(key, value) {
+  try {
+    if (Number.isFinite(value)) localStorage.setItem(key, String(value));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 // Read the persisted Sendspin identity before creating the player.  Music
 // Assistant needs this client_id in its proxy auth frame to whitelist the
 // browser web player; a player built later on localStorage adopts it.
@@ -35,17 +58,37 @@ export function webPlayerClientId() {
   }
 }
 
+// Music Assistant's built-in player uses this exact localStorage key to find
+// the tab that owns playback.  Mirror the Sendspin identity into it before the
+// socket is created, exactly like the official frontend does.
+export function rememberWebPlayerId(clientId) {
+  if (!clientId) return clientId;
+  try {
+    localStorage.setItem(WEBPLAYER_ID_KEY, clientId);
+  } catch {
+    // ignore storage errors
+  }
+  return clientId;
+}
+
 export class WebPlayer {
-  constructor({ url, name, version, onState }) {
+  constructor({ url, name, version, onState, onPairing, onReconnected }) {
     this.url = url;
     this.name = name;
     this.version = version;
     this.onState = onState;
+    this.onPairing = onPairing;
+    this.onReconnected = onReconnected;
     this.player = null;
     this.connected = false;
   }
 
   async connect() {
+    // The official player mirrors the Sendspin Noise public key into this
+    // fixed key; the proxy auth and pairing both resolve the same client id.
+    rememberWebPlayerId(webPlayerClientId());
+    const savedDelay = readNumber(SYNC_DELAY_KEY);
+    const savedVolume = readNumber(VOLUME_KEY);
     const player = new SendspinPlayer({
       url: this.url,
       clientName: this.name,
@@ -56,17 +99,44 @@ export class WebPlayer {
       manufacturer: navigator.vendor || "Unknown",
       softwareVersion: navigator.userAgent || this.version,
       codecs: ["opus", "flac"],
+      syncDelay: savedDelay,
       requiredLeadTimeMs: 250,
       minBufferMs: 500,
-      correctionMode: "sync",
+      // The official frontend only uses the precise "sync" correction when the
+      // player belongs to a group; a standalone web player uses quality-local.
+      correctionMode: "quality-local",
       onStateChange: (state) => {
         this.onState?.(state, this);
+        if (state?.volume !== undefined) writeNumber(VOLUME_KEY, state.volume);
+      },
+      onPairing: (event, detail) => {
+        // The server can request pairing at any point in the handshake; let the
+        // card send the token instead of waiting for connect() to resolve.
+        this.onPairing?.(event, detail);
+      },
+      onDelayCommand: (delayMs) => writeNumber(SYNC_DELAY_KEY, delayMs),
+      reconnect: {
+        baseDelayMs: 1000,
+        maxDelayMs: 30000,
+        onReconnected: () => {
+          // Pairing can be dropped when the socket reconnects; re-announce the
+          // pairing token so the player becomes available again.
+          this.onReconnected?.();
+        },
       },
     });
     this.player = player;
-    // unlock() must be the first awaited call in the click handler so mobile
-    // browsers create/resume the AudioContext inside the user gesture.
-    await player.unlock();
+    if (savedVolume !== undefined) {
+      try {
+        player.setVolume(savedVolume);
+      } catch {
+        // ignore volume restore errors
+      }
+    }
+    // Do NOT call player.unlock() here.  It creates/resumes an AudioContext
+    // outside the click gesture, and Chrome rejects that with NotAllowedError,
+    // which aborts the whole Sendspin connection on desktop.  The SDK creates
+    // and resumes its audio context when the first stream starts.
     await player.connect();
     this.connected = true;
     return player;

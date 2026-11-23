@@ -11,6 +11,7 @@ import {
   normalizeDockModes,
   normalizeDockEntities,
   normalizeDockThemes,
+  normalizeDockFollow,
   loadDockPref,
   saveDockPref,
   subscribeDockPref,
@@ -131,6 +132,21 @@ class HaMusicEditor extends LitElement {
       .dock-theme {
         flex: 0 0 105px;
         min-width: 0;
+      }
+      .dock-follow {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: 0 0 auto;
+        font-size: 11px;
+        color: var(--secondary-text-color);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .dock-follow input {
+        width: 14px;
+        height: 14px;
+        margin: 0;
       }
       .entity-row ha-entity-picker {
         flex: 1 1 auto;
@@ -267,11 +283,17 @@ class HaMusicEditor extends LitElement {
     return pref ? pref.themes : normalizeDockThemes(this._config?.dock_themes);
   }
 
+  _dockFollow() {
+    const pref = loadDockPref();
+    return pref ? pref.follow || {} : normalizeDockFollow(this._config?.dock_follow);
+  }
+
   _syncDockGlobal(patch = {}) {
     const modes = normalizeDockModes(patch.dock ?? this._dockModes());
     const entities = normalizeDockEntities(patch.dock_entities ?? this._dockEntities());
     const themes = normalizeDockThemes(patch.dock_themes ?? this._dockThemes());
-    saveDockPref({ modes, entities, themes });
+    const follow = normalizeDockFollow(patch.dock_follow ?? this._dockFollow());
+    saveDockPref({ modes, entities, themes, follow });
   }
 
   _setDockTheme(mode, value) {
@@ -300,9 +322,26 @@ class HaMusicEditor extends LitElement {
     this._update({
       dock: next.length ? next : "none",
       dock_entities: entities,
+      dock_follow: this._dockFollow(),
       dock_edited: Date.now(),
     });
     this._syncDockGlobal({ dock: next.length ? next : "none", dock_entities: entities });
+  }
+
+  _setDockFollow(mode, checked) {
+    const follow = { ...this._dockFollow() };
+    if (checked) follow[mode] = true;
+    else delete follow[mode];
+    const entities = { ...this._dockEntities() };
+    if (checked && !entities[mode] && this._mainEntity()) {
+      entities[mode] = this._mainEntity();
+    }
+    this._update({
+      dock_follow: follow,
+      dock_entities: entities,
+      dock_edited: Date.now(),
+    });
+    this._syncDockGlobal({ dock_follow: follow, dock_entities: entities });
   }
 
   _setDockEntity(mode, value) {
@@ -648,11 +687,12 @@ class HaMusicEditor extends LitElement {
           <div class="section-title">${this._zh ? "全局迷你播放器" : "Global mini players"}</div>
           <div class="hint">
             ${this._zh
-              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；单击播放/暂停，双击折叠或展开。顶栏只可左右移动、侧边栏只可上下移动；自由播放器长按后可任意拖动，但不能进入侧边栏和顶栏。"
-              : "Each position can use its own entity; click to play/pause, double-click to fold, long-press to drag."}
+              ? "三个位置可以同时启用，也可以分别选择各自的播放器实体；打开「跟随」后会自动跟随卡片内正在播放的播放器。单击播放/暂停，双击折叠或展开。顶栏只可左右移动、侧边栏只可上下移动；自由播放器长按后可任意拖动，但不能进入侧边栏和顶栏。"
+              : "Each position can pin an entity or follow the playing card player; click to play/pause, double-click to fold, long-press to drag."}
           </div>
           ${(() => {
             const dockThemes = this._dockThemes();
+            const dockFollow = this._dockFollow();
             return [
             ["top", this._zh ? "顶栏播放器" : "Top bar player"],
             ["sidebar", this._zh ? "侧边栏播放器" : "Sidebar"],
@@ -660,6 +700,7 @@ class HaMusicEditor extends LitElement {
           ].map(([mode, label]) => {
             const enabled = dockModes.includes(mode);
             const entity = dockEntities[mode] || this._mainEntity();
+            const follow = dockFollow[mode] === true;
             const theme = dockThemes[mode] || this._config.theme || DEFAULT_THEME;
             return html`
               <div class="dock-row">
@@ -674,15 +715,37 @@ class HaMusicEditor extends LitElement {
                 <div class="dock-right">
                   <ha-entity-picker
                     .hass=${this.hass}
-                    .value=${entity || ""}
+                    .value=${follow ? "" : entity || ""}
                     .includeDomains=${["media_player"]}
                     .allowCustomEntity=${false}
-                    .label=${this._zh ? "播放器实体" : "Player entity"}
+                    .disabled=${follow}
+                    .label=${follow
+                      ? this._zh
+                        ? "自动跟随卡片播放器"
+                        : "Follow active card player"
+                      : this._zh
+                        ? "播放器实体"
+                        : "Player entity"}
                     @value-changed=${(event) => {
                       event.stopPropagation();
                       this._setDockEntity(mode, event.detail?.value ?? "");
                     }}
                   ></ha-entity-picker>
+                  ${enabled
+                    ? html`<label
+                        class="dock-follow"
+                        title=${this._zh
+                          ? "自动跟随卡片内正在播放的播放器"
+                          : "Automatically follow the playing card player"}
+                      >
+                        <input
+                          type="checkbox"
+                          .checked=${follow}
+                          @change=${(e) => this._setDockFollow(mode, e.target.checked)}
+                        />
+                        <span>${this._zh ? "跟随" : "Follow"}</span>
+                      </label>`
+                    : nothing}
                   ${enabled
                     ? html`<select
                         class="dock-theme"

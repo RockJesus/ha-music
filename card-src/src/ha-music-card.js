@@ -39,7 +39,7 @@ import {
 } from "./util.js";
 import { paletteFor } from "./palette.js";
 import { fallbackCover } from "./fallback-cover.js";
-import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes, DOCK_REMOVE_EVENT } from "./dock.js";
+import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes, normalizeDockFollow, DOCK_REMOVE_EVENT } from "./dock.js";
 import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq } from "./fab-eq.js";
@@ -4168,24 +4168,27 @@ class HaMusicCard extends LitElement {
     );
     const entities = { ...(pref ? pref.entities : normalizeDockEntities(this._config?.dock_entities)) };
     const themes = { ...(pref ? pref.themes : normalizeDockThemes(this._config?.dock_themes)) };
+    const follow = { ...(pref ? pref.follow || {} : normalizeDockFollow(this._config?.dock_follow)) };
     delete entities[mode];
     delete themes[mode];
+    delete follow[mode];
     const nextDock = modes.length ? modes : "none";
     this._config = {
       ...this._config,
       dock: nextDock,
       dock_entities: entities,
       dock_themes: themes,
+      dock_follow: follow,
       dock_edited: Date.now(),
     };
     this._dockOwner = false;
     this.requestUpdate();
-    this._saveCardDock(nextDock, entities, themes).catch(() => {
+    this._saveCardDock(nextDock, entities, themes, follow).catch(() => {
       /* 保存失败时仍保留当前会话内的删除效果 */
     });
   }
 
-  async _saveCardDock(dock, entities, themes) {
+  async _saveCardDock(dock, entities, themes, follow) {
     if (!this._hass?.callWS) throw new Error("not connected");
     const urlPath = this._dashboardUrlPath();
     const response = await this._hass.callWS({
@@ -4202,6 +4205,7 @@ class HaMusicCard extends LitElement {
       dock,
       dock_entities: entities,
       dock_themes: themes,
+      dock_follow: follow,
       dock_edited: Date.now(),
     };
     view.cards[cardIndex] = replacement;
@@ -4210,6 +4214,14 @@ class HaMusicCard extends LitElement {
       url_path: urlPath,
       config: locationInfo.config,
     });
+  }
+
+  _dockPlayingEntity(fallback = "") {
+    const current = this._eid?.() || "";
+    const list = Array.from(
+      new Set([...(this._entities?.() || []), current, fallback].filter(Boolean))
+    );
+    return pickPlayingEntity(this._hass, list, current) || fallback;
   }
 
   _installDock() {
@@ -4222,12 +4234,14 @@ class HaMusicCard extends LitElement {
     const configDock = this._config?.dock;
     const configEntities = normalizeDockEntities(this._config?.dock_entities);
     const configThemes = normalizeDockThemes(this._config?.dock_themes);
+    const configFollow = normalizeDockFollow(this._config?.dock_follow);
     const pref = loadDockPref();
     // 全局设置一旦存在，所有卡片都以它为准：同一页面/不同仪表盘里
     // 复制出来的多张卡片不会再各自用本地 dock 配置互相覆盖。
     const modes = pref ? pref.modes : normalizeDockModes(configDock);
     const dockEntities = pref ? pref.entities : configEntities;
     const dockThemes = pref ? pref.themes : configThemes;
+    const dockFollow = pref ? pref.follow || {} : configFollow;
     const fallback =
       this._eid?.() ||
       this._config?.entity ||
@@ -4241,8 +4255,11 @@ class HaMusicCard extends LitElement {
     }
     if (!this._hass || !this.isConnected || !fallback) return;
     const entities = {};
+    const playing = dockFollow ? this._dockPlayingEntity(fallback) : fallback;
     for (const mode of modes) {
-      const entity = dockEntities[mode] || fallback;
+      const entity = dockFollow[mode] === true
+        ? playing || fallback
+        : dockEntities[mode] || fallback;
       if (entity) entities[mode] = entity;
     }
     const configs = Object.entries(entities).map(([mode, entity]) => ({
@@ -4261,6 +4278,7 @@ class HaMusicCard extends LitElement {
         themes: Object.fromEntries(
           Object.keys(entities).map((mode) => [mode, dockThemes[mode] || this._themeKey()])
         ),
+        follow: dockFollow,
       });
     }
     this._dockOwner = true;

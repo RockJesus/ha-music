@@ -25,6 +25,16 @@ export function normalizeDockThemes(value) {
   return out;
 }
 
+// 每个位置的“自动跟随”：开启后忽略固定实体，始终跟随卡片内正在播放的播放器。
+export function normalizeDockFollow(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const mode of MODES) {
+    if (value[mode] === true) out[mode] = true;
+  }
+  return out;
+}
+
 function applyMiniTheme(node, themeKey) {
   if (!node) return;
   const key = normalizeTheme(themeKey);
@@ -919,18 +929,19 @@ export function loadDockPref() {
     const modes = normalizeDockModes(pref?.modes ?? pref?.mode);
     const entities = normalizeDockEntities(pref?.entities);
     const themes = normalizeDockThemes(pref?.themes);
+    const follow = normalizeDockFollow(pref?.follow);
     const updated = Number(pref?.updated) || 0;
     const disabled = pref?.disabled === true;
     const legacyEntity = normalizeEntity(pref?.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
-    const cleanModes = modes.filter((mode) => entities[mode]);
+    const cleanModes = modes.filter((mode) => entities[mode] || follow[mode]);
     if (!cleanModes.length) {
       // 显式停用是一个全局状态：没有它，其他仪表盘里旧卡片的本地 dock 配置
       // 会在切页时把播放器重新装回来。
       if (!disabled) return null;
-      return { modes: [], entities, themes, disabled: true, updated };
+      return { modes: [], entities, themes, follow, disabled: true, updated };
     }
-    return { modes: cleanModes, entities, themes, disabled: false, updated };
+    return { modes: cleanModes, entities, themes, follow, disabled: false, updated };
   } catch {
     return null;
   }
@@ -940,6 +951,7 @@ function dockPrefKey(pref) {
   const modes = normalizeDockModes(pref?.modes ?? pref?.mode);
   const entities = normalizeDockEntities(pref?.entities);
   const themes = normalizeDockThemes(pref?.themes);
+  const follow = normalizeDockFollow(pref?.follow);
   const sortedEntities = {};
   for (const mode of Object.keys(entities).sort()) sortedEntities[mode] = entities[mode];
   const sortedThemes = {};
@@ -948,6 +960,7 @@ function dockPrefKey(pref) {
     modes,
     entities: sortedEntities,
     themes: sortedThemes,
+    follow,
     disabled: pref?.disabled === true,
   });
 }
@@ -966,16 +979,18 @@ export function saveDockPref(input = {}) {
     const modes = normalizeDockModes(input.modes ?? input.mode);
     const entities = normalizeDockEntities(input.entities);
     const themes = normalizeDockThemes(input.themes);
+    const follow = normalizeDockFollow(input.follow);
     const updated = Number(input.updated) || Date.now();
     const legacyEntity = normalizeEntity(input.entity);
     if (legacyEntity && modes[0] && !entities[modes[0]]) entities[modes[0]] = legacyEntity;
-    const cleanModes = modes.filter((mode) => entities[mode]);
+    const cleanModes = modes.filter((mode) => entities[mode] || follow[mode]);
     const next =
       cleanModes.length > 0
         ? {
             modes: cleanModes,
             entities,
             themes,
+            follow,
             disabled: false,
             updated,
           }
@@ -983,6 +998,7 @@ export function saveDockPref(input = {}) {
             modes: [],
             entities,
             themes,
+            follow,
             disabled: true,
             updated,
           };

@@ -2219,11 +2219,9 @@ class HaMusicCard extends LitElement {
           this._webEntity = entityId;
           this._localWebEntity = entityId;
           if (auto) {
-            // 自动连接只负责把播放器准备好，不抢当前播放器；胶囊等它真正
-            // 进入 playing/paused 后再由 _syncLocalWebEntity 自动加入。
-            if (this._webEntityInUse(entityId)) {
-              await this._syncLocalWebEntity(entityId);
-            }
+            // 自动连接只负责把播放器准备好，不抢当前播放器；本机 Web 播放器
+            // 这一行常驻在列表里，页面一打开就能看到并直接点播。
+            await this._syncLocalWebEntity(entityId);
             this.requestUpdate();
             return;
           }
@@ -2448,17 +2446,13 @@ class HaMusicCard extends LitElement {
   }
 
   _currentLocalWebEntity() {
-    if (
-      this._webEntity &&
-      this._localWebStateAvailable(this._webEntity) &&
-      this._webEntityInUse(this._webEntity)
-    ) {
+    if (this._webEntity && this._localWebStateAvailable(this._webEntity)) {
       return this._webEntity;
     }
     const player = this._findWebPlayer();
     if (player && player.available !== false) {
       const entityId = this._entityForMaPlayer(player);
-      if (this._localWebStateAvailable(entityId) && this._webEntityInUse(entityId)) {
+      if (this._localWebStateAvailable(entityId)) {
         return entityId;
       }
     }
@@ -2494,15 +2488,10 @@ class HaMusicCard extends LitElement {
         next = current.filter((id) => id !== target && !extras.includes(id));
         next.push(target);
       }
-    } else if (removeEntity || !this._webPlayer?.connected || webIds.some((id) => !this._webEntityInUse(id))) {
-      // 主动断开时移出；连接期间 HA 实体短暂 unavailable 不删。Web 播放器
-      // 已连接但处于 idle/off 时也从胶囊里隐藏，等它真正播放再自动加回。
-      const removeIds = removeEntity
-        ? [removeEntity]
-        : !this._webPlayer?.connected
-          ? webIds
-          : webIds.filter((id) => !this._webEntityInUse(id));
-      next = current.filter((id) => !removeIds.includes(id));
+    } else if (removeEntity) {
+      // 只有用户主动断开时才移出；连接期间短暂 unavailable、停止或闲置
+      // 都保留列表里的本机 Web 播放器行。
+      next = current.filter((id) => id !== removeEntity);
       if (!next.length) return;
     }
     if (!next || !next.length) return;

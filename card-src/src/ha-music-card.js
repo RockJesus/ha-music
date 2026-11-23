@@ -2285,7 +2285,7 @@ class HaMusicCard extends LitElement {
       try {
         await this._call(
           "play_media",
-          { media_id: contentId, enqueue: "replace" },
+          { media_id: contentId, media_type: "track", enqueue: "replace" },
           "music_assistant",
           entityId,
         );
@@ -2299,7 +2299,7 @@ class HaMusicCard extends LitElement {
         if (contentId) {
           await this._call(
             "play_media",
-            { media_id: contentId, enqueue: "replace" },
+            { media_id: contentId, media_type: "track", enqueue: "replace" },
             "music_assistant",
             entityId,
           );

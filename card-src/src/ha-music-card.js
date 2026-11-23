@@ -1849,7 +1849,8 @@ class HaMusicCard extends LitElement {
     if (cx == null || cy == null) return;
     const dx = event.clientX - cx;
     const dy = event.clientY - cy;
-    let angle = Math.atan2(dy, dx) + Math.PI / 2;
+    // 6 点方向为 0，顺时针增长（下 -> 左 -> 上 -> 右）。
+    let angle = Math.atan2(dy, dx) - Math.PI / 2;
     if (angle < 0) angle += Math.PI * 2;
     const ratio = clamp(angle / (Math.PI * 2), 0, 1);
     const duration = Number(this._readMedia().duration) || 0;

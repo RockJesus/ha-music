@@ -56,7 +56,7 @@ function paint(canvas, bars, glow) {
   for (let i = 0; i < barCount; i += 1) {
     const v = clamp(bars[i] || 0, 0, 1);
     // 音柱只负责实时频谱，不按进度压暗；进度由内圈细弧单独表达。
-    // 进度从 12 点方向顺时针增长，与圆形拖动方向一致。
+    // 进度从 6 点方向顺时针增长，与圆形拖动方向一致。
     ctx.shadowBlur = glowOn ? 5 + glow * 7 : 0;
     const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
     const len = 3.2 + Math.pow(v, 1.05) * maxLen;
@@ -99,7 +99,8 @@ function paint(canvas, bars, glow) {
   // 细进度弧压在音柱内侧：柱子负责实时频谱，弧负责精确读数与拖动反馈。
   if (progress >= 0) {
     const arcR = Math.max(8, r0 - 5);
-    const start = -Math.PI / 2;
+    // 进度弧从封面 6 点方向起，顺时针增长，和拖动手柄的角度换算保持一致。
+    const start = Math.PI / 2;
     const end = start + Math.PI * 2 * clamp(progress, 0, 1);
     const arcGrad = ctx.createLinearGradient(0, 0, size, size);
     arcGrad.addColorStop(0, accent[0]);

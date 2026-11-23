@@ -2288,6 +2288,10 @@ class HaMusicCard extends LitElement {
           "music_assistant",
           entityId,
         );
+        // Music Assistant 的 transfer_queue 只负责把队列挂到目标播放器，
+        // auto_play 在当前 HA 集成里不会真正触发播放；队列转移成功后再
+        // 补一条 media_play，Web 才会开始拉流。
+        await this._call("media_play", {}, "media_player", entityId);
         started = true;
       } catch {
         // 源队列为空或不可迁移：走下面的直接播放兜底。

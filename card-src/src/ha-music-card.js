@@ -481,11 +481,12 @@ class HaMusicCard extends LitElement {
     };
     document.addEventListener("visibilitychange", this._onVisibilityChange);
     this._unlockWebAudio = () => {
-      // 自动连接发生在页面加载时，AudioContext 需要一次真实手势才能出声；
-      // 页面第一次点击/触摸时补一次 unlock，之后移除监听。
-      this._webPlayer?.unlock?.();
-      document.removeEventListener("pointerdown", this._unlockWebAudio, true);
-      this._unlockWebAudio = null;
+      // 自动连接发生在页面加载时，AudioContext 需要一次真实手势才能出声。
+      // 每次 pointerdown 都尝试恢复：AudioContext 可能要到真正开始拉流时才
+      // 由 SDK 创建，第一次手势不一定能覆盖到它。
+      if (this._webPlayer?.connected) {
+        Promise.resolve(this._webPlayer.unlock?.()).catch(() => {});
+      }
     };
     document.addEventListener("pointerdown", this._unlockWebAudio, true);
     this._unsubscribeDockPref?.();
@@ -2239,7 +2240,7 @@ class HaMusicCard extends LitElement {
     return state.state === "playing" || state.state === "paused" || state.state === "on";
   }
 
-  _playOnWebPlayer() {
+  async _playOnWebPlayer() {
     const player = this._findWebPlayer();
     if (!player) {
       this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
@@ -2249,6 +2250,14 @@ class HaMusicCard extends LitElement {
     if (!entityId) {
       this._notify(translator(this._hass?.language)("deviceUnavailable"));
       return;
+    }
+    // 这个点击是用户手势：先把 AudioContext 建起来/恢复，再发播放命令。
+    // 否则 MA 会把实体状态改成 playing，但浏览器音频上下文仍是 suspended，
+    // 进度条会停在原处没有声音。
+    try {
+      await this._webPlayer?.unlock?.();
+    } catch {
+      // 忽略：后续播放命令仍会尝试，失败由卡片状态兜底。
     }
     this._webPlayerId = player.player_id;
     this._webEntity = entityId;
@@ -2260,6 +2269,9 @@ class HaMusicCard extends LitElement {
       this._switchEntity(entityId, true);
     }
     this._closePlayers();
+    // 切换卡片显示不等于让 MA 播放；必须显式下发 media_play，Web 才会成为
+    // 当前播放器并真正开始拉流。
+    this._guard(this._call("media_play", {}, "media_player", entityId));
   }
 
   _disconnectWebPlayer(silent = false) {

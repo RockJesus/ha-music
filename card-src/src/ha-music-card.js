@@ -2289,7 +2289,7 @@ class HaMusicCard extends LitElement {
           "music_assistant",
           entityId,
         );
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 4000));
         await this._call("media_play", {}, "media_player", entityId);
         await new Promise((resolve) => setTimeout(resolve, 600));
         started = ["playing", "paused", "buffering"].includes(

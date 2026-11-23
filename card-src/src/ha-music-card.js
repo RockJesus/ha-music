@@ -310,6 +310,7 @@ class HaMusicCard extends LitElement {
     this._hass = hass;
     if (!hass) return;
     this._scheduleAutoWebPlayer();
+    this._pinLocalWebEntityFromStates();
     if (this._webPlayer?.connected && this._webEntity) {
       const webState = hass.states?.[this._webEntity]?.state || "";
       if (webState !== this._webLastState) {
@@ -609,7 +610,12 @@ class HaMusicCard extends LitElement {
         : config.entity
           ? [config.entity]
           : [];
-    return list.filter(Boolean);
+    const out = list.filter(Boolean);
+    // 本机 Web 播放器常驻：仪表盘重渲染会用保存的配置覆盖内存态，这里
+    // 每次取实体列表都把它补回来，停止/闲置都不会从列表里消失。
+    const pinned = this._localWebEntity;
+    if (pinned && this._hass?.states?.[pinned] && !out.includes(pinned)) out.push(pinned);
+    return out;
   }
 
   _eid() {
@@ -2240,6 +2246,19 @@ class HaMusicCard extends LitElement {
     this._webPlayerId = this._webPlayerId || this._findWebPlayer()?.player_id || "";
     if (!auto) this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
     this.requestUpdate();
+  }
+
+  _pinLocalWebEntityFromStates() {
+    if (this._localWebEntity) return;
+    const name = String(this._webName || "").trim();
+    if (!name) return;
+    for (const [entityId, state] of Object.entries(this._hass?.states || {})) {
+      if (!entityId.startsWith("media_player.")) continue;
+      if (String(state?.attributes?.friendly_name || "").trim() !== name) continue;
+      this._localWebEntity = entityId;
+      this.requestUpdate();
+      return;
+    }
   }
 
   _webEntityInUse(entityId) {

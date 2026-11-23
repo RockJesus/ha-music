@@ -2293,39 +2293,27 @@ class HaMusicCard extends LitElement {
         this._notify(error?.message || String(error));
       }
     }
-    // 队列在别的播放器上：先把队列迁到 Web，等 MA 挂载完再 media_play。
-    // auto_play 在当前 HA 集成里不会真正拉流，而且紧跟着发 media_play 会
-    // 撞上队列还没挂好的窗口，表现为“实体闪一下 playing 又回 idle”。
-    if (!started && activeEntity && activeEntity !== entityId && contentId) {
+    // 直接给 Web 播放器建队列并播放。transfer_queue 会让 Web 实体短暂
+    // unavailable，且队列挂载窗口不稳定，容易闪一下又回 idle。
+    if (!started && contentId) {
       try {
         await this._call(
-          "transfer_queue",
-          { source_player: activeEntity, auto_play: true },
+          "play_media",
+          { media_id: contentId, media_type: "track", enqueue: "replace" },
           "music_assistant",
           entityId,
         );
-        await new Promise((resolve) => setTimeout(resolve, 4000));
-        await this._call("media_play", {}, "media_player", entityId);
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         started = ["playing", "paused", "buffering"].includes(
           this._state(entityId)?.state,
         );
-      } catch {
-        // 队列不可迁移：走下面的直接播放兜底。
+      } catch (error) {
+        this._notify(error?.message || String(error));
       }
     }
     if (!started) {
       try {
-        if (contentId) {
-          await this._call(
-            "play_media",
-            { media_id: contentId, media_type: "track", enqueue: "replace" },
-            "music_assistant",
-            entityId,
-          );
-        } else {
-          await this._call("media_play", {}, "media_player", entityId);
-        }
+        await this._call("media_play", {}, "media_player", entityId);
         started = true;
       } catch (error) {
         this._notify(error?.message || String(error));

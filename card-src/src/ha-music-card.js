@@ -2236,7 +2236,8 @@ class HaMusicCard extends LitElement {
     if (!entityId) return false;
     const state = this._hass?.states?.[entityId];
     if (!state) return false;
-    return state.state === "playing" || state.state === "paused" || state.state === "on";
+    if (state.state === "playing" || state.state === "paused" || state.state === "on") return true;
+    return Date.now() < (this._webEntityHoldUntil || 0);
   }
 
   async _playOnWebPlayer() {
@@ -2250,6 +2251,9 @@ class HaMusicCard extends LitElement {
       this._notify(translator(this._hass?.language)("deviceUnavailable"));
       return;
     }
+    // 转移队列到 Web 后实体短暂 idle，不能在这段时间把 Web 胶囊移出配置，
+    // 否则 Lovelace 重渲染会打断刚建立的 Web 播放连接。
+    this._webEntityHoldUntil = Date.now() + 20000;
     // 这个点击是用户手势：先把 AudioContext 建起来/恢复，再发播放命令。
     // 否则 MA 会把实体状态改成 playing，但浏览器音频上下文仍是 suspended，
     // 进度条会停在原处没有声音。

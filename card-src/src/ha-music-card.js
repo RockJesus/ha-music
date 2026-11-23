@@ -2259,19 +2259,68 @@ class HaMusicCard extends LitElement {
     } catch {
       // 忽略：后续播放命令仍会尝试，失败由卡片状态兜底。
     }
+    const activeEntity = this._activeEntity;
+    const activeState = this._state(activeEntity);
+    const activeAttrs = activeState?.attributes || {};
+    const webState = this._state(entityId);
+    const webAttrs = webState?.attributes || {};
+    const contentId = String(
+      activeAttrs.media_content_id || webAttrs.media_content_id || "",
+    );
+    const alreadyHere = entityId === activeEntity && webState?.state === "playing";
+    let started = alreadyHere;
+    // Web 已经是当前播放器但处于暂停：这个点击就是恢复播放。
+    if (!started && entityId === activeEntity && webState?.state === "paused") {
+      try {
+        await this._call("media_play", {}, "media_player", entityId);
+        started = true;
+      } catch (error) {
+        this._notify(error?.message || String(error));
+      }
+    }
+    // 队列在别的播放器上时，先迁队列再播放；直接 media_play 一个没有队列的
+    // Web 实体会被 Music Assistant 拒绝，卡片只能显示 playing 而没有声。
+    if (!started && activeEntity && activeEntity !== entityId && contentId) {
+      try {
+        await this._call(
+          "transfer_queue",
+          { source_player: activeEntity, auto_play: true },
+          "music_assistant",
+          entityId,
+        );
+        started = true;
+      } catch {
+        // 源队列为空或不可迁移：走下面的直接播放兜底。
+      }
+    }
+    if (!started) {
+      try {
+        if (contentId) {
+          await this._call(
+            "play_media",
+            { media_id: contentId, enqueue: "replace" },
+            "music_assistant",
+            entityId,
+          );
+        } else {
+          await this._call("media_play", {}, "media_player", entityId);
+        }
+        started = true;
+      } catch (error) {
+        this._notify(error?.message || String(error));
+      }
+    }
+    if (!started) return;
     this._webPlayerId = player.player_id;
     this._webEntity = entityId;
     this._localWebEntity = entityId;
     // 用户点“在本机播放”时也确保 Web 实体已在卡片列表里。
     this._syncLocalWebEntity(entityId);
-    if (entityId !== this._activeEntity) {
-      this._webReturnEntity = this._activeEntity;
+    if (entityId !== activeEntity) {
+      this._webReturnEntity = activeEntity;
       this._switchEntity(entityId, true);
     }
     this._closePlayers();
-    // 切换卡片显示不等于让 MA 播放；必须显式下发 media_play，Web 才会成为
-    // 当前播放器并真正开始拉流。
-    this._guard(this._call("media_play", {}, "media_player", entityId));
   }
 
   _disconnectWebPlayer(silent = false) {

@@ -2515,21 +2515,15 @@ class HaMusicCard extends LitElement {
         ? { ...previous, entities: next, entity: undefined }
         : { ...previous, entity: next[0], entities: undefined };
     this.requestUpdate();
-    try {
-      await this._saveCardEntities(next);
-      this._localWebSyncKey = key;
-      this._localWebSyncAt = Date.now();
-      if (!target) this._localWebEntity = "";
-    } catch {
-      /* 自动同步失败时保留原卡片配置，不打断播放 */
-      this._config = previous;
-      this.requestUpdate();
-    } finally {
-      this._localWebSyncBusy = false;
-      const pending = this._webSyncPending;
-      this._webSyncPending = null;
-      if (pending) this._syncLocalWebEntity(pending.target, pending.remove);
-    }
+    // Web 胶囊只做本卡片的内存态，不写回 Lovelace 配置。保存配置会触发
+    // 仪表盘重新渲染，进而断开刚建立的 Web 播放连接，表现为播放几秒后中断。
+    this._localWebSyncKey = key;
+    this._localWebSyncAt = Date.now();
+    if (!target) this._localWebEntity = "";
+    this._localWebSyncBusy = false;
+    const pending = this._webSyncPending;
+    this._webSyncPending = null;
+    if (pending) this._syncLocalWebEntity(pending.target, pending.remove);
   }
 
   _playersForPanel() {

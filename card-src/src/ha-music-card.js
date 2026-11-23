@@ -172,6 +172,11 @@ class HaMusicCard extends LitElement {
     this._ringSeeking = false;
     this._ringSeekId = 0;
     this._ringSeekValue = null;
+    this._ringSeekCx = null;
+    this._ringSeekCy = null;
+    this._ringSeekWinBound = false;
+    this._ringSeekWinMove = null;
+    this._ringSeekWinUp = null;
     this._volumePreview = null;
     this._volumeCommitAt = 0;
     this._mutedOverride = null;
@@ -556,6 +561,9 @@ class HaMusicCard extends LitElement {
     this._webPlayer = null;
     if (this._seekSettleTimer) clearTimeout(this._seekSettleTimer);
     this._seekSettleTimer = null;
+    this._ringSeeking = false;
+    this._ringSeekValue = null;
+    this._unbindRingSeekWindow();
     if (this._volumeSettleTimer) clearInterval(this._volumeSettleTimer);
     this._volumeSettleTimer = null;
     this._volumeSettleTicks = 0;
@@ -1738,37 +1746,73 @@ class HaMusicCard extends LitElement {
     }
   }
 
+  _ringBand(event) {
+    // 用封面按钮的真实尺寸算环带：封面内交给播放/暂停，环带外不处理。
+    const root = this.renderRoot;
+    const cover = root?.querySelector?.(".hm-cover");
+    if (!cover) return null;
+    const rect = cover.getBoundingClientRect();
+    if (!rect.width) return null;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const radius = rect.width / 2;
+    const eqRect = root?.querySelector?.(".hm-cover-eq")?.getBoundingClientRect?.();
+    const outer = Math.max(radius + 16, eqRect?.width ? eqRect.width / 2 : radius + 56);
+    const dist = Math.hypot(event.clientX - cx, event.clientY - cy);
+    if (dist < radius - 2 || dist > outer + 10) return null;
+    return { cx, cy, radius, outer };
+  }
+
+  _bindRingSeekWindow() {
+    if (this._ringSeekWinBound) return;
+    this._ringSeekWinMove = (event) => this._onRingSeekMove(event);
+    this._ringSeekWinUp = (event) => this._onRingSeekUp(event);
+    window.addEventListener("pointermove", this._ringSeekWinMove, true);
+    window.addEventListener("pointerup", this._ringSeekWinUp, true);
+    window.addEventListener("pointercancel", this._ringSeekWinUp, true);
+    this._ringSeekWinBound = true;
+  }
+
+  _unbindRingSeekWindow() {
+    if (!this._ringSeekWinBound) return;
+    window.removeEventListener("pointermove", this._ringSeekWinMove, true);
+    window.removeEventListener("pointerup", this._ringSeekWinUp, true);
+    window.removeEventListener("pointercancel", this._ringSeekWinUp, true);
+    this._ringSeekWinBound = false;
+    this._ringSeekWinMove = null;
+    this._ringSeekWinUp = null;
+  }
+
   _onRingSeekDown(event) {
     if (!hasFeature(this._state(), FEATURES.SEEK)) return;
     if (!this._readMedia().duration) return;
+    if (this._ringSeeking) return;
+    const band = this._ringBand(event);
+    if (!band) return;
     event.preventDefault();
     event.stopPropagation();
     this._ringSeeking = true;
-    this._ringSeekId = event.pointerId;
-    try {
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    } catch {
-      /* 旧浏览器无 pointer capture，move/up 仍可在元素上触发 */
-    }
+    this._ringSeekId = event.pointerId ?? 1;
+    this._ringSeekCx = band.cx;
+    this._ringSeekCy = band.cy;
+    this._bindRingSeekWindow();
     this._applyRingSeek(event);
   }
 
   _onRingSeekMove(event) {
-    if (!this._ringSeeking || event.pointerId !== this._ringSeekId) return;
+    if (!this._ringSeeking) return;
+    if (event.pointerId != null && this._ringSeekId != null && event.pointerId !== this._ringSeekId) return;
     event.preventDefault();
     this._applyRingSeek(event);
   }
 
   _onRingSeekUp(event) {
-    if (!this._ringSeeking || event.pointerId !== this._ringSeekId) return;
+    if (!this._ringSeeking) return;
+    if (event.pointerId != null && this._ringSeekId != null && event.pointerId !== this._ringSeekId) return;
     event.preventDefault();
     event.stopPropagation();
     this._ringSeeking = false;
-    try {
-      event.currentTarget.releasePointerCapture?.(event.pointerId);
-    } catch {
-      /* ignore */
-    }
+    this._unbindRingSeekWindow();
     const value = this._ringSeekValue;
     this._ringSeekValue = null;
     if (value != null) this._commitSeekValue(value);
@@ -1778,16 +1822,23 @@ class HaMusicCard extends LitElement {
     if (!this._ringSeeking) return;
     this._ringSeeking = false;
     this._ringSeekValue = null;
+    this._unbindRingSeekWindow();
     this._seekPreview = null;
     this._syncCoverEq();
     this.requestUpdate();
   }
 
   _applyRingSeek(event) {
-    const el = event.currentTarget;
-    const rect = el.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
+    let cx = this._ringSeekCx;
+    let cy = this._ringSeekCy;
+    if (cx == null || cy == null) {
+      const band = this._ringBand(event);
+      if (band) {
+        cx = band.cx;
+        cy = band.cy;
+      }
+    }
+    if (cx == null || cy == null) return;
     const dx = event.clientX - cx;
     const dy = event.clientY - cy;
     let angle = Math.atan2(dy, dx) + Math.PI / 2;
@@ -5425,7 +5476,14 @@ class HaMusicCard extends LitElement {
 
           ${this._lyricsOpen
             ? this._renderLyrics(media, position)
-            : html`<section class="hm-main" data-side-lyrics=${sideLyrics ? "true" : "false"}>
+            : html`<section
+                class="hm-main"
+                data-side-lyrics=${sideLyrics ? "true" : "false"}
+                @pointerdown=${(event) => this._onRingSeekDown(event)}
+                @pointermove=${(event) => this._onRingSeekMove(event)}
+                @pointerup=${(event) => this._onRingSeekUp(event)}
+                @pointercancel=${(event) => this._onRingSeekCancel(event)}
+              >
             <div
               class="hm-cover-wrap"
               data-ringseek=${fusionMode === "ring" ? "true" : "false"}
@@ -5445,18 +5503,7 @@ class HaMusicCard extends LitElement {
                     aria-valuemax=${duration}
                     aria-valuenow=${position}
                     data-disabled=${canSeek ? "false" : "true"}
-                    @pointerdown=${(event) => this._onRingSeekDown(event)}
-                    @pointermove=${(event) => this._onRingSeekMove(event)}
-                    @pointerup=${(event) => this._onRingSeekUp(event)}
-                    @pointercancel=${(event) => this._onRingSeekCancel(event)}
                   ></div>`
-                : nothing}
-              ${fusionMode === "ring" && duration > 0
-                ? html`<div class="hm-ring-readout" aria-hidden="true">
-                    <span data-role="ring-start">${formatTime(position)}</span>
-                    <span class="hm-ring-sep">/</span>
-                    <span>${formatTime(duration)}</span>
-                  </div>`
                 : nothing}
               <button
                 class="hm-cover"
@@ -5479,6 +5526,13 @@ class HaMusicCard extends LitElement {
                       @error=${() => this._onArtError()}
                     />`
                   : html`<span class="hm-cover-ph">${icon("music", 40)}</span>`}
+                ${fusionMode === "ring" && duration > 0
+                  ? html`<span class="hm-ring-readout" aria-hidden="true">
+                      <span data-role="ring-start">${formatTime(position)}</span>
+                      <span class="hm-ring-sep">/</span>
+                      <span>${formatTime(duration)}</span>
+                    </span>`
+                  : nothing}
               </button>
             </div>
 

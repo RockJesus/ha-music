@@ -894,6 +894,8 @@ export const cardStyles = css`
     border-radius: 50%;
     cursor: pointer;
     touch-action: none;
+    /* 事件统一由 .hm-main 捕获处理，避免外圈盖住封面导致拖不动 */
+    pointer-events: none;
   }
 
   .hm-ring-seek[data-disabled="true"] {
@@ -904,8 +906,8 @@ export const cardStyles = css`
   .hm-ring-readout {
     position: absolute;
     left: 50%;
-    top: calc(50% + (var(--hm-cover-size, 168px) / 2) - 24px);
-    z-index: 5;
+    bottom: 10px;
+    z-index: 6;
     translate: -50% 0;
     display: inline-flex;
     align-items: center;

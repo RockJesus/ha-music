@@ -2278,20 +2278,25 @@ class HaMusicCard extends LitElement {
         this._notify(error?.message || String(error));
       }
     }
-    // 直接把当前曲目交给 Web 播放器。transfer_queue 在当前 HA 集成里
-    // 只挂队列、auto_play 不真正拉流，补 media_play 也会出现“显示已切换、
-    // 实体仍 idle”的假成功；play_media 才是会真的让 Web 开始拉流的服务。
-    if (!started && contentId) {
+    // 队列在别的播放器上：先把队列迁到 Web，等 MA 挂载完再 media_play。
+    // auto_play 在当前 HA 集成里不会真正拉流，而且紧跟着发 media_play 会
+    // 撞上队列还没挂好的窗口，表现为“实体闪一下 playing 又回 idle”。
+    if (!started && activeEntity && activeEntity !== entityId && contentId) {
       try {
         await this._call(
-          "play_media",
-          { media_id: contentId, media_type: "track", enqueue: "replace" },
+          "transfer_queue",
+          { source_player: activeEntity, auto_play: true },
           "music_assistant",
           entityId,
         );
-        started = true;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await this._call("media_play", {}, "media_player", entityId);
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        started = ["playing", "paused", "buffering"].includes(
+          this._state(entityId)?.state,
+        );
       } catch {
-        // 交给下面的 media_play 兜底。
+        // 队列不可迁移：走下面的直接播放兜底。
       }
     }
     if (!started) {

@@ -2320,6 +2320,8 @@ class HaMusicCard extends LitElement {
       }
     }
     if (!started) return;
+    // 播放已确认，过渡保护结束：之后暂停/停止应立即按真实状态显隐胶囊。
+    this._webEntityHoldUntil = 0;
     this._webPlayerId = player.player_id;
     this._webEntity = entityId;
     this._localWebEntity = entityId;

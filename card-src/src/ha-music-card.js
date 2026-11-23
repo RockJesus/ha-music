@@ -2278,23 +2278,20 @@ class HaMusicCard extends LitElement {
         this._notify(error?.message || String(error));
       }
     }
-    // 队列在别的播放器上时，先迁队列再播放；直接 media_play 一个没有队列的
-    // Web 实体会被 Music Assistant 拒绝，卡片只能显示 playing 而没有声。
-    if (!started && activeEntity && activeEntity !== entityId && contentId) {
+    // 直接把当前曲目交给 Web 播放器。transfer_queue 在当前 HA 集成里
+    // 只挂队列、auto_play 不真正拉流，补 media_play 也会出现“显示已切换、
+    // 实体仍 idle”的假成功；play_media 才是会真的让 Web 开始拉流的服务。
+    if (!started && contentId) {
       try {
         await this._call(
-          "transfer_queue",
-          { source_player: activeEntity, auto_play: true },
+          "play_media",
+          { media_id: contentId, enqueue: "replace" },
           "music_assistant",
           entityId,
         );
-        // Music Assistant 的 transfer_queue 只负责把队列挂到目标播放器，
-        // auto_play 在当前 HA 集成里不会真正触发播放；队列转移成功后再
-        // 补一条 media_play，Web 才会开始拉流。
-        await this._call("media_play", {}, "media_player", entityId);
         started = true;
       } catch {
-        // 源队列为空或不可迁移：走下面的直接播放兜底。
+        // 交给下面的 media_play 兜底。
       }
     }
     if (!started) {

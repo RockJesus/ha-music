@@ -150,6 +150,17 @@ export class WebPlayer {
     return this.player?.pairingToken || "";
   }
 
+  async unlock() {
+    // Called from a real pointer gesture after the automatic connection.  This
+    // only resumes the existing AudioContext; it never creates a socket.
+    try {
+      await this.player?.unlock();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   disconnect() {
     this.connected = false;
     try {

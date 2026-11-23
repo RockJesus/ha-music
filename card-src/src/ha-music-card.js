@@ -209,6 +209,12 @@ class HaMusicCard extends LitElement {
     this._webTicketTtl = 300;
     this._webTicketLoading = null;
     this._webBusy = false;
+    this._webAutoScheduled = false;
+    this._webAutoTimer = null;
+    this._webAutoFailed = false;
+    this._webAutoStarted = false;
+    this._webAutoOwner = null;
+    this._webLastState = "";
     this._webPlayerId = "";
     this._webEntity = "";
     this._webReturnEntity = "";
@@ -303,6 +309,15 @@ class HaMusicCard extends LitElement {
     const previous = this._hass;
     this._hass = hass;
     if (!hass) return;
+    this._scheduleAutoWebPlayer();
+    if (this._webPlayer?.connected && this._webEntity) {
+      const webState = hass.states?.[this._webEntity]?.state || "";
+      if (webState !== this._webLastState) {
+        this._webLastState = webState;
+        // playing/paused 时加回胶囊，idle/off 时自动隐藏。
+        this._queueLocalWebEntitySync(250);
+      }
+    }
     this._autoSwitchToPlaying(hass);
     if (!this._sfxSynced) queueMicrotask(() => this._syncSoundEffect());
     const entityId = this._eid();
@@ -452,6 +467,27 @@ class HaMusicCard extends LitElement {
     }
     this._onDockRemove = (event) => this._handleDockRemove(event.detail);
     window.addEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
+    this._onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        // 页面不再使用时断开本机 Web 播放器并移出胶囊，避免后台空耗。
+        this._webAutoScheduled = false;
+        if (this._webAutoTimer) clearTimeout(this._webAutoTimer);
+        this._webAutoTimer = null;
+        if (this._webPlayer) this._disconnectWebPlayer(true);
+        return;
+      }
+      this._webAutoScheduled = false;
+      this._scheduleAutoWebPlayer();
+    };
+    document.addEventListener("visibilitychange", this._onVisibilityChange);
+    this._unlockWebAudio = () => {
+      // 自动连接发生在页面加载时，AudioContext 需要一次真实手势才能出声；
+      // 页面第一次点击/触摸时补一次 unlock，之后移除监听。
+      this._webPlayer?.unlock?.();
+      document.removeEventListener("pointerdown", this._unlockWebAudio, true);
+      this._unlockWebAudio = null;
+    };
+    document.addEventListener("pointerdown", this._unlockWebAudio, true);
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = subscribeDockPref(() => {
       // 任意一张卡片的编辑器改动都会广播到这里；重装全局迷你播放器，
@@ -490,6 +526,14 @@ class HaMusicCard extends LitElement {
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
     window.removeEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
+    document.removeEventListener("visibilitychange", this._onVisibilityChange);
+    if (this._unlockWebAudio) {
+      document.removeEventListener("pointerdown", this._unlockWebAudio, true);
+      this._unlockWebAudio = null;
+    }
+    if (this._webAutoTimer) clearTimeout(this._webAutoTimer);
+    this._webAutoTimer = null;
+    if (this._webAutoOwner === this) this._webAutoOwner = null;
     this._cancelChipPress();
     this._chipDrag = null;
     this._chipOrderStyles = null;
@@ -2016,9 +2060,33 @@ class HaMusicCard extends LitElement {
     return named[0] || null;
   }
 
-  async _connectWebPlayer() {
+  _scheduleAutoWebPlayer() {
+    if (this._isPreviewContext()) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
+    if (this._webAutoScheduled || this._webBusy || this._webPlayer?.connected) return;
+    // 同一页面可能放了多张 ha-music 卡片；Web 播放器按浏览器身份只有一份，
+    // 由第一张卡负责连接，其它卡只读取实体，避免互踢重连。
+    const owner = window.__haMusicWebPlayerOwner;
+    if (owner && owner !== this && owner.isConnected !== false) return;
+    window.__haMusicWebPlayerOwner = this;
+    this._webAutoOwner = this;
+    this._webAutoScheduled = true;
+    this._webAutoTimer = setTimeout(() => {
+      this._webAutoTimer = null;
+      if (!this._webAutoScheduled) return;
+      this._webAutoScheduled = false;
+      if (document.visibilityState === "hidden") return;
+      this._connectWebPlayer({ auto: true });
+    }, 1800);
+  }
+
+  async _connectWebPlayer(options = {}) {
+    const auto = Boolean(options?.auto);
     if (this._webBusy || this._webPlayer?.connected) return;
     this._webBusy = true;
+    this._webAutoFailed = false;
     const beforeIds = new Set(this._maPlayers.map((player) => player.player_id));
     this.requestUpdate();
     try {
@@ -2069,20 +2137,27 @@ class HaMusicCard extends LitElement {
       } catch (error) {
         console.warn("HA Music: web player pairing failed", error);
       }
-      this._notify(translator(this._hass?.language)("webPlayerConnected"));
+      this._webAutoStarted = true;
+      if (!auto) this._notify(translator(this._hass?.language)("webPlayerConnected"));
       this._webBusy = false;
       this.requestUpdate();
       await this._exposeWebPlayer();
-      await this._waitForWebPlayer(beforeIds);
+      await this._waitForWebPlayer(beforeIds, { auto });
     } catch (error) {
       this._webBusy = false;
+      this._webAutoStarted = false;
       this._webPlayer?.disconnect();
       this._webPlayer = null;
-      this._notify(
-        `${translator(this._hass?.language)("webPlayerFailed")}: ${
-          error?.message || String(error)
-        }`.slice(0, 180)
-      );
+      this._webAutoFailed = true;
+      if (auto) {
+        console.warn("HA Music: auto web player failed", error);
+      } else {
+        this._notify(
+          `${translator(this._hass?.language)("webPlayerFailed")}: ${
+            error?.message || String(error)
+          }`.slice(0, 180)
+        );
+      }
       this.requestUpdate();
     }
   }
@@ -2119,7 +2194,8 @@ class HaMusicCard extends LitElement {
     }
   }
 
-  async _waitForWebPlayer(beforeIds = new Set()) {
+  async _waitForWebPlayer(beforeIds = new Set(), options = {}) {
+    const auto = Boolean(options?.auto);
     for (let attempt = 0; attempt < 40; attempt += 1) {
       await this._loadPlayers();
       const player = this._findWebPlayer(beforeIds);
@@ -2129,6 +2205,15 @@ class HaMusicCard extends LitElement {
         if (entityId) {
           this._webEntity = entityId;
           this._localWebEntity = entityId;
+          if (auto) {
+            // 自动连接只负责把播放器准备好，不抢当前播放器；胶囊等它真正
+            // 进入 playing/paused 后再由 _syncLocalWebEntity 自动加入。
+            if (this._webEntityInUse(entityId)) {
+              await this._syncLocalWebEntity(entityId);
+            }
+            this.requestUpdate();
+            return;
+          }
           await this._syncLocalWebEntity(entityId);
           if (entityId !== this._activeEntity) {
             this._webReturnEntity = this._activeEntity;
@@ -2142,8 +2227,16 @@ class HaMusicCard extends LitElement {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     this._webPlayerId = this._webPlayerId || this._findWebPlayer()?.player_id || "";
-    this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
+    if (!auto) this._notify(translator(this._hass?.language)("webPlayerWaitEntity"));
     this.requestUpdate();
+  }
+
+  _webEntityInUse(entityId) {
+    if (!entityId) return false;
+    if (entityId === this._activeEntity) return true;
+    const state = this._hass?.states?.[entityId];
+    if (!state) return false;
+    return state.state === "playing" || state.state === "paused" || state.state === "on";
   }
 
   _playOnWebPlayer() {
@@ -2169,7 +2262,7 @@ class HaMusicCard extends LitElement {
     this._closePlayers();
   }
 
-  _disconnectWebPlayer() {
+  _disconnectWebPlayer(silent = false) {
     const webEntity = this._webEntity || this._localWebEntity;
     this._webPlayer?.disconnect();
     this._webPlayer = null;
@@ -2177,13 +2270,15 @@ class HaMusicCard extends LitElement {
     this._webEntity = "";
     this._webPlayerState = null;
     this._localWebEntity = "";
+    this._webAutoStarted = false;
+    this._webAutoFailed = false;
     // 主动断开时立即把本机 Web 实体移出卡片，不等状态轮询。
     if (webEntity) this._syncLocalWebEntity("", webEntity);
     if (webEntity && this._activeEntity === webEntity && this._webReturnEntity) {
       this._switchEntity(this._webReturnEntity, true);
       this._webReturnEntity = "";
     }
-    this.requestUpdate();
+    if (!silent) this.requestUpdate();
   }
 
   _renderWebPlayerRow(t) {
@@ -2203,7 +2298,9 @@ class HaMusicCard extends LitElement {
               ? this._webPlayerId
                 ? t("webPlayerConnected")
                 : t("webPlayerWaitEntity")
-              : t("webPlayerHint")}
+              : this._webAutoFailed
+                ? t("webPlayerAutoFailed")
+                : t("webPlayerConnecting")}
           </span>
         </div>
       </div>
@@ -2225,15 +2322,17 @@ class HaMusicCard extends LitElement {
               >
                 ${t("webPlayerDisconnect")}
               </button>`
-          : html`<button
-              class="hm-player-btn"
-              data-role="web-connect"
-              data-disabled=${this._webBusy ? "true" : "false"}
-              ?disabled=${this._webBusy}
-              @click=${() => this._connectWebPlayer()}
-            >
-              ${this._webBusy ? t("webPlayerConnecting") : t("webPlayerConnect")}
-            </button>`}
+          : this._webAutoFailed
+            ? html`<button
+                class="hm-player-btn"
+                data-role="web-connect"
+                data-disabled=${this._webBusy ? "true" : "false"}
+                ?disabled=${this._webBusy}
+                @click=${() => this._connectWebPlayer({ auto: true })}
+              >
+                ${t("webPlayerRetry")}
+              </button>`
+            : nothing}
       </div>
     </div>`;
   }
@@ -2277,19 +2376,26 @@ class HaMusicCard extends LitElement {
   }
 
   _currentLocalWebEntity() {
-    if (this._webEntity && this._localWebStateAvailable(this._webEntity)) {
+    if (
+      this._webEntity &&
+      this._localWebStateAvailable(this._webEntity) &&
+      this._webEntityInUse(this._webEntity)
+    ) {
       return this._webEntity;
     }
     const player = this._findWebPlayer();
     if (player && player.available !== false) {
       const entityId = this._entityForMaPlayer(player);
-      if (this._localWebStateAvailable(entityId)) return entityId;
+      if (this._localWebStateAvailable(entityId) && this._webEntityInUse(entityId)) {
+        return entityId;
+      }
     }
     const name = String(this._webName || "").trim();
     if (!name) return "";
     for (const [entityId, state] of Object.entries(this._hass?.states || {})) {
       if (!entityId.startsWith("media_player.")) continue;
       if (state.state === "unavailable" || state.state === "unknown") continue;
+      if (!this._webEntityInUse(entityId)) continue;
       if (String(state.attributes?.friendly_name || "").trim() === name) return entityId;
     }
     return "";
@@ -2316,13 +2422,14 @@ class HaMusicCard extends LitElement {
         next = current.filter((id) => id !== target && !extras.includes(id));
         next.push(target);
       }
-    } else if (
-      (removeEntity || !this._webPlayer?.connected) &&
-      (removeEntity ? current.includes(removeEntity) : webIds.length)
-    ) {
-      // 只在主动断开、或播放器确实已断开时移除；连接期间 HA 实体短暂
-      // unavailable 不能把刚加入的 Web 播放器又删掉。
-      const removeIds = removeEntity ? [removeEntity] : webIds;
+    } else if (removeEntity || !this._webPlayer?.connected || webIds.some((id) => !this._webEntityInUse(id))) {
+      // 主动断开时移出；连接期间 HA 实体短暂 unavailable 不删。Web 播放器
+      // 已连接但处于 idle/off 时也从胶囊里隐藏，等它真正播放再自动加回。
+      const removeIds = removeEntity
+        ? [removeEntity]
+        : !this._webPlayer?.connected
+          ? webIds
+          : webIds.filter((id) => !this._webEntityInUse(id));
       next = current.filter((id) => !removeIds.includes(id));
       if (!next.length) return;
     }

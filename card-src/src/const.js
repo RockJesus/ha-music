@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.22.3";
+export const CARD_VERSION = "2.23.0";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -198,6 +198,8 @@ const EN = {
   webPlayerConnected: "This browser is ready to play",
   webPlayerWaitEntity: "Player connected; waiting for Home Assistant entity",
   webPlayerFailed: "Could not start the browser player",
+  webPlayerAutoFailed: "Automatic browser player connection failed",
+  webPlayerRetry: "Retry",
   themeTitle: "Theme",
   soundFx: "Sound effects",
   soundFxHint: "Applies to the playing track",
@@ -301,6 +303,8 @@ const ZH = {
   webPlayerConnected: "本机浏览器已可播放",
   webPlayerWaitEntity: "播放器已连接，正在等待 Home Assistant 实体",
   webPlayerFailed: "本机浏览器播放器启动失败",
+  webPlayerAutoFailed: "本机浏览器播放器自动连接失败",
+  webPlayerRetry: "重试",
   themeTitle: "主题",
   soundFx: "音效",
   soundFxHint: "作用于正在播放的音乐",

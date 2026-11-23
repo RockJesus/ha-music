@@ -2234,7 +2234,6 @@ class HaMusicCard extends LitElement {
 
   _webEntityInUse(entityId) {
     if (!entityId) return false;
-    if (entityId === this._activeEntity) return true;
     const state = this._hass?.states?.[entityId];
     if (!state) return false;
     return state.state === "playing" || state.state === "paused" || state.state === "on";

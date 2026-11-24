@@ -2849,6 +2849,44 @@ export const cardStyles = css`
     }
   }
 
+  /* 歌词重新匹配期间：上一首的歌词半透明占位，位置和高度都不动 */
+  .hm-lyrics[data-stale="true"] .hm-lyrics-scroll {
+    opacity: 0.42;
+    transition: opacity 0.18s ease;
+    pointer-events: none;
+  }
+
+  /* 首次匹配没有可留的内容时，用骨线占住同样的行高 */
+  .hm-lyrics-line[data-skeleton="true"] {
+    pointer-events: none;
+    background: transparent;
+  }
+
+  .hm-lyrics-line[data-skeleton="true"] .hm-lyrics-text {
+    display: block;
+    width: 62%;
+    height: 0.92em;
+    border-radius: 7px;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.2) 45%,
+      rgba(255, 255, 255, 0.08) 90%
+    );
+    background-size: 230% 100%;
+    animation: hmLyricsSkeleton 1.7s ease-in-out infinite;
+  }
+
+  .hm-lyrics-line[data-skeleton="true"]:nth-child(2) .hm-lyrics-text { width: 78%; }
+  .hm-lyrics-line[data-skeleton="true"]:nth-child(3) .hm-lyrics-text { width: 54%; }
+  .hm-lyrics-line[data-skeleton="true"]:nth-child(4) .hm-lyrics-text { width: 70%; }
+  .hm-lyrics-line[data-skeleton="true"]:nth-child(5) .hm-lyrics-text { width: 46%; }
+
+  @keyframes hmLyricsSkeleton {
+    0% { background-position: 130% 0; }
+    100% { background-position: -130% 0; }
+  }
+
   .hm-lyrics-head {
     display: flex;
     align-items: center;

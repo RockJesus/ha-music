@@ -265,6 +265,7 @@ class HaMusicCard extends LitElement {
     this.preview = false;
     this.editMode = false;
     this._lyricsOpen = false;
+    this._lyricsSlot = false;
     this._lyricsKey = "";
     this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
     this._lyricsActive = -1;
@@ -948,12 +949,16 @@ class HaMusicCard extends LitElement {
       return;
     }
     if (event.status === "loading") {
+      const keep = this._lyrics.lines?.length || this._lyrics.plain?.length;
       this._lyrics = {
         status: "loading",
-        lines: [],
-        plain: [],
-        instrumental: false,
+        stale: Boolean(keep),
+        lines: this._lyrics.lines || [],
+        plain: this._lyrics.plain || [],
+        instrumental: Boolean(this._lyrics.instrumental),
         source: "Music Assistant",
+        index: -1,
+        progress: 0,
       };
       this._lyricsActive = -1;
       this._lyricsScrolled = -2;
@@ -984,6 +989,7 @@ class HaMusicCard extends LitElement {
       this._lyricsScrolled = -2;
       this._lyricsActive = -1;
     }
+    if (ready) this._lyricsSlot = true;
     this._lyrics = {
       status: ready ? "ready" : "none",
       lines,
@@ -1082,6 +1088,7 @@ class HaMusicCard extends LitElement {
   _maybeLoadLyrics() {
     if (!this._lyricsEnabled() || this._thumbMode()) {
       this._teardownStudioLyrics();
+      this._lyricsSlot = false;
       return;
     }
     const media = this._readMedia();
@@ -1099,14 +1106,25 @@ class HaMusicCard extends LitElement {
     }
     const entityId = this._eid();
     if (this._lyricsKey === entityId && (this._lyricsUnsub || this._lyricsPending)) return;
+    const sameEntity = this._lyricsKey === entityId;
+    if (!sameEntity) this._lyricsSlot = false;
     this._lyricsKey = entityId;
+    const prev = sameEntity ? this._lyrics : null;
+    const hold = Boolean(prev && (prev.lines?.length || prev.plain?.length));
+    // 切歌期间保留上一首的歌词骨架（半透明占位），不要把侧栏/面板抽空，
+    // 否则歌词每次重新匹配都会把布局推一下。
     this._lyrics = {
       status: "loading",
-      lines: [],
-      plain: [],
-      instrumental: false,
+      stale: hold,
+      lines: hold ? prev.lines : [],
+      plain: hold ? prev.plain : [],
+      instrumental: hold ? prev.instrumental : false,
       source: "Music Assistant",
+      index: -1,
+      progress: 0,
     };
+    this._lyricsActive = -1;
+    this._lyricsScrolled = -2;
     this.requestUpdate();
     this._ensureStudioLyrics();
   }
@@ -5415,7 +5433,7 @@ class HaMusicCard extends LitElement {
     const progress = timed
       ? { index: backendIndex, progress: Number(lyrics.progress) || 0 }
       : { index: -1, progress: 0 };
-    const active = timed ? Math.max(0, progress.index) : -1;
+    const active = timed && lyrics.status !== "loading" ? Math.max(0, progress.index) : -1;
     const lineProgress = active >= 0 ? progress.progress : 0;
     const activeChanged = active !== this._lyricsActive;
     this._lyricsActive = active;
@@ -5433,9 +5451,15 @@ class HaMusicCard extends LitElement {
       body = html`<div class="hm-lyrics-empty">
         ${lyrics.message || protocolErrorText(this._hass?.language)}
       </div>`;
-    } else if (lyrics.status === "loading") {
-      // 歌词匹配期间不显示「正在匹配歌词」占位框，避免侧边歌词/完整面板出现空框。
-      body = nothing;
+    } else if (lyrics.status === "loading" && !timed && !plain.length) {
+      // 首次匹配（没有上一首歌词可留）时铺五行骨线，占住原本的高度，
+      // 免得歌词回来后整块 UI 被重新撑开。
+      body = Array.from(
+        { length: 5 },
+        () => html`<div class="hm-lyrics-line" data-static="true" data-skeleton="true">
+          <span class="hm-lyrics-text"></span>
+        </div>`
+      );
     } else if (lyrics.status === "none" || lyrics.status === "error") {
       const isNone = lyrics.status === "none";
       body = html`<div class="hm-lyrics-empty hm-lyrics-error">
@@ -5478,7 +5502,11 @@ class HaMusicCard extends LitElement {
       return nothing;
     }
 
-    return html`<section class="hm-lyrics ${inline ? "hm-lyrics-inline" : ""}" data-status=${lyrics.status}>
+    return html`<section
+      class="hm-lyrics ${inline ? "hm-lyrics-inline" : ""}"
+      data-status=${lyrics.status}
+      data-stale=${lyrics.stale ? "true" : "false"}
+    >
       <div class="hm-lyrics-head">
         <span class="hm-lyrics-title">${t("lyrics")}</span>
         ${lyrics.source
@@ -5649,7 +5677,7 @@ class HaMusicCard extends LitElement {
     const sideLyrics =
       showLyrics &&
       !this._lyricsOpen &&
-      this._lyrics.status === "ready" &&
+      (this._lyrics.status === "ready" || this._lyricsSlot) &&
       this._sideLyricsVisible();
 
     const lyricLine =

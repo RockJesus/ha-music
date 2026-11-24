@@ -2543,11 +2543,11 @@ class HaMusicCard extends LitElement {
           </span>
           <span class="hm-player-sub">
             ${connected
-              ? this._webPlayerId
+              ? canPlay
                 ? t("webPlayerConnected")
                 : this._webExposeError
                   ? t("webPlayerExposeFailed")
-                  : t("webPlayerExposePending")
+                  : t("webPlayerWaitEntity")
               : this._webAutoFailed
                 ? t("webPlayerAutoFailed")
                 : t("webPlayerConnecting")}
@@ -2564,14 +2564,12 @@ class HaMusicCard extends LitElement {
                   >
                     ${t("webPlayerPlayHere")}
                   </button>`
-                : this._webPlayerId
-                  ? nothing
-                  : html`<button
-                      class="hm-player-btn"
-                      @click=${() => this._retryWebRegistration()}
-                    >
-                      ${t("webPlayerRetry")}
-                    </button>`}
+                : html`<button
+                    class="hm-player-btn"
+                    @click=${() => this._retryWebRegistration()}
+                  >
+                    ${t("webPlayerRetry")}
+                  </button>`}
               <button
                 class="hm-player-btn"
                 data-role="web-disconnect"

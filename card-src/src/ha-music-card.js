@@ -45,6 +45,9 @@ import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq, setFabEqHover } from "./fab-eq.js";
 import {
   WebPlayer,
+  iosModelInfo,
+  platformName,
+  screenSize,
   webPlayerClientId,
   webPlayerName,
 } from "./web-player.js";
@@ -319,6 +322,7 @@ class HaMusicCard extends LitElement {
     if (!hass) return;
     this._scheduleAutoWebPlayer();
     this._pinLocalWebEntityFromStates();
+    if (!this._webNameResolved) this._resolveWebPlayerName();
     if (this._webPlayer?.connected && this._webEntity) {
       const webState = hass.states?.[this._webEntity]?.state || "";
       if (webState !== this._webLastState) {
@@ -2159,6 +2163,83 @@ class HaMusicCard extends LitElement {
       if (fresh) return fresh;
     }
     return named[0] || null;
+  }
+
+  async _resolveWebPlayerName() {
+    // iOS gives no model in the UA, so ask Home Assistant's device registry for
+    // the companion app's hardware identifier and turn it into a marketing name.
+    if (this._webNameResolved) return;
+    this._webNameResolved = true;
+    const platform = platformName();
+    if (platform !== "iOS" && platform !== "Android") return;
+    if (!this._hass?.callWS) {
+      this._webNameResolved = false;
+      return;
+    }
+    let label = "";
+    try {
+      const devices = await this._hass.callWS({ type: "config/device_registry/list" });
+      const mobiles = (Array.isArray(devices) ? devices : []).filter((device) =>
+        (device?.identifiers || []).some(
+          (ident) => Array.isArray(ident) && ident[0] === "mobile_app"
+        )
+      );
+      label = platform === "iOS" ? this._pickIosModel(mobiles) : this._pickAndroidModel(mobiles);
+    } catch (error) {
+      // A non-admin session cannot read the registry; keep the plain platform name.
+      return;
+    }
+    if (!label || !this.isConnected) return;
+    const next = `${webPlayerName()} ${label}`;
+    if (next === this._webName) return;
+    const wasConnected = Boolean(this._webPlayer?.connected);
+    this._webName = next;
+    this.requestUpdate();
+    if (wasConnected) {
+      // The name travels in the Sendspin handshake, so re-announce it.
+      this._disconnectWebPlayer(true);
+      this._webAutoFailed = false;
+      this._connectWebPlayer({ auto: true });
+    }
+  }
+
+  _pickIosModel(devices) {
+    const screen = screenSize();
+    const w = Math.min(screen.width, screen.height);
+    const h = Math.max(screen.width, screen.height);
+    const known = [];
+    let fallback = "";
+    for (const device of devices) {
+      const identifier = String(device?.model || "").trim();
+      if (/^iPhone/i.test(identifier)) {
+        if (!fallback) fallback = "iPhone";
+      } else if (/^iPad/i.test(identifier)) {
+        if (!fallback) fallback = "iPad";
+      } else {
+        continue;
+      }
+      const info = iosModelInfo(identifier);
+      if (info) known.push(info);
+    }
+    if (!known.length) return fallback;
+    const exact = known.find((info) => info[1] === w && info[2] === h);
+    if (exact) return exact[0];
+    const names = new Set(known.map((info) => info[0]));
+    // Every registered iOS device is the same model, and this browser is on iOS:
+    // that model is the only possible answer even if the size did not line up.
+    if (names.size === 1) return known[0][0];
+    return fallback;
+  }
+
+  _pickAndroidModel(devices) {
+    const models = new Set();
+    for (const device of devices) {
+      const model = String(device?.model || "").trim();
+      if (!model) continue;
+      if (!/^(SM-|Pixel|Redmi|M[0-9]|HUAWEI|V2|CPH|KB|ONEPLUS)/i.test(model)) continue;
+      models.add(model);
+    }
+    return models.size === 1 ? [...models][0] : "";
   }
 
   _scheduleAutoWebPlayer() {

@@ -44,6 +44,61 @@ export function webPlayerName() {
   return `Web ${detectPlatform()}`;
 }
 
+// iOS Safari/WKWebView report no hardware model in the user agent, so the only
+// reliable source is Home Assistant's own device registry: the companion app
+// registers this iPhone with its hardware identifier (e.g. iPhone14,3). The
+// table below turns those identifiers into the marketing name and the CSS
+// screen size, which lets the card pick the matching phone when several are
+// registered.
+const IOS_MODELS = {
+  "iPhone14,3": ["iPhone 13 Pro Max", 428, 926],
+  "iPhone14,2": ["iPhone 13 Pro", 390, 844],
+  "iPhone14,5": ["iPhone 13", 390, 844],
+  "iPhone14,4": ["iPhone 13 mini", 375, 812],
+  "iPhone14,6": ["iPhone SE (3rd gen)", 375, 667],
+  "iPhone14,7": ["iPhone 14", 390, 844],
+  "iPhone14,8": ["iPhone 14 Plus", 428, 926],
+  "iPhone15,2": ["iPhone 14 Pro", 393, 852],
+  "iPhone15,3": ["iPhone 14 Pro Max", 430, 932],
+  "iPhone15,4": ["iPhone 15", 393, 852],
+  "iPhone15,5": ["iPhone 15 Plus", 430, 932],
+  "iPhone16,1": ["iPhone 15 Pro", 393, 852],
+  "iPhone16,2": ["iPhone 15 Pro Max", 430, 932],
+  "iPhone17,1": ["iPhone 16 Pro", 402, 874],
+  "iPhone17,2": ["iPhone 16 Pro Max", 440, 956],
+  "iPhone17,3": ["iPhone 16", 393, 852],
+  "iPhone17,4": ["iPhone 16 Plus", 430, 932],
+  "iPhone13,2": ["iPhone 12", 390, 844],
+  "iPhone13,3": ["iPhone 12 Pro", 390, 844],
+  "iPhone13,4": ["iPhone 12 Pro Max", 428, 926],
+  "iPhone12,1": ["iPhone 11", 414, 896],
+  "iPhone12,3": ["iPhone 11 Pro", 375, 812],
+  "iPhone12,5": ["iPhone 11 Pro Max", 414, 896],
+  "iPhone11,8": ["iPhone XR", 414, 896],
+};
+
+/** Marketing name for a registry model identifier, plus its CSS screen size. */
+export function iosModelInfo(identifier) {
+  return IOS_MODELS[String(identifier || "").trim()] || null;
+}
+
+/** Platform token used in the player name: iOS / Android / Windows / macOS / Linux. */
+export function platformName() {
+  return detectPlatform();
+}
+
+/** Screen size in CSS pixels; used to match one registered phone among several. */
+export function screenSize() {
+  try {
+    return {
+      width: Math.round(window.screen?.width || 0),
+      height: Math.round(window.screen?.height || 0),
+    };
+  } catch {
+    return { width: 0, height: 0 };
+  }
+}
+
 function readNumber(key) {
   try {
     const raw = cardStorage()?.getItem(key);

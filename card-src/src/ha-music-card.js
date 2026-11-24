@@ -5192,6 +5192,9 @@ class HaMusicCard extends LitElement {
     this._coverLayers[index] = "";
     this._coverReady[index] = false;
     this.requestUpdate();
+    // 与原来一致：新封面加载失败就整体走失败分支，退成占位符，不保留上一首的图。
+    this._resetCoverLayers();
+    this._onArtError();
   }
 
   _onArtError() {

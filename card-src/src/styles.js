@@ -403,7 +403,7 @@ export const cardStyles = css`
     position: absolute;
     left: 0;
     top: 0;
-    z-index: 2;
+    z-index: 1;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 50%;
     background-color: rgba(9, 11, 18, 0.92);

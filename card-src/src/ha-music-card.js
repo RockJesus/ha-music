@@ -1593,6 +1593,7 @@ class HaMusicCard extends LitElement {
   }
 
   _coverSize(cover) {
+    if (cover?.offsetWidth) return cover.offsetWidth;
     const rect = cover?.getBoundingClientRect?.();
     if (rect?.width) return rect.width;
     return this._coverPx?.(this._layoutKey?.()) || 168;
@@ -1640,11 +1641,13 @@ class HaMusicCard extends LitElement {
     if (!cover) return;
     const size = this._coverSize(cover);
     if (!size) return;
-    const limited = clamp(dx, -size * 1.12, size * 1.12);
-    const progress = Math.min(1, (Math.abs(limited) / size) * 1.1);
+    const limited = clamp(dx, -size * 1.05, size * 1.05);
+    // travel 是滑过一个封面宽的比例：当前封面按它线性渐隐，
+    // 邻曲封面快 1.5 倍浮上来，滑三分之一就能看到“下一首在靠近”。
+    const travel = Math.min(1, Math.abs(limited) / size);
     cover.style.transition = "none";
-    cover.style.transform = `translate3d(${Math.round(limited)}px, 0, 0) scale(${(1 - progress * 0.05).toFixed(3)})`;
-    cover.style.opacity = String(Math.max(0, 1 - progress * 0.96));
+    cover.style.transform = `translate3d(${Math.round(limited)}px, 0, 0) scale(${(1 - travel * 0.12).toFixed(3)})`;
+    cover.style.opacity = String(Math.max(0, 1 - travel * 0.95));
     if (!peek) return;
     const direction = limited <= 0 ? "next" : "prev";
     const art = this._coverNeighborArt(direction);
@@ -1653,23 +1656,26 @@ class HaMusicCard extends LitElement {
       return;
     }
     if (!peek.dataset.ready) {
-      const wrap = cover.parentElement;
-      const wrapRect = wrap?.getBoundingClientRect?.();
-      const coverRect = cover.getBoundingClientRect();
-      peek.style.left = `${Math.round(coverRect.left - (wrapRect?.left || 0))}px`;
-      peek.style.top = `${Math.round(coverRect.top - (wrapRect?.top || 0))}px`;
-      peek.style.width = `${Math.round(coverRect.width)}px`;
-      peek.style.height = `${Math.round(coverRect.height)}px`;
+      // 用布局偏移而不是 getBoundingClientRect：此时封面已经带着拖拽位移，
+      // 量矩形会把位移算进邻曲封面基准位置，导致它“走两倍”。
+      peek.style.left = `${cover.offsetLeft}px`;
+      peek.style.top = `${cover.offsetTop}px`;
+      peek.style.width = `${cover.offsetWidth}px`;
+      peek.style.height = `${cover.offsetHeight}px`;
       peek.dataset.ready = "true";
     }
     if (peek.dataset.art !== art) {
       peek.dataset.art = art;
       peek.style.backgroundImage = `url("${art}")`;
     }
-    const offset = direction === "next" ? limited + size : limited - size;
+    // 邻曲封面略微缩一点出现，两张圆盘才塞得进卡片宽度，也带出层次。
+    const offset = direction === "next" ? limited + size * 0.94 : limited - size * 0.94;
     peek.style.transition = "none";
-    peek.style.transform = `translate3d(${Math.round(offset)}px, 0, 0) scale(${(0.95 + progress * 0.05).toFixed(3)})`;
-    peek.style.opacity = String(Math.min(1, progress * 1.02));
+    peek.style.transform = `translate3d(${Math.round(offset)}px, 0, 0) scale(${(0.82 + travel * 0.18).toFixed(3)})`;
+    peek.style.opacity = String(Math.min(1, travel * 1.5));
+    // 环形音柱固定在原槽位，封面滑走后留着会很怪，跟着一起淡掉。
+    const eq = cover.parentElement?.querySelector?.(".hm-cover-eq");
+    if (eq) eq.style.opacity = String(Math.max(0, 1 - travel * 1.2));
   }
 
   _resetCoverDrag() {
@@ -1687,6 +1693,8 @@ class HaMusicCard extends LitElement {
       peek.dataset.art = "";
       peek.dataset.ready = "";
     }
+    const eq = cover?.parentElement?.querySelector?.(".hm-cover-eq");
+    if (eq) eq.style.opacity = "";
   }
 
   _coverDragCancel() {
@@ -1710,12 +1718,13 @@ class HaMusicCard extends LitElement {
   }
 
   _coverSwipe(direction) {
-    // 松手后把手势收尾：封面继续滑出并透明，邻曲封面滑到正中，
-    // 落地后再真正切曲，新封面淡入。
+    // 松手后把手势收尾：封面继续滑出，邻曲封面滑到圆心顶住画面，
+    // 等真正切曲后的新封面到位再无缝换手，避免中间空一帧或旧图糊上来。
     const cover = this.renderRoot?.querySelector?.(".hm-cover");
     const peek = this._coverPeekEl();
     const size = this._coverSize(cover);
     const sign = direction === "next" ? -1 : 1;
+    const beforeTitle = this._readMedia()?.title || "";
     if (this._coverPending) {
       this._skip(this._coverPending);
       this._coverPending = null;
@@ -1730,40 +1739,51 @@ class HaMusicCard extends LitElement {
     if (cover) {
       cover.style.transition =
         "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.22s ease";
-      cover.style.transform = `translate3d(${slide}px, 0, 0) scale(0.96)`;
+      cover.style.transform = `translate3d(${slide}px, 0, 0) scale(0.9)`;
       cover.style.opacity = "0";
     }
     if (peek) {
       peek.style.transition =
         "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.22s ease";
-      peek.style.transform = "translate3d(0, 0, 0) scale(1)";
+      peek.style.transform = "translate3d(0, 0, 0) scale(0.98)";
       peek.style.opacity = peek.dataset.art ? "1" : "0";
     }
     this._coverGestureTimer = setTimeout(() => {
       const pending = this._coverPending;
       this._coverPending = null;
       if (pending) this._skip(pending);
-      const landed = this.renderRoot?.querySelector?.(".hm-cover");
-      if (landed) {
-        landed.style.transition = "none";
-        landed.style.transform = "translate3d(0, 0, 0) scale(1)";
-        landed.style.opacity = "1";
-        // 邻曲封面先占住圆心，真实封面叠上来淡入，切曲瞬间不会空一帧。
-        landed.animate?.(
-          [
-            { opacity: 0, transform: "scale(0.96)" },
-            { opacity: 1, transform: "scale(1)" },
-          ],
-          { duration: 340, easing: "ease-out" }
-        );
+      // 封面留在圆心但隐藏，邻曲封面继续占位。
+      if (cover) {
+        cover.style.transition = "none";
+        cover.style.transform = "translate3d(0, 0, 0) scale(1)";
+        cover.style.opacity = "0";
       }
-      this.requestUpdate();
-      this._coverGestureTimer = setTimeout(() => {
-        this._coverDragTimer = null;
-        this._resetCoverDrag();
-        this._coverGesture = "";
+      const deadline = Date.now() + 1400;
+      const settle = () => {
+        if (!this.isConnected) return;
+        const title = this._readMedia()?.title || "";
+        const arrived = title !== beforeTitle;
+        if (!arrived && Date.now() < deadline) {
+          this._coverDragTimer = setTimeout(settle, 70);
+          return;
+        }
+        if (cover) {
+          cover.style.transition = "opacity 0.18s ease";
+          cover.style.opacity = "1";
+        }
+        if (peek) {
+          peek.style.transition = "opacity 0.12s ease";
+          peek.style.opacity = "0";
+        }
         this.requestUpdate();
-      }, 360);
+        this._coverDragTimer = setTimeout(() => {
+          this._coverDragTimer = null;
+          this._resetCoverDrag();
+          this._coverGesture = "";
+          this.requestUpdate();
+        }, 320);
+      };
+      this._coverDragTimer = setTimeout(settle, 70);
     }, 250);
   }
 

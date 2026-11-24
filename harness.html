@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>harness</title>
+<style>
+  html,body{margin:0;background:#07070d;height:100%}
+  #wrap{width:430px;height:932px;overflow:hidden}
+  ha-music{display:block;width:430px;height:932px}
+</style>
+<div id="wrap"><ha-music id="card"></ha-music></div>
+<script type="module">
+import "/hm-dev/ha-music.js";
+await customElements.whenDefined("ha-music");
+const art = (c1,c2,label)=>`data:image/svg+xml;utf8,${encodeURIComponent(
+`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="600" height="600" fill="url(#g)"/></svg>`)}`;
+const now = new Date().toISOString();
+function st(entity_id, extra){return {entity_id, state:'playing', attributes:Object.assign({friendly_name:entity_id, media_title:'Song A', media_artist:'Artist A', media_album_name:'Album', media_image_url:art('#7b3fe4','#12b5a5','A'), media_duration:214, mass_player_type:'player', active_queue:'q1', volume_level:0.4, supported_features:1}, extra||{}), last_changed:now, last_updated:now, context:{id:'x',parent_id:null,user_id:null}};}
+const states = {'media_player.test': st('media_player.test')};
+const queue = {queue_id:'q1', items:[
+  {index:0, active:false, art:art('#0f3d3e','#2f9e86','B'), title:'Song B'},
+  {index:1, active:true, art:art('#7b3fe4','#12b5a5','A'), title:'Song A'},
+  {index:2, active:false, art:art('#8a1c4a','#ff6f61','C'), title:'Song C'}
+]};
+const hass = {
+  states, language:'zh-Hans', locale:{language:'zh-Hans'}, themes:{}, config:{}, services:{ha_music_studio:{play:{},queue_command:{},web_player_expose:{}}},
+  user:{id:'u',name:'Test',is_admin:true}, panels:{}, callService: async()=>[],
+  callWS: async(msg)=>{ if(msg.type==='ha_music_studio/player_group') return {players:[{player_id:'upTEST',name:'Test',available:true,state:'playing'}]};
+    return []; },
+  connection:{ sendMessagePromise: async(msg)=>({result:{queue: queue}}), subscribeMessage: async()=>(()=>{}) },
+};
+const card = document.getElementById('card');
+card.setConfig({type:'custom:ha-music', entity:'media_player.test', theme:'aurora', layout:'full', cover:'ambient', visualizer:'bars', music_assistant:'/b93b5321_music_assistant'});
+card.hass = hass;
+window.__card = card; window.__artC = art("#8a1c4a","#ff6f61");
+</script>

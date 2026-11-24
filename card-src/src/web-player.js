@@ -26,15 +26,6 @@ function cardStorage() {
   }
 }
 
-function detectBrowser() {
-  const ua = navigator.userAgent || "";
-  if (/Edg\//.test(ua)) return "Edge";
-  if (/OPR\//.test(ua)) return "Opera";
-  if (/Firefox\//.test(ua)) return "Firefox";
-  if (/Chrome\//.test(ua)) return "Chrome";
-  if (/Safari\//.test(ua)) return "Safari";
-  return "Browser";
-}
 
 function detectPlatform() {
   const ua = navigator.userAgent || "";
@@ -47,7 +38,10 @@ function detectPlatform() {
 }
 
 export function webPlayerName() {
-  return `Web (${detectBrowser()} on ${detectPlatform()})`;
+  // Keep the name short and device-shaped: "Web iOS", "Web Android",
+  // "Web Windows". The browser is deliberately left out so one person's phone
+  // reads the same in Music Assistant and in Home Assistant's player picker.
+  return `Web ${detectPlatform()}`;
 }
 
 function readNumber(key) {

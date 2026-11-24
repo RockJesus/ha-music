@@ -2707,7 +2707,7 @@ class HaMusicCard extends LitElement {
     return [...this._maPlayers]
       .filter((player) => {
         // Web 播放器由抽屉顶部的本机播放器行单独承载，避免同一台浏览器出现两行。
-        const isWeb = String(player?.name || "").startsWith("Web (");
+        const isWeb = String(player?.name || "").startsWith("Web ");
         const isCurrentWeb =
           (player?.player_id && player.player_id === this._webPlayerId) ||
           (isWeb && player?.name === this._webName);

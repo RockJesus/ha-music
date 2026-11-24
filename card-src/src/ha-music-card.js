@@ -2195,6 +2195,8 @@ class HaMusicCard extends LitElement {
     const wasConnected = Boolean(this._webPlayer?.connected);
     this._webName = next;
     this.requestUpdate();
+    const entity = this._currentLocalWebEntity();
+    if (entity) this._alignLocalWebEntityName(entity);
     if (wasConnected) {
       // The name travels in the Sendspin handshake, so re-announce it.
       this._disconnectWebPlayer(true);
@@ -2697,6 +2699,52 @@ class HaMusicCard extends LitElement {
     }, delay);
   }
 
+  async _alignLocalWebEntityName(entityId) {
+    // Music Assistant renames the player (Web iOS iPhone 13 Pro Max), but the HA
+    // device created for it keeps the old name, so the entity's friendly_name -
+    // and therefore the chip and every dashboard - stays "Web (Browser on iOS)".
+    // Fix both: rename the device (name_by_user) and drop any entity-level name
+    // override, so the entity simply follows the device name.
+    if (!this._hass?.callWS || !this._webName || !this._webPlayerId) return;
+    if (this._webEntityNamed === this._webName) return;
+    const entity = entityId || this._webEntity || this._currentLocalWebEntity();
+    try {
+      const devices = await this._hass.callWS({ type: "config/device_registry/list" });
+      const device = (Array.isArray(devices) ? devices : []).find((entry) =>
+        (entry?.identifiers || []).some(
+          (ident) =>
+            Array.isArray(ident) &&
+            ident[0] === "music_assistant" &&
+            ident[1] === this._webPlayerId
+        )
+      );
+      if (!device) return;
+      if (String(device.name_by_user || "") !== this._webName) {
+        await this._hass.callWS({
+          type: "config/device_registry/update",
+          device_id: device.id,
+          name_by_user: this._webName,
+        });
+      }
+      if (entity) {
+        const entry = await this._hass.callWS({
+          type: "config/entity_registry/get",
+          entity_id: entity,
+        });
+        if (String(entry?.unique_id || "") === this._webPlayerId && entry?.name) {
+          await this._hass.callWS({
+            type: "config/entity_registry/update",
+            entity_id: entity,
+            name: null,
+          });
+        }
+      }
+      this._webEntityNamed = this._webName;
+    } catch (error) {
+      // Non-admin sessions cannot edit the registry; the name still shows in MA.
+    }
+  }
+
   _isLocalWebEntity(entityId) {
     if (!entityId) return false;
     if (entityId === this._localWebEntity || entityId === this._webEntity) return true;
@@ -2745,6 +2793,7 @@ class HaMusicCard extends LitElement {
     if (!current.length) return;
     const target = removeEntity ? "" : preferredTarget || this._currentLocalWebEntity();
     if (target) this._localWebEntity = target;
+    if (target) this._alignLocalWebEntityName(target);
     const webIds = current.filter((id) => this._isLocalWebEntity(id));
     let next = null;
     if (target) {

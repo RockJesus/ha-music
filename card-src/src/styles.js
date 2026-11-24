@@ -340,6 +340,33 @@ export const cardStyles = css`
     -webkit-user-drag: none;
   }
 
+  /* 封面双层：旧图常驻不透明，新图解码后从上方淡入，切歌不出现空帧。 */
+  .hm-cover .hm-cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .hm-cover .hm-cover-img[data-state="under"] {
+    z-index: 1;
+    opacity: 1;
+    transition: none;
+  }
+
+  .hm-cover .hm-cover-img[data-state="in"][data-ready="true"] {
+    opacity: 1;
+  }
+
+  .hm-cover .hm-cover-img[data-state="off"] {
+    z-index: 2;
+    opacity: 0;
+  }
+
   .hm-cover .hm-cover-ph {
     position: absolute;
     inset: 0;

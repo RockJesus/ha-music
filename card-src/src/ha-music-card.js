@@ -255,6 +255,11 @@ class HaMusicCard extends LitElement {
     this._audioSpecAt = 0;
     this._artSeq = 0;
     this._artSlot = 0;
+    this._coverLayers = ["", ""];
+    this._coverSlot = 0;
+    this._coverPending = "";
+    this._coverReady = [false, false];
+    this._coverFadeTimer = null;
     this._dockOwner = false;
     this._unsubscribeDockPref = null;
     this._lyricDockOwner = false;
@@ -427,6 +432,7 @@ class HaMusicCard extends LitElement {
       this._artUrl = "";
       this._artSource = "";
       this._artFailedSource = "";
+      this._resetCoverLayers();
       this._resetLyrics();
     }
     if (this._config.show_lyrics === false) this._lyricsOpen = false;
@@ -1786,8 +1792,15 @@ class HaMusicCard extends LitElement {
           return;
         }
         if (cover) {
-          cover.style.transition = "opacity 0.18s ease";
-          cover.style.opacity = "1";
+          if (arrived) {
+            // 新曲封面已经在卡片内部完成交叉淡入，这里再补一段淡入会多压一层暗，
+            // 看起来像“切歌闪一下”，所以直接落回不透明。
+            cover.style.transition = "none";
+            cover.style.opacity = "1";
+          } else {
+            cover.style.transition = "opacity 0.18s ease";
+            cover.style.opacity = "1";
+          }
         }
         if (peek) {
           peek.style.transition = "opacity 0.12s ease";
@@ -1799,7 +1812,7 @@ class HaMusicCard extends LitElement {
           this._resetCoverDrag();
           this._coverGesture = "";
           this.requestUpdate();
-        }, 320);
+        }, 460);
       };
       this._coverDragTimer = setTimeout(settle, 70);
     }, 250);
@@ -3755,6 +3768,7 @@ class HaMusicCard extends LitElement {
     this._artUrl = "";
     this._artSource = "";
     this._artFailedSource = "";
+    this._resetCoverLayers();
     this._menu = null;
     this._seekPreview = null;
     this._seekPending = null;
@@ -4557,6 +4571,7 @@ class HaMusicCard extends LitElement {
         this._crossFadeArt(card, this._artUrl);
       }
     });
+    this._safeEffect("cover-art", () => this._applyCoverArt(this._coverUrlFor()));
     this._safeEffect("range", () => this._syncRangeValues());
     this._safeEffect("entities-nav", () => this._syncEntitiesNav());
     this._safeEffect("entities-order", () => this._syncChipOrderStyles());
@@ -4599,7 +4614,7 @@ class HaMusicCard extends LitElement {
   }
 
   _syncCoverSpinEffect() {
-    const img = this.renderRoot?.querySelector?.(".hm-cover img");
+    const img = this.renderRoot?.querySelector?.('.hm-cover .hm-cover-img[data-state="under"]');
     if (!img) return;
     syncCoverSpin(img, this._state()?.state === "playing");
   }
@@ -5085,6 +5100,98 @@ class HaMusicCard extends LitElement {
   _artUrlFor() {
     const media = this._readMedia();
     return normalizeArt(this._hass, media.art);
+  }
+
+  _resetCoverLayers() {
+    if (this._coverFadeTimer) {
+      clearTimeout(this._coverFadeTimer);
+      this._coverFadeTimer = null;
+    }
+    this._coverLayers = ["", ""];
+    this._coverSlot = 0;
+    this._coverPending = "";
+    this._coverReady = [false, false];
+  }
+
+  _coverUrlFor() {
+    const state = this._state();
+    if (!state || state.state === "unavailable" || state.state === "unknown") {
+      return "";
+    }
+    const media = this._readMedia();
+    return this._artUrl || fallbackCover(media) || "";
+  }
+
+  /**
+   * 封面切图走双层交叉淡入：旧图一直垫在下面，新图解码完成后才淡上来，
+   * 中间不会出现空帧（直接换 src 会先变空白再出图，就是切歌时那一下闪）。
+   */
+  _applyCoverArt(url) {
+    const want = url || "";
+    const cur = this._coverLayers[this._coverSlot] || "";
+    if (want === cur) {
+      if (this._coverPending && this._coverPending !== want) {
+        const idx = 1 - this._coverSlot;
+        this._coverLayers[idx] = "";
+        this._coverReady[idx] = false;
+        this._coverPending = "";
+        this.requestUpdate();
+      }
+      return;
+    }
+    if (!want) {
+      if (this._coverLayers[0] || this._coverLayers[1]) {
+        this._resetCoverLayers();
+        this.requestUpdate();
+      }
+      return;
+    }
+    if (!cur) {
+      // 还没有任何可留的底图：直接落位，避免首次只显示占位符。
+      this._coverLayers[this._coverSlot] = want;
+      this._coverReady[this._coverSlot] = true;
+      this._coverPending = "";
+      this.requestUpdate();
+      return;
+    }
+    if (this._coverPending === want) return;
+    const idx = 1 - this._coverSlot;
+    this._coverPending = want;
+    this._coverLayers[idx] = want;
+    this._coverReady[idx] = false;
+    this.requestUpdate();
+  }
+
+  _onCoverLayerLoad(index) {
+    if (this._coverLayers[index] !== this._coverPending) return;
+    if (this._coverReady[index]) return;
+    this._coverReady[index] = true;
+    this.requestUpdate();
+    this._commitCoverArt(index);
+  }
+
+  _commitCoverArt(index) {
+    if (this._coverFadeTimer) clearTimeout(this._coverFadeTimer);
+    // 等淡入跑完再把旧图撤掉，避免切图瞬间闪回底噪/占位符。
+    this._coverFadeTimer = setTimeout(() => {
+      this._coverFadeTimer = null;
+      if (this._coverLayers[index] !== this._coverPending) return;
+      const prev = this._coverSlot;
+      this._coverSlot = index;
+      this._coverPending = "";
+      this._coverReady[index] = true;
+      this._coverLayers[prev] = "";
+      this._coverReady[prev] = false;
+      this.requestUpdate();
+    }, 320);
+  }
+
+  _onCoverLayerError(index) {
+    if (this._coverLayers[index] !== this._coverPending) return;
+    this._coverPending = "";
+    this._coverLayers[index] = "";
+    this._coverReady[index] = false;
+    this.requestUpdate();
   }
 
   _onArtError() {
@@ -5687,10 +5794,7 @@ class HaMusicCard extends LitElement {
       this._lyrics.index >= 0
         ? this._lyrics.lines[this._lyrics.index]?.text || ""
         : "";
-    const coverUrl =
-      state.state === "unavailable" || state.state === "unknown"
-        ? ""
-        : this._artUrl || fallbackCover(media);
+    const coverUrl = this._coverUrlFor();
 
     return html`
       <div
@@ -5965,13 +6069,26 @@ class HaMusicCard extends LitElement {
                 @dragstart=${(event) => event.preventDefault()}
                 @click=${() => this._onCoverClick()}
               >
+                ${this._coverLayers.map((url, index) =>
+                  url
+                    ? html`<img
+                        class="hm-cover-img"
+                        data-state=${index === this._coverSlot
+                          ? "under"
+                          : url === this._coverPending
+                            ? "in"
+                            : "off"}
+                        data-ready=${this._coverReady[index] ? "true" : "false"}
+                        src=${url}
+                        alt=${mediaTitle || ""}
+                        draggable="false"
+                        @load=${() => this._onCoverLayerLoad(index)}
+                        @error=${() => this._onCoverLayerError(index)}
+                      />`
+                    : nothing,
+                )}
                 ${coverUrl
-                  ? html`<img
-                      src=${coverUrl}
-                      alt=${mediaTitle || ""}
-                      draggable="false"
-                      @error=${() => this._onArtError()}
-                    />`
+                  ? nothing
                   : html`<span class="hm-cover-ph">${icon("music", 40)}</span>`}
                 ${fusionMode === "ring" && duration > 0
                   ? html`<span class="hm-ring-readout" aria-hidden="true">

@@ -398,6 +398,23 @@ export const cardStyles = css`
   }
 
 
+  /* 滑动切歌时贴在当前封面外侧的下一首/上一首封面 */
+  .hm-cover-peek {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 2;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    background-color: rgba(9, 11, 18, 0.92);
+    background-position: center;
+    background-size: cover;
+    box-shadow: 0 18px 38px -14px rgba(0, 0, 0, 0.9);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
   /* 主封面环形音频律动：与右下角悬浮唱片同源，围绕封面外圈展开 */
 
   .hm-cover-wrap[data-eq="true"] .hm-cover-eq-glow {

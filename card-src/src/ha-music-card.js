@@ -281,6 +281,8 @@ class HaMusicCard extends LitElement {
     this._coverGesture = "";
     this._coverGestureTimer = null;
     this._coverPending = null;
+    this._coverDragTimer = null;
+    this._queueSnapshotTask = null;
     this._coverSuppressClick = false;
     this._coverSuppressTimer = null;
     this._progressRaf = null;
@@ -602,6 +604,7 @@ class HaMusicCard extends LitElement {
     this._stopTimer();
     this._stopProgressTicker();
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    if (this._coverDragTimer) clearTimeout(this._coverDragTimer);
     if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
     this._stopSpectrum();
     this._coverGestureTimer = null;
@@ -1589,37 +1592,191 @@ class HaMusicCard extends LitElement {
     this.requestUpdate();
   }
 
+  _coverSize(cover) {
+    const rect = cover?.getBoundingClientRect?.();
+    if (rect?.width) return rect.width;
+    return this._coverPx?.(this._layoutKey?.()) || 168;
+  }
+
+  _coverNeighborArt(direction) {
+    const items = this._queueSnapshot?.items;
+    if (!Array.isArray(items) || !items.length) return "";
+    const index = items.findIndex((item) => item.active);
+    if (index < 0) return "";
+    const neighbor = items[direction === "next" ? index + 1 : index - 1];
+    return String(neighbor?.art || "");
+  }
+
+  _ensureQueueSnapshot() {
+    // 滑动时要用邻曲封面，队列快照还没到就先补一次。
+    if (!this._studioReady?.() || this._thumbMode?.()) return;
+    if (Array.isArray(this._queueSnapshot?.items) && this._queueSnapshot.items.length) return;
+    if (this._queueSnapshotTask) return;
+    try {
+      this._queueSnapshotTask = this._queueCommand("snapshot")
+        .then((response) => {
+          this._queueSnapshotTask = null;
+          const queue = response?.result?.queue || response?.queue;
+          if (!queue || !Array.isArray(queue.items) || !queue.items.length) return;
+          this._queueSnapshot = queue;
+          this.requestUpdate();
+        })
+        .catch(() => {
+          this._queueSnapshotTask = null;
+        });
+    } catch (error) {
+      this._queueSnapshotTask = null;
+    }
+  }
+
+  _coverPeekEl() {
+    return this.renderRoot?.querySelector?.(".hm-cover-peek") || null;
+  }
+
+  _coverDragPreview(dx) {
+    // 手指（或鼠标）拖动时：当前封面跟着走并渐出，邻曲封面在外侧跟着滑入。
+    const cover = this.renderRoot?.querySelector?.(".hm-cover");
+    const peek = this._coverPeekEl();
+    if (!cover) return;
+    const size = this._coverSize(cover);
+    if (!size) return;
+    const limited = clamp(dx, -size * 1.12, size * 1.12);
+    const progress = Math.min(1, (Math.abs(limited) / size) * 1.1);
+    cover.style.transition = "none";
+    cover.style.transform = `translate3d(${Math.round(limited)}px, 0, 0) scale(${(1 - progress * 0.05).toFixed(3)})`;
+    cover.style.opacity = String(Math.max(0, 1 - progress * 0.96));
+    if (!peek) return;
+    const direction = limited <= 0 ? "next" : "prev";
+    const art = this._coverNeighborArt(direction);
+    if (!art) {
+      peek.style.opacity = "0";
+      return;
+    }
+    if (!peek.dataset.ready) {
+      const wrap = cover.parentElement;
+      const wrapRect = wrap?.getBoundingClientRect?.();
+      const coverRect = cover.getBoundingClientRect();
+      peek.style.left = `${Math.round(coverRect.left - (wrapRect?.left || 0))}px`;
+      peek.style.top = `${Math.round(coverRect.top - (wrapRect?.top || 0))}px`;
+      peek.style.width = `${Math.round(coverRect.width)}px`;
+      peek.style.height = `${Math.round(coverRect.height)}px`;
+      peek.dataset.ready = "true";
+    }
+    if (peek.dataset.art !== art) {
+      peek.dataset.art = art;
+      peek.style.backgroundImage = `url("${art}")`;
+    }
+    const offset = direction === "next" ? limited + size : limited - size;
+    peek.style.transition = "none";
+    peek.style.transform = `translate3d(${Math.round(offset)}px, 0, 0) scale(${(0.95 + progress * 0.05).toFixed(3)})`;
+    peek.style.opacity = String(Math.min(1, progress * 1.02));
+  }
+
+  _resetCoverDrag() {
+    const cover = this.renderRoot?.querySelector?.(".hm-cover");
+    if (cover) {
+      cover.style.transition = "";
+      cover.style.transform = "";
+      cover.style.opacity = "";
+    }
+    const peek = this._coverPeekEl();
+    if (peek) {
+      peek.style.transition = "";
+      peek.style.transform = "translate3d(0, 0, 0)";
+      peek.style.opacity = "0";
+      peek.dataset.art = "";
+      peek.dataset.ready = "";
+    }
+  }
+
+  _coverDragCancel() {
+    const cover = this.renderRoot?.querySelector?.(".hm-cover");
+    const peek = this._coverPeekEl();
+    if (cover) {
+      cover.style.transition =
+        "transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease";
+      cover.style.transform = "translate3d(0, 0, 0) scale(1)";
+      cover.style.opacity = "1";
+    }
+    if (peek) {
+      peek.style.transition = "opacity 0.18s ease, transform 0.24s ease";
+      peek.style.opacity = "0";
+    }
+    if (this._coverDragTimer) clearTimeout(this._coverDragTimer);
+    this._coverDragTimer = setTimeout(() => {
+      this._coverDragTimer = null;
+      this._resetCoverDrag();
+    }, 300);
+  }
+
   _coverSwipe(direction) {
-    // 纯渐隐切歌：先让封面与环形音柱淡出，再切曲并淡入新封面。
-    // 不放位移/回弹动画，避免滑动后封面左右晃一下。
+    // 松手后把手势收尾：封面继续滑出并透明，邻曲封面滑到正中，
+    // 落地后再真正切曲，新封面淡入。
+    const cover = this.renderRoot?.querySelector?.(".hm-cover");
+    const peek = this._coverPeekEl();
+    const size = this._coverSize(cover);
+    const sign = direction === "next" ? -1 : 1;
     if (this._coverPending) {
       this._skip(this._coverPending);
       this._coverPending = null;
     }
     this._coverPending = direction;
-    this._coverGesture = "out";
-    this.requestUpdate();
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    if (this._coverDragTimer) {
+      clearTimeout(this._coverDragTimer);
+      this._coverDragTimer = null;
+    }
+    const slide = Math.round(size * 1.12) * sign;
+    if (cover) {
+      cover.style.transition =
+        "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.22s ease";
+      cover.style.transform = `translate3d(${slide}px, 0, 0) scale(0.96)`;
+      cover.style.opacity = "0";
+    }
+    if (peek) {
+      peek.style.transition =
+        "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.22s ease";
+      peek.style.transform = "translate3d(0, 0, 0) scale(1)";
+      peek.style.opacity = peek.dataset.art ? "1" : "0";
+    }
     this._coverGestureTimer = setTimeout(() => {
-      if (this._coverPending) {
-        this._skip(this._coverPending);
-        this._coverPending = null;
+      const pending = this._coverPending;
+      this._coverPending = null;
+      if (pending) this._skip(pending);
+      const landed = this.renderRoot?.querySelector?.(".hm-cover");
+      if (landed) {
+        landed.style.transition = "none";
+        landed.style.transform = "translate3d(0, 0, 0) scale(1)";
+        landed.style.opacity = "1";
+        // 邻曲封面先占住圆心，真实封面叠上来淡入，切曲瞬间不会空一帧。
+        landed.animate?.(
+          [
+            { opacity: 0, transform: "scale(0.96)" },
+            { opacity: 1, transform: "scale(1)" },
+          ],
+          { duration: 340, easing: "ease-out" }
+        );
       }
-      this._coverGesture = "in";
       this.requestUpdate();
       this._coverGestureTimer = setTimeout(() => {
-        if (this._coverGesture === "in") {
-          this._coverGesture = "";
-          this.requestUpdate();
-        }
-      }, 340);
-    }, 240);
+        this._coverDragTimer = null;
+        this._resetCoverDrag();
+        this._coverGesture = "";
+        this.requestUpdate();
+      }, 360);
+    }, 250);
   }
 
   _onCoverPointerDown(event) {
     if (this._thumbMode() || (event.pointerType === "mouse" && event.button !== 0)) return;
     this._coverSuppressClick = false;
     if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
+    if (this._coverDragTimer) {
+      clearTimeout(this._coverDragTimer);
+      this._coverDragTimer = null;
+      this._resetCoverDrag();
+    }
+    this._ensureQueueSnapshot();
     this._coverPress = {
       id: event.pointerId,
       x: event.clientX,
@@ -1646,6 +1803,7 @@ class HaMusicCard extends LitElement {
         }
       }
       if (event.cancelable) event.preventDefault();
+      this._coverDragPreview(dx);
     }
   }
 
@@ -1665,6 +1823,7 @@ class HaMusicCard extends LitElement {
       this._coverSwipe(dx < 0 ? "next" : "prev");
       return;
     }
+    if (press.captured) this._coverDragCancel();
     if (press.moved || Math.hypot(dx, dy) > 12) {
       this._coverSuppressClick = true;
       if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
@@ -1675,7 +1834,9 @@ class HaMusicCard extends LitElement {
   }
 
   _onCoverPointerCancel() {
+    const cancelled = Boolean(this._coverPress?.captured);
     this._coverPress = null;
+    if (cancelled) this._coverDragCancel();
   }
 
   _onCoverClick() {
@@ -5772,6 +5933,7 @@ class HaMusicCard extends LitElement {
                     </span>`
                   : nothing}
               </button>
+              <div class="hm-cover-peek" aria-hidden="true"></div>
             </div>
 
             <div class="hm-info" data-side-lyrics=${sideLyrics ? "true" : "false"}>

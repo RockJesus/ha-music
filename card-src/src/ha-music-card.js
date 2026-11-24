@@ -1597,11 +1597,101 @@ class HaMusicCard extends LitElement {
   _togglePlay() {
     const state = this._state()?.state;
     const playing = state === "playing" || state === "buffering";
-    this._guard(this._call(playing ? "media_pause" : "media_play"));
+    if (playing) {
+      this._guard(this._call("media_pause"));
+      return;
+    }
+    this._guard(this._resumePlay(this._eid()));
+  }
+
+  _maPlayable(entityId) {
+    if (!this._hass?.services?.music_assistant?.play_media) return false;
+    const attrs = this._state(entityId)?.attributes || {};
+    return (
+      attrs.mass_player_type !== undefined ||
+      attrs.active_queue !== undefined ||
+      entityId === this._localWebEntity ||
+      entityId === this._webEntity
+    );
+  }
+
+  _trackContentId(entityId) {
+    const attrs = this._state(entityId)?.attributes || {};
+    return String(attrs.media_content_id || attrs.media_uri || "").trim();
+  }
+
+  _playErrorText(error) {
+  const raw = String(error?.message || error || "").trim();
+    const t = translator(this._hass?.language);
+    if (/could not be found|not found|cannot be found|找不到/i.test(raw)) return t("mediaLost");
+    return raw.length > 80 ? `${raw.slice(0, 80)}…` : raw;
+  }
+
+  async _startTrackOnPlayer(entityId, contentId) {
+    // MA 队列里没有当前条目时，media_play 会报 "media item could not be found"，
+    // 并且 HA 前端会直接弹一条服务调用失败；这里改用 play_media 把这支曲子放回队列再播。
+    if (!this._maPlayable(entityId)) return false;
+    const id = contentId || this._trackContentId(entityId);
+    if (!id) return false;
+    const attrs = this._state(entityId)?.attributes || {};
+    let mediaType = String(attrs.media_content_type || "track").trim() || "track";
+    if (mediaType === "music") mediaType = "track";
+    try {
+      await this._hass.callService("music_assistant", "play_media", {
+        entity_id: entityId,
+        media_id: id,
+        media_type: mediaType,
+        enqueue: "play",
+      });
+      return true;
+    } catch (error) {
+      this._notify(this._playErrorText(error));
+      return false;
+    }
+  }
+
+  async _resumePlay(entityId) {
+    const state = this._state(entityId)?.state;
+    const idle = !state || ["idle", "off", "standby", "unknown", "unavailable"].includes(state);
+    const contentId = this._trackContentId(entityId);
+    // 待机/关机时队列里本来就没有可恢复的条目：先发 media_play 只会换来一条错误弹窗。
+    if (idle) {
+      if (contentId && (await this._startTrackOnPlayer(entityId, contentId))) return true;
+      this._notify(translator(this._hass?.language)("queueEmpty"));
+      return false;
+    }
+    try {
+      await this._call("media_play", {}, "media_player", entityId);
+      return true;
+    } catch (error) {
+      if (contentId && (await this._startTrackOnPlayer(entityId, contentId))) return true;
+      this._notify(this._playErrorText(error));
+      return false;
+    }
+  }
+
+  _queueNeighborContent(direction) {
+    const items = this._queueSnapshot?.items;
+    if (!Array.isArray(items) || !items.length) return "";
+    const active = items.findIndex((item) => item?.active);
+    if (active < 0) return "";
+    const item = items[direction === "next" ? active + 1 : active - 1];
+    return String(item?.contentId || item?.uri || "").trim();
   }
 
   _skip(direction) {
-    this._guard(this._call(direction === "next" ? "media_next_track" : "media_previous_track"));
+    const entityId = this._eid();
+    const moving = this._call(
+      direction === "next" ? "media_next_track" : "media_previous_track",
+    );
+    this._guard(
+      Promise.resolve(moving).catch(async (error) => {
+        // 队列条目丢了的时候切歌同样会报 item not found，用快照里的邻曲补一枪。
+        const fallback = this._queueNeighborContent(direction);
+        if (fallback && (await this._startTrackOnPlayer(entityId, fallback))) return;
+        this._notify(this._playErrorText(error));
+      }),
+    );
   }
 
   _coverCue(gesture) {
@@ -2781,12 +2871,7 @@ class HaMusicCard extends LitElement {
       }
     }
     if (!started) {
-      try {
-        await this._call("media_play", {}, "media_player", entityId);
-        started = true;
-      } catch (error) {
-        this._notify(error?.message || String(error));
-      }
+      started = await this._resumePlay(entityId);
     }
     if (!started) return;
     // 播放已确认，过渡保护结束：之后暂停/停止应立即按真实状态显隐胶囊。

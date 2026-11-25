@@ -283,6 +283,9 @@ class HaMusicCard extends LitElement {
     this._lyricsPending = false;
     this._lyricsSubKey = "";
     this._lyricsTrackId = "";
+    // 歌词请求的幂等键：同一首歌失败过就不再自激重试（等换歌/手动重试）
+    this._lyricsAttemptKey = "";
+    this._lyricsFailedKey = "";
     this._coverPress = null;
     this._coverGesture = "";
     this._coverGestureTimer = null;
@@ -868,6 +871,7 @@ class HaMusicCard extends LitElement {
         instrumental: false,
         source: "Music Assistant",
       };
+      this._lyricsFailedKey = this._lyricsAttemptKey;
       return;
     }
     const entityId = this._eid();
@@ -880,6 +884,7 @@ class HaMusicCard extends LitElement {
     this._lyricsPending = true;
     const handle = (unsubscribe) => {
       this._lyricsPending = false;
+      this._lyricsFailedKey = "";
       if (this._lyricsSubKey !== subKey) {
         try {
           unsubscribe?.();
@@ -900,6 +905,8 @@ class HaMusicCard extends LitElement {
         instrumental: false,
         source: "Music Assistant",
       };
+      // 记住这次失败，避免 updated() 里的 _maybeLoadLyrics 再次发起同样的请求。
+      this._lyricsFailedKey = this._lyricsAttemptKey;
       this.requestUpdate();
     };
     try {
@@ -1121,6 +1128,13 @@ class HaMusicCard extends LitElement {
     }
     const entityId = this._eid();
     if (this._lyricsKey === entityId && (this._lyricsUnsub || this._lyricsPending)) return;
+    // 同一首（实体+标题+歌手+偏移）已经请求失败过：不再重复进入。
+    // 否则 fail() 里的 requestUpdate 会再次触发 updated() → 这里 → requestUpdate，
+    // 形成同步自激循环，把主线程占满（歌词服务异常/未装订阅命令时必现）。
+    const attemptKey = [entityId, media.title, media.artist || "", this._lyricsOffset].join("\u001f");
+    if (this._lyricsFailedKey === attemptKey) return;
+    this._lyricsAttemptKey = attemptKey;
+    const wasLoading = this._lyrics?.status === "loading";
     const sameEntity = this._lyricsKey === entityId;
     if (!sameEntity) this._lyricsSlot = false;
     this._lyricsKey = entityId;
@@ -1140,7 +1154,7 @@ class HaMusicCard extends LitElement {
     };
     this._lyricsActive = -1;
     this._lyricsScrolled = -2;
-    this.requestUpdate();
+    if (!wasLoading) this.requestUpdate();
     this._ensureStudioLyrics();
   }
 
@@ -1155,6 +1169,8 @@ class HaMusicCard extends LitElement {
     this._lyricsScrolled = -2;
     if (this._lyricsOpen) {
       this._lyricsActive = -1;
+      // 用户主动打开：清掉上一次的失败记录，允许再试一次。
+      this._lyricsFailedKey = "";
       this._maybeLoadLyrics();
     }
     this.requestUpdate();
@@ -1162,6 +1178,7 @@ class HaMusicCard extends LitElement {
 
   _retryLyrics() {
     this._lyricsKey = "";
+    this._lyricsFailedKey = "";
     this._teardownStudioLyrics();
     this._lyricsOpen = true;
     this._maybeLoadLyrics();

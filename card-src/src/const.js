@@ -1,6 +1,6 @@
 // HA Music —— 常量、主题、特性位、文案
 
-export const CARD_VERSION = "2.28.2";
+export const CARD_VERSION = "2.28.3";
 export const CARD_TYPE = "ha-music";
 export const CARD_NAME = "HA Music";
 
@@ -198,7 +198,7 @@ const EN = {
   webPlayerConnected: "This browser is ready to play",
   webPlayerWaitEntity: "Player connected; waiting for Home Assistant entity",
   queueEmpty: "Nothing queued on this player — pick a track in Music Assistant",
-  mediaLost: "That track is no longer in this player's queue",
+  mediaLost: "Source unavailable — re-authenticate the provider in MA",
   webPlayerExposeFailed: "Connected, but registering with Home Assistant failed",
   webPlayerExposePending: "Connected; registering with Home Assistant…",
   webPlayerFailed: "Could not start the browser player",
@@ -307,7 +307,7 @@ const ZH = {
   webPlayerConnected: "本机浏览器已可播放",
   webPlayerWaitEntity: "播放器已连接，正在等待 Home Assistant 实体",
   queueEmpty: "这个播放器队列里没有曲目，先去 Music Assistant 里选一首",
-  mediaLost: "这首歌已经不在这个播放器的队列里了",
+  mediaLost: "音源不可用，请重新登录音乐提供器",
   webPlayerExposeFailed: "已连接，但注册到 Home Assistant 失败",
   webPlayerExposePending: "已连接，正在注册到 Home Assistant…",
   webPlayerFailed: "本机浏览器播放器启动失败",

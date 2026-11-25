@@ -1793,9 +1793,10 @@ export const cardStyles = css`
     z-index: 8;
     translate: -50% 0;
     max-width: 84%;
-    padding: 7px 12px;
+    padding: 8px 13px;
     border-radius: 999px;
     font-size: 11px;
+    line-height: 1.45;
     color: rgba(255, 255, 255, 0.9);
     background: rgba(20, 12, 18, 0.9);
     border: 1px solid rgba(255, 120, 150, 0.35);

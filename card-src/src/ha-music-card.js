@@ -1621,9 +1621,16 @@ class HaMusicCard extends LitElement {
   }
 
   _playErrorText(error) {
-  const raw = String(error?.message || error || "").trim();
+    const raw = String(error?.message || error || "").trim();
     const t = translator(this._hass?.language);
-    if (/could not be found|not found|cannot be found|找不到/i.test(raw)) return t("mediaLost");
+    // 队列条目还在但取不到音频流（提供器授权过期、曲目下架）时，
+    // HA 只会回一句 media item could not be found，这里换成能指导操作的提示。
+    if (/could not be found|not found|cannot be found|找不到|no playable item/i.test(raw)) {
+      return t("mediaLost");
+    }
+    if (/credential|login|unauthori|forbidden|授权|登录|token/i.test(raw)) {
+      return t("mediaLost");
+    }
     return raw.length > 80 ? `${raw.slice(0, 80)}…` : raw;
   }
 

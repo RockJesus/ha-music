@@ -1266,6 +1266,10 @@ class HaMusicCard extends LitElement {
       );
     }
     if (layout === "mini") return 44;
+    if (this._compactCard()) {
+      // 矮卡（手机默认卡片）：封面跟着高度收，留给文字与控件。
+      return Math.round(Math.min(98, Math.max(58, height * 0.26)));
+    }
     if (layout === "compact") {
       // 极矮小卡（<270）封面再收一档，否则播放键会被挤出卡片
       const base = Math.min(88, Math.max(52, height * 0.26));
@@ -4725,6 +4729,7 @@ class HaMusicCard extends LitElement {
       this._syncPanelFlag();
       this._queuePanelFit();
     });
+    this._safeEffect("compact", () => this._syncCompact());
     this._safeEffect("dock", () => {
       this._installDock();
       this._installLyricDock();
@@ -4959,6 +4964,47 @@ class HaMusicCard extends LitElement {
     this._panel = panel;
     this.setAttribute("data-panel", String(panel));
     this.renderRoot?.querySelector?.(".hm-card")?.setAttribute("data-panel", String(panel));
+  }
+
+  /**
+   * 手机默认卡片（矮卡）走紧凑模式：封面与文字左右排、砍掉次要行、压扁控件。
+   * 只按宽度判断会漏掉"够宽但很矮"的默认格，所以这里按实测高度切。
+   */
+  _compactCard() {
+    const height = this._height || 0;
+    return Boolean(
+      !this._panel &&
+        !this._thumbMode() &&
+        this._layoutKey() === "full" &&
+        height > 0 &&
+        height < 400
+    );
+  }
+
+  _syncCompact() {
+    const height = this._height || 0;
+    const width = this._width || 0;
+    const on = Boolean(
+      !this._panel &&
+        !this._thumbMode() &&
+        this._layoutKey() === "full" &&
+        height > 0 &&
+        height < 400 &&
+        width > 0
+    );
+    const tight = on && height < 300;
+    if (
+      on === this.classList.contains("hm-compact") &&
+      tight === this.classList.contains("hm-compact-tight")
+    ) {
+      return;
+    }
+    this.classList.toggle("hm-compact", on);
+    this.classList.toggle("hm-compact-tight", tight);
+    // 覆盖层/抽屉等非 shadow 元素也跟随，避免主题层还按大卡排版。
+    const card = this.renderRoot?.querySelector?.(".hm-card");
+    card?.classList.toggle("hm-compact", on);
+    card?.classList.toggle("hm-compact-tight", tight);
   }
 
   _isThumbnailPreview() {

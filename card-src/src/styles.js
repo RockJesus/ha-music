@@ -579,14 +579,17 @@ export const cardStyles = css`
   }
 
   .hm-spec {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 6px;
+    row-gap: 3px;
     font-size: clamp(10px, 2.4cqi, 11.5px);
     line-height: 1.3;
     letter-spacing: 0.04em;
     color: rgba(226, 232, 255, 0.46);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .hm-spec-short {
@@ -596,7 +599,7 @@ export const cardStyles = css`
   /* 「比特完美」标识：MA 报告该输出未重采样/未改位深时出现 */
   .hm-spec-bp {
     display: inline-block;
-    margin-left: 6px;
+    flex: 0 0 auto;
     padding: 1px 5px;
     border: 1px solid rgba(120, 255, 214, 0.5);
     border-radius: 4px;
@@ -4672,5 +4675,133 @@ export const cardStyles = css`
 
   .hm-card.hm-narrow-panel[data-panel="true"].hm-panel-tight .hm-title {
     font-size: clamp(18px, 5.4cqi, 26px);
+  }
+
+  /* ---------- 矮卡紧凑模式（手机默认卡片高度） ----------
+     默认卡在手机上通常只有 250~380px 高：封面/信息竖排 + 两行控件会把
+     进度与音量挤出卡片。这里改回左右双栏、砍掉次要行、压扁控件，
+     保证标题/歌手/规格/进度/播放都在卡片内。 */
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-body {
+    gap: 8px;
+    padding: clamp(10px, 2.8cqi, 14px);
+    justify-content: flex-start;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-top {
+    flex-wrap: nowrap;
+    row-gap: 0;
+    min-height: 22px;
+    gap: 6px;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-status {
+    flex: 0 1 auto;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-top-actions {
+    width: auto;
+    gap: 4px;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-main {
+    grid-template-columns: var(--hm-cover-size) minmax(0, 1fr);
+    justify-items: stretch;
+    text-align: left;
+    align-items: center;
+    gap: clamp(10px, 3cqi, 16px);
+    flex: 0 0 auto;
+    min-height: 0;
+    --hm-ring-pad: 8px;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-meta {
+    align-items: flex-start;
+    text-align: left;
+    gap: 4px;
+    width: 100%;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-info {
+    width: 100%;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-info {
+    gap: 4px;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-title {
+    font-size: clamp(17px, 4.8cqi, 23px);
+    line-height: 1.2;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-artist {
+    font-size: clamp(11px, 2.9cqi, 13px);
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-modes,
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-tags,
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-vis,
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-now-lyric {
+    display: none;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-transport {
+    width: 100%;
+    gap: clamp(3px, 1.2cqi, 8px);
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-transport .hm-btn {
+    flex: 1 1 0;
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+    max-width: 38px;
+    min-width: 0;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-play {
+    flex: 0 0 auto;
+    width: clamp(44px, 13cqi, 54px);
+    height: clamp(44px, 13cqi, 54px);
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-volume {
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* 极矮卡（<300px）：音量行塞不下，先保住进度与播放键。 */
+  :host(.hm-compact-tight) .hm-card[data-layout="full"] .hm-volume {
+    display: none;
+  }
+
+  :host(.hm-compact-tight) .hm-card[data-layout="full"] .hm-body {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  :host(.hm-compact-tight) .hm-card[data-layout="full"] .hm-controls {
+    gap: 0;
+  }
+
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-volume .hm-volume-mute,
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-volume .hm-vol-minus,
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-volume .hm-vol-plus {
+    width: 32px;
+    height: 32px;
   }
 `;

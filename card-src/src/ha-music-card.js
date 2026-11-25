@@ -4065,13 +4065,41 @@ class HaMusicCard extends LitElement {
     if (!this._isMaPlayer(entityId)) return;
     const key = trackKey || "";
     const sameTrack = Boolean(key) && key === this._audioSpecKey;
-    // 同一首且已经拿到规格就不再查；没拿到（首次请求失败/WS 还没就绪）要继续重试，
-    // 否则卡片会一直停在「没有规格」的状态，直到换歌才恢复。
-    if (sameTrack && this._audioSpec) return;
+    // 同一首且规格（含比特完美判定）都拿到了就不再查；没拿到（首次请求失败/WS 还没就绪）
+    // 要继续重试，否则卡片会一直停在「没有规格」或「缺标识」的状态，直到换歌才恢复。
+    if (sameTrack && this._audioSpec && typeof this._audioSpec.bitPerfect === "boolean") {
+      return;
+    }
     const now = Date.now();
     if (now - this._audioSpecAt < (sameTrack ? 5000 : 1000)) return;
     this._audioSpecAt = now;
     try {
+      // 优先走集成侧的快照：MA 的 audio_processing（含 bit_perfect）只在
+      // MA 客户端模型里有，核心 music_assistant/get_queue 服务会把它剥掉。
+      let snapAudio = null;
+      try {
+        const snap = await this._queueCommand("snapshot");
+        const snapQueue = snap?.result?.queue || snap?.queue || null;
+        snapAudio = snapQueue?.current_audio || null;
+      } catch {
+        snapAudio = null;
+      }
+      if (
+        snapAudio &&
+        (snapAudio.codec || snapAudio.sample_rate || snapAudio.bit_depth)
+      ) {
+        this._audioSpec = {
+          codec: String(snapAudio.codec || ""),
+          sampleRate: Number(snapAudio.sample_rate) || 0,
+          bitDepth: Number(snapAudio.bit_depth) || 0,
+          bitRate: Number(snapAudio.bit_rate) || 0,
+          channels: Number(snapAudio.channels) || 0,
+          bitPerfect: snapAudio.bit_perfect === true,
+        };
+        this._audioSpecKey = key;
+        this.requestUpdate();
+        return;
+      }
       const response = await this._serviceResponse("music_assistant", "get_queue", {
         entity_id: entityId,
       });
@@ -4089,9 +4117,9 @@ class HaMusicCard extends LitElement {
       // MA 把每个输出的失真情况挂在 stream_details.audio_processing.outputs[].fidelity，
       // bit_perfect 为 true 表示该输出是源码样本直通（面板上标「比特完美」）。
       const outputs = details?.audio_processing?.outputs;
-      const bitPerfect =
-        Array.isArray(outputs) &&
-        outputs.some((out) => out?.fidelity?.bit_perfect === true);
+      const bitPerfect = Array.isArray(outputs)
+        ? outputs.some((out) => out?.fidelity?.bit_perfect === true)
+        : null;
       if (!codec && !sampleRate && !bitDepth && !bitRate) {
         this._audioSpec = null;
       } else {

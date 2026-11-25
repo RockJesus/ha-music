@@ -593,6 +593,20 @@ export const cardStyles = css`
     display: none;
   }
 
+  /* 「比特完美」标识：MA 报告该输出未重采样/未改位深时出现 */
+  .hm-spec-bp {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border: 1px solid rgba(120, 255, 214, 0.5);
+    border-radius: 4px;
+    color: rgba(150, 255, 224, 0.92);
+    font-size: 0.86em;
+    letter-spacing: 0.06em;
+    line-height: 1.35;
+    vertical-align: 1px;
+  }
+
   @container (max-width: 520px) {
     .hm-spec-full {
       display: none;

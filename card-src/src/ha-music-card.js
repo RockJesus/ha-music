@@ -4086,10 +4086,23 @@ class HaMusicCard extends LitElement {
       const bitRate = Number(details?.bit_rate) || 0;
       const channels = Number(details?.channels) || 0;
       const codec = String(details?.content_type || "").trim();
+      // MA 把每个输出的失真情况挂在 stream_details.audio_processing.outputs[].fidelity，
+      // bit_perfect 为 true 表示该输出是源码样本直通（面板上标「比特完美」）。
+      const outputs = details?.audio_processing?.outputs;
+      const bitPerfect =
+        Array.isArray(outputs) &&
+        outputs.some((out) => out?.fidelity?.bit_perfect === true);
       if (!codec && !sampleRate && !bitDepth && !bitRate) {
         this._audioSpec = null;
       } else {
-        this._audioSpec = { codec, sampleRate, bitDepth, bitRate, channels };
+        this._audioSpec = {
+          codec,
+          sampleRate,
+          bitDepth,
+          bitRate,
+          channels,
+          bitPerfect,
+        };
         this._audioSpecKey = key;
       }
     } catch (err) {
@@ -6222,9 +6235,15 @@ class HaMusicCard extends LitElement {
                     : statusText)}
               </div>
               ${this._audioSpecText() && !previewUi
-                ? html`<div class="hm-spec" title=${this._audioSpecText()}>
+                ? html`<div
+                    class="hm-spec"
+                    title=${`${this._audioSpecText()}${this._audioSpec?.bitPerfect ? ` · ${t("bitPerfect")}` : ""}`}
+                  >
                     <span class="hm-spec-full">${this._audioSpecText()}</span>
                     <span class="hm-spec-short">${this._audioSpecText(true)}</span>
+                    ${this._audioSpec?.bitPerfect
+                      ? html`<span class="hm-spec-bp">${t("bitPerfect")}</span>`
+                      : nothing}
                   </div>`
                 : this._config?.debug
                   ? html`<div class="hm-spec">

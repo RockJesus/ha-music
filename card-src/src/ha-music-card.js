@@ -376,7 +376,16 @@ class HaMusicCard extends LitElement {
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
     // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
-    if (trackChanged || !prior || !this._audioSpec) this._loadAudioSpec(trackKey);
+    // 切歌时 MA 还没算完 processing chain：规格先到了、bit_perfect 还是 null，
+    // 这种情况要继续轮询补判定，否则标识要等整页刷新才出现。
+    if (
+      trackChanged ||
+      !prior ||
+      !this._audioSpec ||
+      (this._audioSpec && this._audioSpec.bitPerfect == null)
+    ) {
+      this._loadAudioSpec(trackKey);
+    }
     this._syncArt(readMedia(state), entityId);
     // 封面旋转跟播放状态走：不依赖 Lit 是否真的重绘（重绘失败或签名未变时也能纠正）。
     this._safeEffect("cover-spin", () => this._syncCoverSpinEffect());
@@ -4088,13 +4097,16 @@ class HaMusicCard extends LitElement {
         snapAudio &&
         (snapAudio.codec || snapAudio.sample_rate || snapAudio.bit_depth)
       ) {
+        const snapVerdict = snapAudio.bit_perfect;
         this._audioSpec = {
           codec: String(snapAudio.codec || ""),
           sampleRate: Number(snapAudio.sample_rate) || 0,
           bitDepth: Number(snapAudio.bit_depth) || 0,
           bitRate: Number(snapAudio.bit_rate) || 0,
           channels: Number(snapAudio.channels) || 0,
-          bitPerfect: snapAudio.bit_perfect === true,
+          // null 表示 MA 还没算完 processing chain，不能当成 false，否则不再重试
+          bitPerfect:
+            snapVerdict === true ? true : snapVerdict === false ? false : null,
         };
         this._audioSpecKey = key;
         this.requestUpdate();

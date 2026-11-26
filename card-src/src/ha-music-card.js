@@ -2016,8 +2016,8 @@ class HaMusicCard extends LitElement {
   }
 
   _coverSwipe(direction) {
-    // 松手后把手势收尾：封面继续滑出，邻曲封面滑到圆心顶住画面，
-    // 等真正切曲后的新封面到位再无缝换手，避免中间空一帧或旧图糊上来。
+    // 松手后收尾：有邻曲封面就滑出去、让它顶住画面；没有邻曲封面（队列快照还没到）
+    // 就原地等，绝不把封面藏空——那会露出底色，看起来就是“闪一下”。
     const cover = this.renderRoot?.querySelector?.(".hm-cover");
     const peek = this._coverPeekEl();
     const size = this._coverSize(cover);
@@ -2033,62 +2033,84 @@ class HaMusicCard extends LitElement {
       clearTimeout(this._coverDragTimer);
       this._coverDragTimer = null;
     }
+    const hasPeek = Boolean(peek?.dataset?.art);
     const slide = Math.round(size * 1.12) * sign;
     if (cover) {
       cover.style.transition =
         "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.22s ease";
-      cover.style.transform = `translate3d(${slide}px, 0, 0) scale(0.9)`;
-      cover.style.opacity = "0";
+      if (hasPeek) {
+        cover.style.transform = `translate3d(${slide}px, 0, 0) scale(0.9)`;
+        cover.style.opacity = "0";
+      } else {
+        cover.style.transform = "translate3d(0, 0, 0) scale(0.94)";
+        cover.style.opacity = "0.7";
+      }
     }
     if (peek) {
       peek.style.transition =
         "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.22s ease";
       peek.style.transform = "translate3d(0, 0, 0) scale(0.98)";
-      peek.style.opacity = peek.dataset.art ? "1" : "0";
+      peek.style.opacity = hasPeek ? "1" : "0";
     }
+    const reveal = () => {
+      if (cover) {
+        // 封面内部已经在做交叉淡入，这里只负责揭开，不再补一段淡入。
+        cover.style.transition = "none";
+        cover.style.opacity = "1";
+      }
+      if (peek) {
+        peek.style.transition = "opacity 0.12s ease";
+        peek.style.opacity = "0";
+      }
+      this.requestUpdate();
+      this._coverDragTimer = setTimeout(() => {
+        this._coverDragTimer = null;
+        this._resetCoverDrag();
+        this._coverGesture = "";
+        this.requestUpdate();
+      }, 460);
+    };
     this._coverSwipeTimer = setTimeout(() => {
       const pending = this._coverSwipeDir;
       this._coverSwipeDir = null;
       if (pending) this._skip(pending);
-      // 封面留在圆心但隐藏，邻曲封面继续占位。
       if (cover) {
         cover.style.transition = "none";
         cover.style.transform = "translate3d(0, 0, 0) scale(1)";
-        cover.style.opacity = "0";
+        if (hasPeek) cover.style.opacity = "0";
       }
+      // 曲名迟迟不来（切歌失败）就早点还原；曲名到了但封面还在解码，可以多等一会儿。
       const deadline = Date.now() + 1400;
+      const artDeadline = Date.now() + 2600;
+      let arrivedAt = 0;
       const settle = () => {
         if (!this.isConnected) return;
         const title = this._readMedia()?.title || "";
         const arrived = title !== beforeTitle;
-        if (!arrived && Date.now() < deadline) {
-          this._coverDragTimer = setTimeout(settle, 70);
+        if (!arrived) {
+          if (Date.now() < deadline) this._coverDragTimer = setTimeout(settle, 60);
+          else reveal();
           return;
         }
-        if (cover) {
-          if (arrived) {
-            // 新曲封面已经在卡片内部完成交叉淡入，这里再补一段淡入会多压一层暗，
-            // 看起来像“切歌闪一下”，所以直接落回不透明。
-            cover.style.transition = "none";
-            cover.style.opacity = "1";
-          } else {
-            cover.style.transition = "opacity 0.18s ease";
-            cover.style.opacity = "1";
-          }
+        if (!arrivedAt) arrivedAt = Date.now();
+        // 曲名会先到，封面地址要等一次异步解析（resolveArtUrl）。抢在解析之前揭开，
+        // 就会先把上一首的图糊出来，看起来就是“闪一下”。所以：
+        //  · 新图图层还没解码完 → 继续让邻曲封面顶着；
+        //  · 地址还没变（同专辑同封面）→ 再等一小会儿，确认不是“还没解析出来”；
+        //  · 最后有超时兜底，绝不无限挂着。
+        const want = this._coverUrlFor();
+        const shown = this._coverLayers?.[this._coverSlot] || "";
+        const incomingReady =
+          this._coverPending !== "" && Boolean(this._coverReady?.[1 - this._coverSlot]);
+        const sameArt = !want || want === shown;
+        const settledNow = sameArt ? Date.now() - arrivedAt >= 560 : incomingReady;
+        if (!settledNow && Date.now() < artDeadline) {
+          this._coverDragTimer = setTimeout(settle, 60);
+          return;
         }
-        if (peek) {
-          peek.style.transition = "opacity 0.12s ease";
-          peek.style.opacity = "0";
-        }
-        this.requestUpdate();
-        this._coverDragTimer = setTimeout(() => {
-          this._coverDragTimer = null;
-          this._resetCoverDrag();
-          this._coverGesture = "";
-          this.requestUpdate();
-        }, 460);
+        reveal();
       };
-      this._coverDragTimer = setTimeout(settle, 70);
+      this._coverDragTimer = setTimeout(settle, 60);
     }, 250);
   }
 

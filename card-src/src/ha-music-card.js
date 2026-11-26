@@ -1123,6 +1123,57 @@ class HaMusicCard extends LitElement {
         cardEl.style.setProperty("--hm-ring-band", nextBand);
       }
     }
+    // 统一收口：用封面圆心到卡片/内容区四边内沿的真实余量限制环带半径。
+    // 前面的逻辑只处理了左侧，右/上/下在矮格里仍会把音柱画到卡片外被裁；
+    // 这里四边一起算：横向不够时优先把封面右移（最多 12px）腾位置，
+    // 纵向没有可挪的余量，只能把环带等宽收窄，保证整圈音柱都在可视区内。
+    if (cardEl && wrapNode?.getBoundingClientRect) {
+      const cb = cardEl.getBoundingClientRect();
+      const bodyEl = this.renderRoot?.querySelector?.(".hm-body");
+      const bb = bodyEl?.getBoundingClientRect?.();
+      const wb = wrapNode.getBoundingClientRect();
+      if (cb.width > 1 && wb.width > 1) {
+        const half = wb.width / 2;
+        const cx = wb.left + half;
+        const cy = wb.top + half;
+        const margin = 4;
+        const leftBound = Math.max(cb.left, bb ? bb.left : cb.left) + 0;
+        const rightBound = Math.min(cb.right, bb ? bb.right : cb.right);
+        const roomX = Math.min(cx - leftBound, rightBound - cx);
+        const roomY = Math.min(cy - cb.top, cb.bottom - cy);
+        let allow = Math.max(0, Math.floor(2 * (roomX - margin - half)));
+        // 横向不够时优先把封面右移（最多 12px），而不是立刻把音柱压短。
+        // 位移按"无位移时的自然位置"算，保证同一份几何下算出同一个位移，
+        // 不会每轮渲染越推越右或来回弹。
+        const curInset = parseFloat(cardEl.style.getPropertyValue("--hm-ring-inset")) || 0;
+        const leftGap = cx - leftBound;
+        const rightGap = rightBound - cx;
+        const naturalLeft = leftGap - curInset;
+        const naturalRight = rightGap + curInset;
+        const wantHalf = half + band / 2 + margin;
+        let insetNext = curInset;
+        if (naturalLeft >= wantHalf) {
+          insetNext = 0;
+        } else {
+          const need = Math.min(Math.round(wantHalf - naturalLeft), 12);
+          if (need > 0 && naturalRight - need >= wantHalf) insetNext = need;
+        }
+        const effLeft = naturalLeft + insetNext;
+        const effRight = naturalRight - insetNext;
+        allow = Math.min(allow, Math.max(0, Math.floor(2 * (Math.min(effLeft, effRight) - margin - half))));
+        // 环带还受纵向限制：矮格里没有可挪空间，只能等宽收窄。
+        allow = Math.min(allow, Math.max(0, Math.floor(2 * (roomY - margin - half))));
+        if (allow < band) band = allow;
+        if (insetNext !== curInset) {
+          if (insetNext > 0) cardEl.style.setProperty("--hm-ring-inset", `${insetNext}px`);
+          else cardEl.style.removeProperty("--hm-ring-inset");
+        }
+        const bandNext = `${band}px`;
+        if (cardEl.style.getPropertyValue("--hm-ring-band") !== bandNext) {
+          cardEl.style.setProperty("--hm-ring-band", bandNext);
+        }
+      }
+    }
     const size = Math.min(1200, width + band);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
@@ -5858,7 +5909,12 @@ class HaMusicCard extends LitElement {
     // 按内容算行数（mushroom 的做法）：rows = 内容高度需要的栅格行，min_rows 与之一致。
     // 用户仍可往上拖高，但默认高度不会小于内容，避免裁切。
     const w = this._width || 0;
-    const h = this._height || 0;
+    // 高度按"内容需要"而不是"当前分到的"来算：用拿到的高度反算行数会自我
+    // 兑现（一旦被压矮就永远长不回去），内容反而被裁。这里取内容高度与当前
+    // 高度的大者，保证 declared rows 永远装得下内容。
+    const bodyEl = this.renderRoot?.querySelector?.(".hm-body");
+    const needH = bodyEl ? Math.max(0, Math.round(bodyEl.scrollHeight || 0)) : 0;
+    const h = Math.max(this._height || 0, needH);
     let rows;
     if (h) {
       // 行高 56px、行间距 8px：rows 行可容纳 rows*56 + (rows-1)*8

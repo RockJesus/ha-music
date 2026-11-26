@@ -2323,7 +2323,7 @@ class HaMusicCard extends LitElement {
     this._seekPreview = clamped;
     this._progFrame = null;
     this._progShown = clamped;
-    this._progHoldUntil = 0;
+    this._progHoldUntil = Date.now() + 1000;
     this._stopProgressTicker();
     // 立刻把滑块/时间标签挪到目标位置：只靠下一次 hass 刷新会晚半秒才动。
     if (duration) this._paintProgress(clamped, duration);
@@ -7126,11 +7126,14 @@ class HaMusicCard extends LitElement {
           // 集成这帧的 elapsed 可能比插值落后一两百毫秒，直接用会让进度条每秒
           // 往回退一小格；小幅落后时按已显示位置续上，真进度跳转（>0.4s）才认。
           const shown = this._progShown;
+          // 集成帧的 elapsed 与已显示位置天然有 1~3s 相位差（HA 的 media_position
+          // 比真帧早 2~3s），播放中只认“向前”：小幅落后一律按已显示位置续上，
+          // 否则每秒都会往回修一次，就是用户看到的“回跳一下”。
           if (
             event.playing &&
             shown != null &&
             pos < shown &&
-            shown - pos < 0.5
+            shown - pos < 3.4
           ) {
             pos = shown;
           }

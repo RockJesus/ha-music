@@ -162,13 +162,14 @@ export const cardStyles = css`
 
   /* ---------- 内容骨架 ---------- */
   .hm-body {
+    --hm-pad-x: clamp(12px, 3.2cqi, 20px);
     position: relative;
     z-index: 1;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: clamp(8px, 2.4cqi, 16px);
-    padding: clamp(12px, 3.2cqi, 20px);
+    padding: var(--hm-pad-x);
     height: 100%;
     box-sizing: border-box;
     max-width: 760px;
@@ -843,6 +844,13 @@ export const cardStyles = css`
   }
 
   /* ---------- 频谱进度合一（可选动效） ---------- */
+  /* 音柱左右顶满卡片：抵消正文左右内边距，频谱从卡片左边缘画到右边缘
+     （边缘仍保留 mask 的 7% 渐隐，收边不会发硬）。 */
+  .hm-card[data-layout="full"]:not([data-panel="true"]) .hm-vis[data-style="bars"] {
+    /* 正文左右各留 3cqi 边距 + 自身内边距，这里一并抵消，频谱正好铺满卡片 */
+    margin-inline: calc(-1 * (3cqi + var(--hm-pad-x, 12px)));
+  }
+
   .hm-vis[data-style="rail"] {
     height: clamp(56px, 12cqi, 76px);
     overflow: visible;
@@ -1897,7 +1905,8 @@ export const cardStyles = css`
 
   /* 紧凑且偏矮（<420px）：收紧留白、控制键与音量行，给内容腾出底部空间 */
   .hm-card[data-short="true"] .hm-body {
-    padding: clamp(8px, 1.5cqi, 12px);
+    --hm-pad-x: clamp(8px, 1.5cqi, 12px);
+    padding: var(--hm-pad-x);
     gap: clamp(6px, 1.2cqi, 9px);
   }
 
@@ -2103,6 +2112,7 @@ export const cardStyles = css`
 
   /* 居中构图但卡不高：收紧间距，先让封面与控件全部留在卡内 */
   :host(.hm-stack-short) .hm-body {
+    --hm-pad-x: 13px;
     padding: 13px;
     gap: 6px;
   }
@@ -2878,13 +2888,15 @@ export const cardStyles = css`
   }
 
   .hm-card[data-tight="true"] .hm-body {
-    padding: clamp(7px, 1.4cqi, 11px);
+    --hm-pad-x: clamp(7px, 1.4cqi, 11px);
+    padding: var(--hm-pad-x);
     padding-bottom: 6px;
     gap: clamp(5px, 1cqi, 7px);
   }
 
   /* 超矮卡（<230 高）再收紧一圈内边距与间距 */
   .hm-card[data-micro="true"] .hm-body {
+    --hm-pad-x: 6px;
     padding: 6px 6px 5px;
     gap: 4px;
   }
@@ -4822,8 +4834,9 @@ export const cardStyles = css`
      进度与音量挤出卡片。这里改回左右双栏、砍掉次要行、压扁控件，
      保证标题/歌手/规格/进度/播放都在卡片内。 */
   :host(.hm-compact) .hm-card[data-layout="full"] .hm-body {
+    --hm-pad-x: clamp(10px, 2.8cqi, 14px);
     gap: 8px;
-    padding: clamp(10px, 2.8cqi, 14px);
+    padding: var(--hm-pad-x);
     justify-content: flex-start;
   }
 

@@ -5016,7 +5016,7 @@ class HaMusicCard extends LitElement {
         !this._thumbMode() &&
         this._layoutKey() === "full" &&
         width > 0 &&
-        width <= 620 &&
+        width <= 700 &&
         height > 0 &&
         height < 500
     );

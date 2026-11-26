@@ -2066,7 +2066,7 @@ export const cardStyles = css`
 
   /* 381~620px：改成竖排居中构图（封面在环内居中，歌名/歌手/规格/胶囊全部居中），
      与窄卡保持同一套视觉语言。 */
-  @container (min-width: 381px) and (max-width: 620px) {
+  @container (min-width: 381px) and (max-width: 700px) {
     .hm-card[data-layout="full"] .hm-main {
       grid-template-columns: 1fr;
       justify-items: center;

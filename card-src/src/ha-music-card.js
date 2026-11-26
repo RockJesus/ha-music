@@ -322,6 +322,14 @@ class HaMusicCard extends LitElement {
     this._studioKey = "";
     this._studioUnsub = null;
     this._studioPending = false;
+    // 集成侧 1Hz 进度帧：有它就不再自己跑 rAF 推进度条
+    this._progKey = "";
+    this._progUnsub = null;
+    this._progPending = false;
+    this._progFrame = null;
+    this._progFailedAt = 0;
+    // 集成侧封面取色（随进度帧下发），命中就跳过 canvas 采样
+    this._studioPalette = null;
     this._studioFailedAt = 0;
   }
 
@@ -4765,6 +4773,7 @@ class HaMusicCard extends LitElement {
       this._observeLyricsScroll();
     });
     this._safeEffect("spectrum", () => this._syncSpectrum());
+    this._safeEffect("progress", () => this._ensureStudioProgress());
     this._safeEffect("ticker", () => this._syncProgressTicker());
   }
 
@@ -5531,6 +5540,13 @@ class HaMusicCard extends LitElement {
       this.requestUpdate();
       return;
     }
+    // 集成已经算好这张封面的主色：直接吃现成的，前端不再拉图 + canvas 采样。
+    const studio = this._studioPalette;
+    if (studio && studio.url === url && studio.palette) {
+      this._palette = studio.palette;
+      this.requestUpdate();
+      return;
+    }
     paletteFor(url, key).then((palette) => {
       if (this._paletteKey !== key) return;
       this._palette = palette;
@@ -5545,7 +5561,19 @@ class HaMusicCard extends LitElement {
     this._progressPaintAt = 0;
   }
 
+  _progFresh() {
+    const frame = this._progFrame;
+    return Boolean(frame && frame.at && Date.now() - frame.at < 3200);
+  }
+
   _syncProgressTicker() {
+    // 集成每秒推一帧进度：这种情况下不再自跑 rAF，只在收到帧时画一次。
+    if (this._progFresh() && this._seekPreview === null) {
+      this._stopProgressTicker();
+      const frame = this._progFrame;
+      if (frame) this._paintProgress(frame.position, frame.duration);
+      return;
+    }
     if (this._seekPreview !== null || this._state()?.state !== "playing") {
       this._stopProgressTicker();
       return;
@@ -5582,30 +5610,42 @@ class HaMusicCard extends LitElement {
       return;
     }
     const position = clamp(Number(media.position) || 0, 0, duration);
-    const percent = clamp((position / duration) * 100, 0, 100);
     const paintNow = performance.now();
     if (this._isMobileUi() && this._progressPaintAt && paintNow - this._progressPaintAt < 32) {
       this._progressRaf = requestAnimationFrame(() => this._progressTick());
       return;
     }
     this._progressPaintAt = paintNow;
-    // 只更新进度条本身，不触发整卡重绘；播放时按帧推进，拖动时由用户接管。
-    seek.value = String(position);
-    seek.style.setProperty("--pct", `${percent}%`);
-    const second = Math.floor(position);
+    this._paintProgress(position, duration);
+  }
+
+  /** 只更新进度条与时间标签，不触发整卡重绘。 */
+  _paintProgress(position, duration) {
+    const root = this.renderRoot;
+    const seek = root?.querySelector?.('input.hm-range[data-role="seek"]');
+    // 环形音柱卡没有 range 元素，进度只体现在 ring readout 的时间
+    const ring = root?.querySelector?.('[data-role="ringseek"]');
+    if ((!seek && !ring) || !duration) return;
+    const value = clamp(Number(position) || 0, 0, duration);
+    const percent = clamp((value / duration) * 100, 0, 100);
+    if (seek) {
+      seek.value = String(value);
+      seek.style.setProperty("--pct", `${percent}%`);
+    }
+    this._syncRingReadout(value);
+    const second = Math.floor(value);
     if (second !== this._progressLastSecond) {
       this._progressLastSecond = second;
-      setLitText(this.renderRoot?.querySelector?.(".hm-time"), formatTime(position));
-      // 切歌后模板可能还保留上一首的结束时间；这里每帧用当前时长校正，
+      setLitText(this.renderRoot?.querySelector?.(".hm-time"), formatTime(value));
+      // 切歌后模板可能还保留上一首的结束时间；这里每次用当前时长校正，
       // 不只更新当前时间，避免总时长标签停在旧值直到整卡重绘。
       setLitText(
         this.renderRoot?.querySelector?.(".hm-time.end"),
         this._showRemaining
-          ? `-${formatTime(Math.max(duration - position, 0))}`
+          ? `-${formatTime(Math.max(duration - value, 0))}`
           : formatTime(duration)
       );
     }
-    this._progressRaf = requestAnimationFrame(() => this._progressTick());
   }
 
   _syncRangeValues() {
@@ -7039,6 +7079,71 @@ class HaMusicCard extends LitElement {
       })
       .finally(() => {
         if (this._studioKey === key) this._studioPending = false;
+      });
+  }
+
+  /**
+   * 集成每秒推一帧 {elapsed,duration,playing,art,palette}：
+   * 进度条靠它推进，封面主色也不再由卡片做 canvas 采样。
+   */
+  _ensureStudioProgress() {
+    if (!this._studioAvailable() || !this._eid()) return;
+    const key = this._eid();
+    if (this._progKey === key && (this._progUnsub || this._progPending)) return;
+    if (this._progFailedAt && Date.now() - this._progFailedAt < 60 * 1000) return;
+    this._progUnsub?.();
+    this._progUnsub = null;
+    if (this._progKey !== key) this._progFrame = null;
+    this._progKey = key;
+    this._progPending = true;
+    const connection = this._hass?.connection;
+    if (!connection?.subscribeMessage) {
+      this._progPending = false;
+      return;
+    }
+    let request;
+    try {
+      request = connection.subscribeMessage(
+        (event) => {
+          if (!event || event.type !== "progress" || !protocolMatches(event)) return;
+          const duration = Number(event.duration) || 0;
+          this._progFrame = {
+            position: Number(event.elapsed) || 0,
+            duration,
+            at: Date.now(),
+            playing: Boolean(event.playing),
+          };
+          if (event.palette && event.art) {
+            this._studioPalette = { url: String(event.art), palette: event.palette };
+            if (this._artUrl && this._artUrl === this._studioPalette.url) {
+              this._palette = event.palette;
+              this.requestUpdate();
+            }
+          }
+          if (duration && this._seekPreview === null) {
+            this._paintProgress(this._progFrame.position, duration);
+          }
+        },
+        { type: "ha_music_studio/subscribe_progress", entity_id: key }
+      );
+    } catch {
+      this._progPending = false;
+      this._progFailedAt = Date.now();
+      return;
+    }
+    Promise.resolve(request)
+      .then((unsub) => {
+        if (this._progKey !== key) {
+          unsub?.();
+          return;
+        }
+        this._progUnsub = unsub;
+      })
+      .catch(() => {
+        this._progFailedAt = Date.now();
+      })
+      .finally(() => {
+        if (this._progKey === key) this._progPending = false;
       });
   }
 

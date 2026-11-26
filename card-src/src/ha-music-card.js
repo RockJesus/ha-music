@@ -7176,8 +7176,8 @@ class HaMusicCard extends LitElement {
       [split[0], split[1]],
       [split[1], count],
     ].map(([from, to], zone) => {
-      const x0 = zoneGap * zone;
-      const x1 = x0 + (to - from) * cell;
+      const x0 = zoneGap * zone + from * cell;
+      const x1 = zoneGap * zone + to * cell;
       return [x0, Math.max(x0 + 1, x1)];
     });
     const stops = [
@@ -7235,10 +7235,11 @@ class HaMusicCard extends LitElement {
     const zoneStarts = [0, split[0], split[1], count];
     for (let index = 0; index < count; index += 1) {
       const zone = index < split[0] ? 0 : index < split[1] ? 1 : 2;
-      const zoneIndex = index - zoneStarts[zone];
       const level = clamp(Number(levels[index]) || 0, 0.02, 1);
       const barHeight = Math.max(2, level * barArea);
-      const x = zoneGap * zone + zoneIndex * cell + (cell - barWidth) / 2;
+      // 柱子的横坐标必须按全局序号累计，不能每个频段从 0 重排，
+      // 否则三段的柱子会互相叠在左侧，看起来频谱只占了左边三分之一。
+      const x = zoneGap * zone + index * cell + (cell - barWidth) / 2;
       const y = height - barHeight;
       const played =
         progress < 0 || index / Math.max(1, count - 1) <= progress + 0.002;

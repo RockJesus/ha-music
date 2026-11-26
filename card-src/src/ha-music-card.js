@@ -5614,31 +5614,9 @@ class HaMusicCard extends LitElement {
     this._progressPaintAt = 0;
   }
 
-  /**
-   * 集成帧是否还能当基准：拖动/快进后旧帧会落后整整一秒，
-   * 这时若还按它插值，进度条会先回跳到旧位置再前进。
-   */
-  _progFrameAligned(frame, media) {
-    if (!frame || !frame.duration) return false;
-    const duration = Number(media?.duration) || 0;
-    if (duration && Math.abs(duration - Number(frame.duration)) > 1) return false;
-    const predicted = this._studioFramePosition(frame);
-    const actual = Number(media?.position) || 0;
-    return Math.abs(predicted - actual) <= 1;
-  }
-
   _syncProgressTicker() {
     // 集成约每秒推一帧进度：只按帧画会一秒跳一格，这里改成按帧时间戳插值，
     // 由 rAF 以约 30fps 推进，松手拖拽（seekPreview）时仍然让位给用户操作。
-    const frameNow = this._progFrame;
-    if (
-      frameNow &&
-      this._progFresh() &&
-      frameNow.playing &&
-      !this._progFrameAligned(frameNow, this._readMedia())
-    ) {
-      this._progFrame = null;
-    }
     if (this._progFresh() && this._seekPreview === null) {
       if (this._state()?.state === "playing") {
         if (!this._progressRaf) {
@@ -5675,7 +5653,9 @@ class HaMusicCard extends LitElement {
       return;
     }
     const frame = this._progFrame;
-    if (this._progFresh() && frame?.duration && this._progFrameAligned(frame, this._readMedia())) {
+    // 只认集成帧这一条时间线：HA 状态里的 media_position 比帧晚约 1s，
+    // 过去拿它做“对齐校验”会因为两边天然差 1s 反复丢帧，形成每秒一次的回跳。
+    if (this._progFresh() && frame?.duration && frame.playing) {
       const paintNow = performance.now();
       if (!this._progressPaintAt || paintNow - this._progressPaintAt >= 33) {
         this._progressPaintAt = paintNow;
@@ -5705,6 +5685,8 @@ class HaMusicCard extends LitElement {
     }
     this._progressPaintAt = paintNow;
     this._paintProgress(position, duration);
+    // 没有集成帧时也要继续跑：否则 ticker 停摆，只剩每秒一次的 hass 刷新在推位置。
+    this._progressRaf = nextFrame(() => this._progressTick());
   }
 
   /** 只更新进度条与时间标签，不触发整卡重绘。 */
@@ -5750,7 +5732,7 @@ class HaMusicCard extends LitElement {
       // 两份时间戳不同，混用会让进度条在每次 hass 刷新时跳一下。
       const frame = this._progFrame;
       const predicted =
-        this._progFresh() && frame?.duration && frame.playing && this._progFrameAligned(frame, media)
+        this._progFresh() && frame?.duration && frame.playing
           ? this._studioFramePosition(frame)
           : null;
       const value = predicted != null
@@ -7137,7 +7119,7 @@ class HaMusicCard extends LitElement {
             event.playing &&
             shown != null &&
             pos < shown &&
-            shown - pos < 0.4
+            shown - pos < 0.5
           ) {
             pos = shown;
           }

@@ -293,7 +293,10 @@ class HaMusicCard extends LitElement {
     this._coverPress = null;
     this._coverGesture = "";
     this._coverGestureTimer = null;
-    this._coverPending = null;
+    // 手势方向必须和封面层正在加载的 URL（_coverPending）分开存，
+    // 否则 _applyCoverArt 会把方向改写成一个 URL 或空串，滑一下就变成乱切歌。
+    this._coverSwipeDir = null;
+    this._coverSwipeTimer = null;
     this._coverDragTimer = null;
     this._queueSnapshotTask = null;
     this._coverSuppressClick = false;
@@ -645,13 +648,15 @@ class HaMusicCard extends LitElement {
     this._stopTimer();
     this._stopProgressTicker();
     if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    if (this._coverSwipeTimer) clearTimeout(this._coverSwipeTimer);
     if (this._coverDragTimer) clearTimeout(this._coverDragTimer);
     if (this._coverSuppressTimer) clearTimeout(this._coverSuppressTimer);
     this._stopSpectrum();
     this._coverGestureTimer = null;
+    this._coverSwipeTimer = null;
     this._coverSuppressTimer = null;
     this._coverPress = null;
-    this._coverPending = null;
+    this._coverSwipeDir = null;
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
@@ -1858,6 +1863,7 @@ class HaMusicCard extends LitElement {
   }
 
   _skip(direction) {
+    if (direction !== "next" && direction !== "prev") direction = "next";
     const entityId = this._eid();
     const moving = this._call(
       direction === "next" ? "media_next_track" : "media_previous_track",
@@ -2017,12 +2023,12 @@ class HaMusicCard extends LitElement {
     const size = this._coverSize(cover);
     const sign = direction === "next" ? -1 : 1;
     const beforeTitle = this._readMedia()?.title || "";
-    if (this._coverPending) {
-      this._skip(this._coverPending);
-      this._coverPending = null;
+    if (this._coverSwipeDir) {
+      this._skip(this._coverSwipeDir);
+      this._coverSwipeDir = null;
     }
-    this._coverPending = direction;
-    if (this._coverGestureTimer) clearTimeout(this._coverGestureTimer);
+    this._coverSwipeDir = direction;
+    if (this._coverSwipeTimer) clearTimeout(this._coverSwipeTimer);
     if (this._coverDragTimer) {
       clearTimeout(this._coverDragTimer);
       this._coverDragTimer = null;
@@ -2040,9 +2046,9 @@ class HaMusicCard extends LitElement {
       peek.style.transform = "translate3d(0, 0, 0) scale(0.98)";
       peek.style.opacity = peek.dataset.art ? "1" : "0";
     }
-    this._coverGestureTimer = setTimeout(() => {
-      const pending = this._coverPending;
-      this._coverPending = null;
+    this._coverSwipeTimer = setTimeout(() => {
+      const pending = this._coverSwipeDir;
+      this._coverSwipeDir = null;
       if (pending) this._skip(pending);
       // 封面留在圆心但隐藏，邻曲封面继续占位。
       if (cover) {

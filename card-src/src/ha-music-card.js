@@ -5656,7 +5656,16 @@ class HaMusicCard extends LitElement {
     const info = this._volumeInfo(media);
     if (seek && this._seekPreview === null) {
       const max = media.duration || 0;
-      const value = clamp(media.position, 0, max || media.position);
+      // 集成帧新鲜时用它插值出的位置，别用 HA 状态里那份低频 position：
+      // 两份时间戳不同，混用会让进度条在每次 hass 刷新时跳一下。
+      const frame = this._progFrame;
+      const predicted =
+        this._progFresh() && frame?.duration && frame.playing
+          ? this._studioFramePosition(frame)
+          : null;
+      const value = predicted != null
+        ? clamp(predicted, 0, max || predicted)
+        : clamp(media.position, 0, max || media.position);
       seek.value = String(value);
       seek.max = String(max || 0);
       seek.style.setProperty(

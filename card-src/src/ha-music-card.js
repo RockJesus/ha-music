@@ -7358,7 +7358,10 @@ class HaMusicCard extends LitElement {
     // 直接量它会把上一次（更大）的尺寸当成当前宽度，卡片缩小时频谱只画半截。
     const host = canvas.parentElement || canvas;
     const rect = host.getBoundingClientRect();
-    const cssH = Math.max(1, Math.round(canvas.getBoundingClientRect().height || rect.height));
+    // 高度必须量容器，不能量 canvas 自己：canvas 的 style.height 是我们上一轮
+    // 写进去的，一旦某次量到 1px（行被压扁/隐藏），写回的 1px 会让它永远只有
+    // 1px —— 立柱行就变成一条几乎看不见的虚线（「立柱没效果」的根因）。
+    const cssH = Math.max(1, Math.round(rect.height || canvas.getBoundingClientRect().height));
     const width = Math.max(1, Math.round(rect.width));
     const height = cssH;
     if (!width || !height) return false;

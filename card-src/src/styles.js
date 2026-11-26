@@ -1499,7 +1499,8 @@ export const cardStyles = css`
   }
 
   .hm-controls.is-stacked .hm-transport {
-    justify-content: center;
+    /* 播控按钮在卡片内左右顶满：整行铺满宽度、两端对齐，首尾按钮贴到卡片内边距。 */
+    justify-content: space-between;
     width: 100%;
   }
 

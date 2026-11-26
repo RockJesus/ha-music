@@ -1092,88 +1092,66 @@ class HaMusicCard extends LitElement {
     // 整圈音柱会被方形画布边缘削平（看起来就是「被裁切」的短毛刺）。
     // 28px 环带 = 每侧 14px，足够画 3 + 4 + 5 的外扩音柱，仍在卡片留白内。
     const fitted = narrowPanel ? hardBand : this._ringFit(width, hardBand);
-    let band = Math.min(hardBand, Math.max(width >= 300 ? 34 : 28, fitted));
+    // 环带下限拉到 34px：紧凑格里 28px 环带的柱子只有 6-7px 长，
+    // 再加上 2.4px 线宽和抗锯齿，整圈看上去只剩一圈微光，等于没效果。
+    // 34px 至少能给到每侧 17px，柱长 10px 以上，律动能看出来；
+    // 真放不下时由下面的四边收口自动收窄，不会越界。
+    let band = Math.min(hardBand, Math.max(34, fitted));
     const cardEl = this.renderRoot?.querySelector?.(".hm-card");
-    // 音柱画布永远以封面为圆心、向四周各扩 band/2。紧凑格里封面常常紧贴
-    // 卡片内边距（只剩 8px），band 兜到 28px 后画布左右各 14px 就顶出了卡片
-    // 边框，左边的半圈音柱直接被裁掉。这里先量出封面左侧的真实留白，不够就
-    // 把封面整体右移（最多 14px）给环带腾地方；实在腾不出来再收窄 band，
-    // 保证整圈音柱都在卡片可视范围内。
+    // 音柱画布以封面为圆心向四周各扩 band/2，所以"环带放不放得下"完全取决于
+    // 封面圆心到卡片/内容区四边的余量。这里一次性算完：先按左右余量求一个
+    // 平衡的封面右移量（最多 16px），再用四边最小的余量把 band 收到放得下为止。
+    // 关键点：全部基于"没有位移时的自然位置"推导，同一份几何重复进入也得到
+    // 同一个结果，既不越推越右，也不需要"改位移后再重绘一轮"——那样会在
+    // 每次 update 里反复改 inset，窄卡上直接抖成死循环。
+    let ringInset = 0;
     const wrapBox = wrapNode?.getBoundingClientRect?.();
     if (cardEl && wrapBox && wrapBox.width > 0) {
-      const cardBox = cardEl.getBoundingClientRect();
-      const curInset =
-        parseFloat(cardEl.style.getPropertyValue("--hm-ring-inset")) || 0;
-      const naturalLeft = wrapBox.left - curInset - cardBox.left;
-      const wantPad = Math.ceil(band / 2) + 1;
-      let inset = Math.max(0, Math.min(14, wantPad - naturalLeft));
-      const roomLeft = naturalLeft + inset;
-      if (roomLeft < wantPad) {
-        band = Math.max(16, Math.min(band, 2 * (roomLeft - 1)));
-        inset = Math.max(0, Math.min(14, Math.ceil(band / 2) + 1 - naturalLeft));
-      }
-      const nextInset = `${Math.round(inset * 100) / 100}px`;
-      if (cardEl.style.getPropertyValue("--hm-ring-inset") !== nextInset) {
-        cardEl.style.setProperty("--hm-ring-inset", nextInset);
+      const cb = cardEl.getBoundingClientRect();
+      const bodyEl = this.renderRoot?.querySelector?.(".hm-body");
+      const bb = bodyEl?.getBoundingClientRect?.();
+      if (cb.width > 1) {
+        const half = wrapBox.width / 2;
+        const curInset =
+          parseFloat(cardEl.style.getPropertyValue("--hm-ring-inset")) || 0;
+        const cx = wrapBox.left + half;
+        const cy = wrapBox.top + half;
+        const margin = 3;
+        const leftBound = Math.max(cb.left, bb ? bb.left : cb.left);
+        const rightBound = Math.min(cb.right, bb ? bb.right : cb.right);
+        // 去掉当前位移后，圆心到左右内沿的自然余量（与 inset 无关）
+        const natLeft = cx - curInset - leftBound;
+        const natRight = rightBound - cx + curInset;
+        const natTop = cy - cb.top;
+        const natBottom = cb.bottom - cy;
+        const need = half + band / 2 + margin;
+        let inset = Math.max(0, Math.min(16, (natRight - natLeft) / 2));
+        if (natLeft + inset < need) {
+          const maxShift = Math.min(16, natRight - need);
+          if (maxShift > 0) inset = Math.max(inset, Math.min(need - natLeft, maxShift));
+        }
+        const avail =
+          Math.min(natLeft + inset, natRight - inset, natTop, natBottom) - margin;
+        const fitBand = Math.max(0, Math.floor(2 * (avail - half)));
+        if (fitBand < band) band = fitBand;
+        ringInset = Math.round(inset);
       }
     }
     if (cardEl) {
+      if (ringInset > 0) {
+        const nextInset = `${ringInset}px`;
+        if (cardEl.style.getPropertyValue("--hm-ring-inset") !== nextInset) {
+          cardEl.style.setProperty("--hm-ring-inset", nextInset);
+        }
+      } else if (cardEl.style.getPropertyValue("--hm-ring-inset")) {
+        cardEl.style.removeProperty("--hm-ring-inset");
+      }
       const nextBand = `${band}px`;
       if (cardEl.style.getPropertyValue("--hm-ring-band") !== nextBand) {
         cardEl.style.setProperty("--hm-ring-band", nextBand);
       }
     }
-    // 统一收口：用封面圆心到卡片/内容区四边内沿的真实余量限制环带半径。
-    // 前面的逻辑只处理了左侧，右/上/下在矮格里仍会把音柱画到卡片外被裁；
-    // 这里四边一起算：横向不够时优先把封面右移（最多 12px）腾位置，
-    // 纵向没有可挪的余量，只能把环带等宽收窄，保证整圈音柱都在可视区内。
-    if (cardEl && wrapNode?.getBoundingClientRect) {
-      const cb = cardEl.getBoundingClientRect();
-      const bodyEl = this.renderRoot?.querySelector?.(".hm-body");
-      const bb = bodyEl?.getBoundingClientRect?.();
-      const wb = wrapNode.getBoundingClientRect();
-      if (cb.width > 1 && wb.width > 1) {
-        const half = wb.width / 2;
-        const cx = wb.left + half;
-        const cy = wb.top + half;
-        const margin = 4;
-        const leftBound = Math.max(cb.left, bb ? bb.left : cb.left) + 0;
-        const rightBound = Math.min(cb.right, bb ? bb.right : cb.right);
-        const roomX = Math.min(cx - leftBound, rightBound - cx);
-        const roomY = Math.min(cy - cb.top, cb.bottom - cy);
-        let allow = Math.max(0, Math.floor(2 * (roomX - margin - half)));
-        // 横向不够时优先把封面右移（最多 12px），而不是立刻把音柱压短。
-        // 位移按"无位移时的自然位置"算，保证同一份几何下算出同一个位移，
-        // 不会每轮渲染越推越右或来回弹。
-        const curInset = parseFloat(cardEl.style.getPropertyValue("--hm-ring-inset")) || 0;
-        const leftGap = cx - leftBound;
-        const rightGap = rightBound - cx;
-        const naturalLeft = leftGap - curInset;
-        const naturalRight = rightGap + curInset;
-        const wantHalf = half + band / 2 + margin;
-        let insetNext = curInset;
-        if (naturalLeft >= wantHalf) {
-          insetNext = 0;
-        } else {
-          const need = Math.min(Math.round(wantHalf - naturalLeft), 12);
-          if (need > 0 && naturalRight - need >= wantHalf) insetNext = need;
-        }
-        const effLeft = naturalLeft + insetNext;
-        const effRight = naturalRight - insetNext;
-        allow = Math.min(allow, Math.max(0, Math.floor(2 * (Math.min(effLeft, effRight) - margin - half))));
-        // 环带还受纵向限制：矮格里没有可挪空间，只能等宽收窄。
-        allow = Math.min(allow, Math.max(0, Math.floor(2 * (roomY - margin - half))));
-        if (allow < band) band = allow;
-        if (insetNext !== curInset) {
-          if (insetNext > 0) cardEl.style.setProperty("--hm-ring-inset", `${insetNext}px`);
-          else cardEl.style.removeProperty("--hm-ring-inset");
-        }
-        const bandNext = `${band}px`;
-        if (cardEl.style.getPropertyValue("--hm-ring-band") !== bandNext) {
-          cardEl.style.setProperty("--hm-ring-band", bandNext);
-        }
-      }
-    }
+
     const size = Math.min(1200, width + band);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
@@ -1200,7 +1178,9 @@ class HaMusicCard extends LitElement {
       // 柱子只剩 5px 长、柱尖又贴着画布边缘，看起来就是一圈毛刺。
       // 大封面（>=300）保持原来的 3px 呼吸缝；小封面把起点贴到封面外 2px、
       // 边距收到 2px，把省下的空间全给柱长，同时仍保证柱尖在画布内。
-      innerRadius: width / 2 + (width >= 300 ? 3 : 2),
+      // 小封面上柱子本来就短，再把起点贴到封面外 2px 就只剩几条毛刺；
+      // 改成从封面边缘略微内收（-2px）起步，柱长多出 4px，仍以封面为圆心。
+      innerRadius: width / 2 + (width >= 300 ? 3 : -2),
       edge: width >= 300 ? 4 : 2,
       lineWidth:
         width >= 300
@@ -4873,7 +4853,15 @@ class HaMusicCard extends LitElement {
   }
 
   updated() {
-    if (this._syncBox()) this.requestUpdate();
+    // 尺寸补测只在尺寸真的变了时才再渲染一轮，并且限次：
+    // 版式切换会让容器高度跟着变，若不封顶就会「渲染→量高→又变→再渲染」
+    // 自锁成死循环（窄格里整页会直接卡住不响应）。
+    if (this._syncBox()) {
+      this._boxReflows = (this._boxReflows || 0) + 1;
+      if (this._boxReflows <= 4) this.requestUpdate();
+    } else {
+      this._boxReflows = 0;
+    }
     const card = this.renderRoot?.querySelector?.(".hm-card");
     if (!card) return;    // 缩略预览：清掉任何残留的背景大图，避免整张封面被解码后常驻内存。
     if (this._thumbMode()) {

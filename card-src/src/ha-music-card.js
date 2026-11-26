@@ -1085,7 +1085,11 @@ class HaMusicCard extends LitElement {
         : 48;
     // 音柱的外扩量按当前布局的真实余量收一收：卡片矮、或右边文字快被挤没时，
     // 宁可让环带变窄，也不能让音柱冲出卡片或压住别的元素。
-    const band = narrowPanel ? hardBand : this._ringFit(width, hardBand);
+    // 但下限要兜住：紧凑格里真实余量只剩 3px 时，画布半径比封面半径还小，
+    // 整圈音柱会被方形画布边缘削平（看起来就是「被裁切」的短毛刺）。
+    // 28px 环带 = 每侧 14px，足够画 3 + 4 + 5 的外扩音柱，仍在卡片留白内。
+    const fitted = narrowPanel ? hardBand : this._ringFit(width, hardBand);
+    const band = Math.min(hardBand, Math.max(width >= 300 ? 34 : 28, fitted));
     const cardEl = this.renderRoot?.querySelector?.(".hm-card");
     if (cardEl) {
       const nextBand = `${band}px`;

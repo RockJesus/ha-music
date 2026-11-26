@@ -46,7 +46,11 @@ function paint(canvas, bars, glow) {
   ctx.clearRect(0, 0, size, size);
   const R = size / 2;
   const edge = Number.isFinite(state.edge) ? state.edge : 8;
-  const maxLen = Math.max(4, R - r0 - edge);
+  // 起始半径必须给末端留够余量：小封面（紧凑格里 80px 上下）画布半径只有
+  // 封面半径 + 几像素，原来的 4px 最小柱长会把柱尖画到画布外，整圈音柱被
+  // 方形画布边缘削平，看起来像被裁切。这里把起点压回画布内并限制柱长。
+  const startR = Math.min(r0, Math.max(4, R - edge - 3));
+  const maxLen = Math.max(0, R - edge - 1.5 - startR);
   const accent = state.accent || FALLBACK_ACCENT;
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
@@ -61,7 +65,8 @@ function paint(canvas, bars, glow) {
     // 进度从 6 点方向顺时针增长，与圆形拖动方向一致。
     ctx.shadowBlur = glowOn ? 5 + glow * 7 : 0;
     const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2;
-    const len = 3.2 + Math.pow(v, 1.05) * maxLen;
+    // 静态底长 3.2px 也要受 maxLen 约束，否则小画布里柱尖仍会越过边缘被削掉。
+    const len = Math.min(3.2 + Math.pow(v, 1.05) * maxLen, Math.max(0.6, maxLen));
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = Math.abs(Math.sin(angle));
@@ -69,10 +74,10 @@ function paint(canvas, bars, glow) {
     const alpha = 0.5 + v * 0.48;
     // 柱底保留少量 alpha，让每一根柱都从根部可见；若从 0 渐入，
     // 短柱只剩外端几个像素，整圈会退化成虚线，看起来像音柱缺失。
-    const x0 = R + c * r0;
-    const y0 = R + s * r0;
-    const x1 = R + c * (r0 + len);
-    const y1 = R + s * (r0 + len);
+    const x0 = R + c * startR;
+    const y0 = R + s * startR;
+    const x1 = R + c * (startR + len);
+    const y1 = R + s * (startR + len);
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
     grad.addColorStop(0, rgba(color, alpha * 0.22));
     grad.addColorStop(0.18, rgba(color, alpha * 0.28));

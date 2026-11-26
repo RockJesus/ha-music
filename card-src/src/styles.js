@@ -4897,7 +4897,10 @@ export const cardStyles = css`
   }
 
   :host(.hm-compact) .hm-card[data-layout="full"] .hm-main {
-    grid-template-columns: var(--hm-cover-size) minmax(0, 1fr);
+    /* 首列按「封面 + 环带外扩」给宽：环形音柱向封面外伸 band/2，
+       这一格不放宽，右半圈就会压到标题/歌手文字上。
+       文字列从这里往右站，标题不再贴着封面。 */
+    grid-template-columns: calc(var(--hm-cover-size, 98px) + var(--hm-ring-band, 0px) * 0.5 + 8px) minmax(0, 1fr);
     justify-items: stretch;
     text-align: left;
     align-items: center;

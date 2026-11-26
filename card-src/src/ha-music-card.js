@@ -1285,6 +1285,7 @@ class HaMusicCard extends LitElement {
   }
 
   _layoutKey() {
+    this._syncBox();
     if (this._thumbMode()) return "full";
     if (this._panel) {
       // 面板/预览也可能是宽而矮的格子（如 460×320），不能一律 full 竖排。
@@ -4768,7 +4769,26 @@ class HaMusicCard extends LitElement {
     return !this._chipDrag;
   }
 
+  // Sections/网格下 ResizeObserver 偶尔始终不回调（contentRect 拿到 0 之后元素尺寸
+  // 改由外部 CSS 驱动），_width/_height 就停在 0，版式被错判成 full 而纵向溢出，
+  // 播放键与音量被裁在卡片外面。这里每轮渲染后直接从真实盒模型补一次，一轮收敛。
+  _syncBox() {
+    const w = Math.round(this.clientWidth || 0);
+    const h = Math.round(this.clientHeight || 0);
+    let changed = false;
+    if (w && Math.abs(w - (this._width || 0)) >= 1) {
+      this._width = w;
+      changed = true;
+    }
+    if (h && Math.abs(h - (this._height || 0)) >= 1) {
+      this._height = h;
+      changed = true;
+    }
+    return changed;
+  }
+
   updated() {
+    if (this._syncBox()) this.requestUpdate();
     const card = this.renderRoot?.querySelector?.(".hm-card");
     if (!card) return;    // 缩略预览：清掉任何残留的背景大图，避免整张封面被解码后常驻内存。
     if (this._thumbMode()) {

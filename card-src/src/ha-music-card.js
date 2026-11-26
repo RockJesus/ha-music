@@ -1125,11 +1125,11 @@ class HaMusicCard extends LitElement {
         const natTop = cy - cb.top;
         const natBottom = cb.bottom - cy;
         const need = half + band / 2 + margin;
-        let inset = Math.max(0, Math.min(16, (natRight - natLeft) / 2));
-        if (natLeft + inset < need) {
-          const maxShift = Math.min(16, natRight - need);
-          if (maxShift > 0) inset = Math.max(inset, Math.min(need - natLeft, maxShift));
-        }
+        // 只补足"差多少"，不做左右均衡：均衡会在右侧宽裕时也无谓右移，
+        // 把封面挤进比自身更窄的格子，宽高被压成椭圆。差多少补多少，
+        // 大多数卡片天然留白够用，inset 就是 0，封面保持正圆。
+        let inset = Math.max(0, Math.min(16, Math.round(need - natLeft)));
+        if (natRight - inset < need) inset = Math.max(0, Math.min(inset, Math.round(natRight - need)));
         const avail =
           Math.min(natLeft + inset, natRight - inset, natTop, natBottom) - margin;
         const fitBand = Math.max(0, Math.floor(2 * (avail - half)));

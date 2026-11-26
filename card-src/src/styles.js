@@ -2252,6 +2252,9 @@ export const cardStyles = css`
     position: relative;
     isolation: isolate;
     min-width: 0;
+    /* 宽度固定成封面直径：右移（--hm-ring-inset）只靠 margin-left 推，
+       不能把这一格压窄，否则 .hm-cover 的 max-width:100% 会把封面压成椭圆。 */
+    width: var(--hm-cover-size, 168px);
     /* 环形音柱左右各扩 band/2；封面离卡片左边太近时由脚本把这一格右移，
        让整圈音柱落在卡片内，不会被边框裁掉。 */
     margin-left: var(--hm-ring-inset, 0px);

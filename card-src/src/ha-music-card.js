@@ -1076,11 +1076,21 @@ class HaMusicCard extends LitElement {
     const narrowPanel =
       Boolean(this._panel) &&
       Boolean(this.renderRoot?.querySelector?.(".hm-card")?.classList?.contains("hm-narrow-panel"));
-    const band = narrowPanel
+    const hardBand = narrowPanel
       ? Math.min(120, Math.max(84, Math.round(width * 0.24)))
       : width >= 300
         ? 88
         : 48;
+    // 音柱的外扩量按当前布局的真实余量收一收：卡片矮、或右边文字快被挤没时，
+    // 宁可让环带变窄，也不能让音柱冲出卡片或压住别的元素。
+    const band = narrowPanel ? hardBand : this._ringFit(width, hardBand);
+    const cardEl = this.renderRoot?.querySelector?.(".hm-card");
+    if (cardEl) {
+      const nextBand = `${band}px`;
+      if (cardEl.style.getPropertyValue("--hm-ring-band") !== nextBand) {
+        cardEl.style.setProperty("--hm-ring-band", nextBand);
+      }
+    }
     const size = Math.min(1200, width + band);
     if (canvas.style.width !== `${size}px`) canvas.style.width = `${size}px`;
     if (canvas.style.height !== `${size}px`) canvas.style.height = `${size}px`;
@@ -1103,7 +1113,8 @@ class HaMusicCard extends LitElement {
       visible: true,
       position: this._seekPreview ?? media.position,
       size,
-      innerRadius: width / 2 + 8,
+      innerRadius: width / 2 + 3,
+      edge: 4,
       lineWidth:
         width >= 300
           ? Math.max(1.8, Math.min(2.6, width / 210))
@@ -1124,6 +1135,49 @@ class HaMusicCard extends LitElement {
       album: first(media.album),
       bands: this._bandLevels,
     });
+  }
+
+  /**
+   * 环带能外扩多少：量封面中心到四侧最近障碍的距离（顶栏、下面的行、右边文字、卡片边），
+   * 音柱最外圈必须落在里面。空间不够时环带收窄，绝不让音柱冲出卡片或被别的元素压住。
+   */
+  _ringFit(width, hardBand) {
+    const root = this.renderRoot;
+    const card = root?.querySelector?.(".hm-card");
+    const body = root?.querySelector?.(".hm-body");
+    const info = root?.querySelector?.(".hm-info");
+    const cover = root?.querySelector?.(".hm-cover");
+    if (!card || !body || !cover) return hardBand;
+    const cardRect = card.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    const coverRect = cover.getBoundingClientRect();
+    if (!coverRect.width || !bodyRect.height) return hardBand;
+    const cx = coverRect.left + coverRect.width / 2;
+    const cy = coverRect.top + coverRect.height / 2;
+    let top = cardRect.top + 6;
+    let bottom = cardRect.bottom - 6;
+    let left = Math.max(cardRect.left + 6, bodyRect.left + 6);
+    let right = Math.min(cardRect.right - 6, bodyRect.right - 6);
+    const mainEl = cover.closest?.(".hm-main");
+    for (const parent of [mainEl, body]) {
+      if (!parent) continue;
+      for (const sib of parent.children) {
+        if (sib === mainEl && parent === body) continue;
+        if (sib === cover.parentElement) continue;
+        const r = sib.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        if (r.bottom <= coverRect.top + 2) top = Math.max(top, r.bottom + 4);
+        else if (r.top >= coverRect.bottom - 2) bottom = Math.min(bottom, r.top - 4);
+      }
+    }
+    const infoRect = info?.getBoundingClientRect?.();
+    const twoCol = Boolean(infoRect && infoRect.width > 1 && infoRect.left > coverRect.right - 8);
+    if (twoCol) right = Math.min(right, infoRect.left - 4);
+    const clearance = Math.min(cy - top, bottom - cy, cx - left, right - cx);
+    // size/2 = width/2 + band/2，再留 5px 给描边和圆头线帽
+    // 音柱末端离画布边还有 4px，所以外圈半径留到 clearance - 1 为止
+    const fit = 2 * (clearance - width / 2 + 4);
+    return Math.max(0, Math.min(hardBand, Math.round(fit)));
   }
 
   _maybeLoadLyrics() {
@@ -5018,6 +5072,8 @@ class HaMusicCard extends LitElement {
       card?.classList.toggle("hm-stack-short", stackShort);
     }
     this._syncFit();
+    // 卡尺寸变了，环带可用余量跟着变，重新量一次
+    this._syncCoverEq();
   }
 
   /**

@@ -44,7 +44,8 @@ function paint(canvas, bars, glow) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, size, size);
   const R = size / 2;
-  const maxLen = Math.max(4, R - r0 - 8);
+  const edge = Number.isFinite(state.edge) ? state.edge : 8;
+  const maxLen = Math.max(4, R - r0 - edge);
   const accent = state.accent || FALLBACK_ACCENT;
   const barCount = state.barCount || BARS;
   const half = barCount / 2;
@@ -301,6 +302,7 @@ export function syncFabEq(canvas, root, media = {}) {
       root,
       size: SIZE,
       r0: 33.5,
+      edge: 8,
       lineWidth: 3,
       cap: "round",
       dpr: DPR,
@@ -340,6 +342,8 @@ export function syncFabEq(canvas, root, media = {}) {
   state.root = root;
   state.size = size;
   state.r0 = Number.isFinite(innerRadius) ? innerRadius : size * 0.322;
+  // 音柱末端离画布边的余量：封面环带空间紧，把这个余量调小一点，短带也能看到柱形
+  state.edge = Number.isFinite(Number(media.edge)) ? Math.max(3, Math.min(12, Number(media.edge))) : 8;
   state.lineWidth = Math.max(1.6, Math.min(5, Number(media.lineWidth) || 3));
   state.cap = media.cap === "butt" ? "butt" : "round";
   const requestedBars = Math.round(Number(media.bars) || BARS);

@@ -4857,6 +4857,15 @@ export const cardStyles = css`
     margin-block-end: 0;
   }
 
+  /* 音柱贴近进度条：封面块下沿与频谱行、进度条各收 4px，
+     让环带底缘到进度条之间只剩一条窄缝（原来空出 20px 以上） */
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-vis,
+  :host(.hm-stack-short) .hm-card[data-layout="full"] .hm-vis,
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-progress,
+  :host(.hm-stack-short) .hm-card[data-layout="full"] .hm-progress {
+    margin-block-start: -4px;
+  }
+
   /* 进度条贴住播控行：下半部只留 4px 视觉缝，不再飘在中段 */
   :host(.hm-compact) .hm-card[data-layout="full"] .hm-progress,
   :host(.hm-stack-short) .hm-card[data-layout="full"] .hm-progress {

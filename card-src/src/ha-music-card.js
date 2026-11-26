@@ -40,7 +40,13 @@ import {
 import { paletteFor } from "./palette.js";
 import { fallbackCover } from "./fallback-cover.js";
 import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes, normalizeDockFollow, DOCK_REMOVE_EVENT } from "./dock.js";
-import { installLyricDock, uninstallLyricDock, loadLyricDockPref, saveLyricDockPref } from "./lyric-dock.js";
+import {
+  installLyricDock,
+  uninstallLyricDock,
+  loadLyricDockPref,
+  saveLyricDockPref,
+  LYRIC_DOCK_REMOVE_EVENT,
+} from "./lyric-dock.js";
 import { syncCoverSpin } from "./cover-spin.js";
 import { syncFabEq, setFabEqHover } from "./fab-eq.js";
 import {
@@ -506,6 +512,13 @@ class HaMusicCard extends LitElement {
     }
     this._onDockRemove = (event) => this._handleDockRemove(event.detail);
     window.addEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
+    // 悬浮歌词被右键关掉后，其他卡片立刻按新记忆卸载，不必等下一次 hass 刷新
+    this._onLyricDockRemove = () => {
+      this._lyricDockOwner = false;
+      this._installLyricDock();
+      this.requestUpdate();
+    };
+    window.addEventListener(LYRIC_DOCK_REMOVE_EVENT, this._onLyricDockRemove);
     this._onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         // 切后台不再主动断开：Sendspin 会话继续保持，实体不会变 unavailable。
@@ -574,6 +587,7 @@ class HaMusicCard extends LitElement {
     this._unsubscribeDockPref?.();
     this._unsubscribeDockPref = null;
     window.removeEventListener(DOCK_REMOVE_EVENT, this._onDockRemove);
+    window.removeEventListener(LYRIC_DOCK_REMOVE_EVENT, this._onLyricDockRemove);
     document.removeEventListener("visibilitychange", this._onVisibilityChange);
     if (this._unlockWebAudio) {
       document.removeEventListener("pointerdown", this._unlockWebAudio, true);

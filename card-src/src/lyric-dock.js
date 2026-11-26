@@ -5,6 +5,8 @@ import { THEMES, DEFAULT_THEME } from "./const.js";
 import { colorTriplet } from "./util.js";
 import { protocolMatches, protocolErrorText } from "./protocol.js";
 
+export const LYRIC_DOCK_REMOVE_EVENT = "ha-music-lyric-dock-remove";
+
 const PREF_KEY = "haMusicLyricDock";
 const POS_KEY = "haMusicLyricDockPos";
 const HOLD_MS = 360;
@@ -314,9 +316,11 @@ class HaMusicLyric extends HTMLElement {
     this._onPointerMove = (event) => this._handlePointerMove(event);
     this._onPointerUp = () => this._handlePointerUp();
     this._onPointerCancel = () => this._handlePointerCancel();
-    this._onContextMenu = (event) => {
-      if (this._press || this._dragging) event.preventDefault();
+    this._menu = null;
+    this._onDocDown = (event) => {
+      if (this._menu && !this._menu.contains(event.target)) this._closeMenu();
     };
+    this._onContextMenu = (event) => this._handleContextMenu(event);
     this._onResize = () => this._applyPosition();
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
@@ -384,6 +388,7 @@ class HaMusicLyric extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._closeMenu();
     window.removeEventListener("resize", this._onResize);
     if (this._poll) clearInterval(this._poll);
     this._poll = null;
@@ -659,6 +664,159 @@ class HaMusicLyric extends HTMLElement {
     } catch {
       /* ignore */
     }
+  }
+
+  _handleContextMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this._press || this._dragging) return;
+    this._showMenu(event);
+  }
+
+  _showMenu(event) {
+    this._closeMenu();
+    const zh = !this._hass?.language || String(this._hass.language).startsWith("zh");
+    const x = Number(event?.clientX) || 0;
+    const y = Number(event?.clientY) || 0;
+    const bubble = document.createElement("div");
+    bubble.className = "ha-music-lyric-bubble";
+    bubble.setAttribute("role", "dialog");
+    bubble.innerHTML = `
+      <style>
+        .ha-music-lyric-bubble {
+          position: fixed;
+          inset: auto;
+          margin: 0;
+          padding: 0;
+          width: min(232px, calc(100vw - 16px));
+          border: 0;
+          background: transparent;
+          color: #f6f8ff;
+          font-family: var(--ha-font-family, "Noto Sans SC", system-ui, sans-serif);
+          font-size: 12px;
+          line-height: 1.5;
+          overflow: visible;
+          z-index: 2147483647;
+        }
+        .ha-music-lyric-bubble-card {
+          padding: 11px 12px 10px;
+          border-radius: 12px;
+          border: 1px solid rgba(var(--hm-accent-rgb, 46, 230, 197), 0.42);
+          background: rgba(var(--hm-base-rgb, 5, 10, 18), 0.94);
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.46);
+          backdrop-filter: blur(14px);
+        }
+        .ha-music-lyric-bubble-title {
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 2px;
+        }
+        .ha-music-lyric-bubble-desc {
+          font-size: 11px;
+          opacity: 0.62;
+          margin-bottom: 9px;
+        }
+        .ha-music-lyric-bubble-actions {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-end;
+        }
+        .ha-music-lyric-bubble-actions button {
+          appearance: none;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.06);
+          color: inherit;
+          font: inherit;
+          padding: 4px 10px;
+          cursor: pointer;
+        }
+        .ha-music-lyric-bubble-actions button[data-menu-action="remove"] {
+          border-color: rgba(var(--hm-accent-rgb, 46, 230, 197), 0.55);
+          background: rgba(var(--hm-accent-rgb, 46, 230, 197), 0.18);
+        }
+      </style>
+      <div class="ha-music-lyric-bubble-card">
+        <div class="ha-music-lyric-bubble-title"></div>
+        <div class="ha-music-lyric-bubble-desc"></div>
+        <div class="ha-music-lyric-bubble-actions">
+          <button type="button" data-menu-action="cancel"></button>
+          <button type="button" data-menu-action="remove"></button>
+        </div>
+      </div>
+    `;
+    bubble.querySelector(".ha-music-lyric-bubble-title").textContent = zh
+      ? "关闭悬浮歌词？"
+      : "Remove the floating lyrics?";
+    bubble.querySelector(".ha-music-lyric-bubble-desc").textContent = zh
+      ? "关闭后可在卡片设置的「悬浮歌词」重新打开。"
+      : "Turn it back on from the card's floating lyrics setting.";
+    const cancel = bubble.querySelector('[data-menu-action="cancel"]');
+    const remove = bubble.querySelector('[data-menu-action="remove"]');
+    cancel.textContent = zh ? "取消" : "Cancel";
+    remove.textContent = zh ? "关闭" : "Remove";
+    cancel.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._closeMenu();
+    });
+    remove.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._removeSelf();
+    });
+    bubble.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") this._closeMenu();
+    });
+    bubble.addEventListener("click", (event) => event.stopPropagation());
+    document.body.appendChild(bubble);
+    this._menu = bubble;
+    // 不用 popover：部分 WebView / 旧内核里 showPopover 不生效，元素会停在 display:none。
+    window.setTimeout(() => {
+      if (this._menu === bubble) document.addEventListener("pointerdown", this._onDocDown, true);
+    }, 0);
+    const place = () => {
+      if (!bubble.isConnected) return;
+      const rect = bubble.getBoundingClientRect();
+      const gap = 10;
+      const margin = 8;
+      let left = x + gap;
+      let top = y + gap;
+      if (left + rect.width > window.innerWidth - margin) left = x - rect.width - gap;
+      left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+      if (top + rect.height > window.innerHeight - margin) top = y - rect.height - gap;
+      top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+      bubble.style.left = `${Math.round(left)}px`;
+      bubble.style.top = `${Math.round(top)}px`;
+    };
+    place();
+    window.requestAnimationFrame(place);
+  }
+
+  _closeMenu() {
+    document.removeEventListener("pointerdown", this._onDocDown, true);
+    const menu = this._menu;
+    this._menu = null;
+    if (!menu) return;
+    menu.remove();
+  }
+
+  _removeSelf() {
+    this._closeMenu();
+    saveLyricDockPref({
+      enabled: false,
+      entity: this._entity || this._preferred || "",
+      updated: Date.now(),
+    });
+    try {
+      window.dispatchEvent(
+        new CustomEvent(LYRIC_DOCK_REMOVE_EVENT, { detail: { enabled: false } })
+      );
+    } catch {
+      /* ignore */
+    }
+    if (window.__haMusicLyricDock === this) window.__haMusicLyricDock = null;
+    this.remove();
   }
 
   _handlePointerMove(event) {

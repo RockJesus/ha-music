@@ -103,9 +103,24 @@ function paint(canvas, bars, glow) {
   }
   ctx.shadowBlur = 0;
   ctx.shadowColor = "transparent";
-  // 细进度弧压在音柱内侧：柱子负责实时频谱，弧负责精确读数与拖动反馈。
+  // 进度弧必须画在封面圆之外：画布在封面下面（z-index 低于封面），
+  // 只要弧半径小于封面半径就会被封面整条挡住，看得见封面却看不见进度。
+  // 所以这里用调用方给的真实半径（封面半径 + 1.5px）贴住封面边缘画。
   if (progress >= 0) {
-    const arcR = Math.max(8, r0 - 5);
+    const arcR = Number.isFinite(state.arcRadius) ? state.arcRadius : Math.max(8, r0 - 2.5);
+    // 进度环比音柱略粗一点，才看得清"走到哪"；底轨同宽，未播放段也有参照。
+    // 环宽随封面尺寸缩放：大封面若仍按固定 3px，一圈细得几乎看不见。
+    const arcW = Number.isFinite(state.arcWidth)
+      ? state.arcWidth
+      : Math.max(2.2, Math.min(5.6, (state.lineWidth || 3) * 0.95));
+    // 先铺一圈极淡的底轨，进度未走到的部分也有参照，读得出现在播到哪。
+    // 底轨用中性白，不用主色：主色底轨容易和已播放段混成一整圈，看不出进度。
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = arcW;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(R, R, arcR, 0, Math.PI * 2);
+    ctx.stroke();
     // 进度弧从封面 6 点方向起，顺时针增长，和拖动手柄的角度换算保持一致。
     const start = Math.PI / 2;
     const end = start + Math.PI * 2 * clamp(progress, 0, 1);
@@ -113,7 +128,7 @@ function paint(canvas, bars, glow) {
     arcGrad.addColorStop(0, accent[0]);
     arcGrad.addColorStop(1, accent[1]);
     ctx.strokeStyle = arcGrad;
-    ctx.lineWidth = Math.max(1.6, (state.lineWidth || 3) * 0.8);
+    ctx.lineWidth = arcW;
     ctx.globalAlpha = 0.95;
     ctx.shadowColor = rgba(parseHex(accent[1]), 0.5);
     ctx.shadowBlur = 8;
@@ -137,7 +152,7 @@ function paint(canvas, bars, glow) {
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.arc(ax, ay, 6.6, 0, Math.PI * 2);
+        ctx.arc(ax, ay, Math.max(4.6, arcW * 1.8), 0, Math.PI * 2);
         ctx.stroke();
         ctx.shadowBlur = 0;
         ctx.fillStyle = "#ffffff";
@@ -151,7 +166,7 @@ function paint(canvas, bars, glow) {
         ctx.shadowBlur = 10;
         ctx.shadowColor = rgba(accentRgb, 0.45);
         ctx.beginPath();
-        ctx.arc(R + cs * arcR, R + sn * arcR, Math.max(1.6, ctx.lineWidth * 0.9), 0, Math.PI * 2);
+        ctx.arc(R + cs * arcR, R + sn * arcR, Math.max(1.8, arcW * 0.85), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -308,6 +323,8 @@ export function syncFabEq(canvas, root, media = {}) {
       root,
       size: SIZE,
       r0: 33.5,
+      arcRadius: null,
+      arcWidth: null,
       edge: 8,
       lineWidth: 3,
       cap: "round",
@@ -348,6 +365,10 @@ export function syncFabEq(canvas, root, media = {}) {
   state.root = root;
   state.size = size;
   state.r0 = Number.isFinite(innerRadius) ? innerRadius : size * 0.322;
+  const arcRadius = Number(media.arcRadius);
+  state.arcRadius = Number.isFinite(arcRadius) ? arcRadius : null;
+  const arcWidth = Number(media.arcWidth);
+  state.arcWidth = Number.isFinite(arcWidth) ? arcWidth : null;
   // 音柱末端离画布边的余量：封面环带空间紧，把这个余量调小一点，短带也能看到柱形
   state.edge = Number.isFinite(Number(media.edge)) ? Math.max(3, Math.min(12, Number(media.edge))) : 8;
   state.lineWidth = Math.max(1.6, Math.min(5, Number(media.lineWidth) || 3));

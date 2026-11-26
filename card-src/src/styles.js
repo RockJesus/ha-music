@@ -453,7 +453,9 @@ export const cardStyles = css`
     position: absolute;
     left: 50%;
     top: 50%;
-    z-index: 1;
+    /* 画布要压在封面之上：进度环画在封面内侧 2.5px，若画布在下层会被整条挡住。
+       音柱起点在封面外 2px，叠上来也只会碰到留白，不会盖住专辑图。 */
+    z-index: 5;
     width: calc(var(--hm-cover-size, 168px) + var(--hm-ring-pad, 48px));
     height: calc(var(--hm-cover-size, 168px) + var(--hm-ring-pad, 48px));
     translate: -50% -50%;

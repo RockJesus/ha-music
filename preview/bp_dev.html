@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>ha-music card rig</title>
+<style>*{box-sizing:border-box}html,body{margin:0;background:#05060a;height:100%}
+#view{display:block;width:100%;height:100%}ha-music{display:block;height:100%}</style>
+<script type="module" src="../ha-music_dev.js?v=dev38"></script></head><body>
+<div id="view"></div>
+<script type="module">
+const params=new URLSearchParams(location.search);
+const attrs={ entity_id:"media_player.mapc", state:"playing", attributes:{
+  friendly_name:"MApc", media_title:params.get("t")||"Glad You Did",
+  media_artist:"Sasha Alex Sloan (萨莎·斯隆)", media_album_name:"The Search",
+  entity_picture:"art/cover-aurora-720.jpg", media_duration:191, media_position:95,
+  media_position_updated_at:new Date(Date.now()-2000).toISOString(),
+  volume_level:0.28, is_volume_muted:false, mass_player_type:"player",
+  active_queue:"q1", shuffle:false, repeat:"off", source:"Music Assistant Queue",
+  supported_features:8320575 }};
+const hass={ language:"zh-Hans", states:{"media_player.mapc":attrs},
+  services:{ music_assistant:{ play_media:{} }, ha_music_studio:{} },
+  hassUrl:p=>p, callService:async()=>({context:{id:"p"}}), callWS:async()=>({response:{}}),
+  connection:{ sendMessagePromise: async (msg)=>{
+    if(msg?.type==="ha_music_studio/queue_command" && msg.action==="snapshot"){
+      return { result:{ queue:{ queue_id:"q1", state:"playing",
+        items:[{index:0,queueItemId:"i0",title:"Glad You Did",artist:"Sasha Alex Sloan",duration:191,active:true}],
+        current_item_id:"i0", current_index:0, total:1,
+        current_audio:{ codec:"flac", sample_rate:192000, bit_depth:24, channels:2, bit_rate:0, bit_perfect: params.get("bp")!=="0" },
+        current_title:"Glad You Did", elapsed:95, duration:191,
+        shuffle:false, repeat:"off", crossfade_enabled:false, autoplay_enabled:false }}};
+    }
+    return { title:"root", children:[] };
+  }}};
+const card=document.createElement("ha-music");
+
+const view=document.getElementById("view");
+if(params.get("panel")==="1"){const pav=document.createElement("hui-panel-view");pav.style.cssText="display:block;position:fixed;inset:0";pav.appendChild(card);view.appendChild(pav);}else{view.appendChild(card);}
+const force=params.get("force");
+if(force){ const st=document.createElement("style");
+  st.textContent = force==="2col" ? `
+   .hm-card .hm-main{grid-template-columns:var(--hm-cover-size) minmax(0,1fr)!important;justify-items:stretch!important;text-align:left!important;gap:12px!important;align-items:center!important}
+   .hm-card .hm-meta{align-items:flex-start!important;text-align:left!important}
+   .hm-card .hm-tags{display:none!important}
+   .hm-card .hm-vis{display:none!important}
+   .hm-card .hm-controls{flex-direction:column!important;gap:6px!important}
+   .hm-card .hm-play{width:50px!important;height:50px!important}` : "";
+  card.renderRoot.appendChild(st);
+}
+card.hass=hass;
+card.setConfig({entity:"media_player.mapc",entities:["media_player.mapc"],theme:params.get("theme")||"aurora",cover:params.get("cover")||"ambient",visualizer:params.get("vis")||"none",layout:"full"});
+if(params.get("lyrics")==="1"){
+  card._maybeLoadLyrics=()=>{}; card._lyrics={status:"ready",stale:false,lines:[{start:0,text:"Only when the night is quiet"},{start:10,text:"I can hear the search begin"},{start:20,text:"Every road leads back to you"}],plain:["Only when the night is quiet"],instrumental:false,source:"Music Assistant",index:2,progress:0.5};
+  card._lyricsActive=2; card.requestUpdate();
+}
+const box=document.createElement("pre"); box.id="mm"; box.style.display="none"; document.body.appendChild(box);
+setTimeout(()=>{
+  const root=card.shadowRoot||card.renderRoot;
+  const S=s=>root.querySelector(s);
+  const m=el=>{const r=el.getBoundingClientRect();return `${Math.round(r.width)}x${Math.round(r.height)}@${Math.round(r.top)},${Math.round(r.left)}`};
+  const out={card:m(S(".hm-card")), cls:S(".hm-card")?.className, spec:card._audioSpecText(false), bp:Boolean(card._audioSpec&&card._audioSpec.bitPerfect)};
+  for(const s of [".hm-main",".hm-cover-wrap",".hm-cover",".hm-info",".hm-meta",".hm-title",".hm-artist",".hm-spec",".hm-tags",".hm-controls",".hm-vis"]){const e=S(s); out[s]=e?m(e):"-";}
+  box.textContent=JSON.stringify(out);
+},900);
+</script></body></html>

@@ -1185,7 +1185,11 @@ class HaMusicCard extends LitElement {
       // 边距收到 2px，把省下的空间全给柱长，同时仍保证柱尖在画布内。
       // 小封面上柱子本来就短，再把起点贴到封面外 2px 就只剩几条毛刺；
       // 改成从封面边缘略微内收（-2px）起步，柱长多出 4px，仍以封面为圆心。
-      innerRadius: width / 2 + (width >= 300 ? 3 : -2),
+      innerRadius: width / 2 + 2,
+      // 进度弧画在封面内侧 2.5px（画布已抬到封面上层）：弧成了一圈贴着封面
+      // 边缘的进度环，与外侧音柱之间留 1px 缝隙，两者互不挤压也不会被封面遮住。
+      arcRadius: width / 2 - 2.5,
+      arcWidth: Math.max(2.2, Math.min(5.6, width * 0.011)),
       edge: width >= 300 ? 4 : 2,
       lineWidth:
         width >= 300

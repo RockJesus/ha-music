@@ -2242,7 +2242,14 @@ class HaMusicCard extends LitElement {
     const root = this.renderRoot;
     if (!root) return;
     const label = root.querySelector('[data-role="ring-start"]');
-    if (label) setLitText(label, formatTime(value));
+    if (label) {
+      // 进度现在是 30fps 插值推进，文本每秒才变一次，别每帧都去写一遍
+      const text = formatTime(value);
+      if (text !== this._ringStartText) {
+        this._ringStartText = text;
+        setLitText(label, text);
+      }
+    }
     const slider = root.querySelector('[data-role="ringseek"]');
     if (slider) slider.setAttribute("aria-valuenow", String(Math.round(value)));
   }
@@ -5524,14 +5531,32 @@ class HaMusicCard extends LitElement {
     this._progressPaintAt = 0;
   }
 
+  /** 以集成帧为基准，按帧时间戳推算当前位置（每秒一帧时靠它把进度条推顺）。 */
+  _studioFramePosition(frame) {
+    if (!frame) return 0;
+    const duration = Number(frame.duration) || 0;
+    const base = Number(frame.position) || 0;
+    if (!duration) return base;
+    const drift = frame.playing ? Math.max(0, Date.now() - frame.at) / 1000 : 0;
+    return clamp(base + drift, 0, duration);
+  }
+
   _progFresh() {
     const frame = this._progFrame;
     return Boolean(frame && frame.at && Date.now() - frame.at < 3200);
   }
 
   _syncProgressTicker() {
-    // 集成每秒推一帧进度：这种情况下不再自跑 rAF，只在收到帧时画一次。
+    // 集成约每秒推一帧进度：只按帧画会一秒跳一格，这里改成按帧时间戳插值，
+    // 由 rAF 以约 30fps 推进，松手拖拽（seekPreview）时仍然让位给用户操作。
     if (this._progFresh() && this._seekPreview === null) {
+      if (this._state()?.state === "playing") {
+        if (!this._progressRaf) {
+          this._progressLastSecond = -1;
+          this._progressRaf = requestAnimationFrame(() => this._progressTick());
+        }
+        return;
+      }
       this._stopProgressTicker();
       const frame = this._progFrame;
       if (frame) this._paintProgress(frame.position, frame.duration);
@@ -5557,6 +5582,16 @@ class HaMusicCard extends LitElement {
     this._progressRaf = null;
     if (this._seekPreview !== null || this._state()?.state !== "playing") {
       this._progressLastSecond = -1;
+      return;
+    }
+    const frame = this._progFrame;
+    if (this._progFresh() && frame?.duration) {
+      const paintNow = performance.now();
+      if (!this._progressPaintAt || paintNow - this._progressPaintAt >= 33) {
+        this._progressPaintAt = paintNow;
+        this._paintProgress(this._studioFramePosition(frame), frame.duration);
+      }
+      this._progressRaf = requestAnimationFrame(() => this._progressTick());
       return;
     }
     const seek = this.renderRoot?.querySelector?.(
@@ -5590,6 +5625,7 @@ class HaMusicCard extends LitElement {
     const ring = root?.querySelector?.('[data-role="ringseek"]');
     if ((!seek && !ring) || !duration) return;
     const value = clamp(Number(position) || 0, 0, duration);
+    this._progShown = value;
     const percent = clamp((value / duration) * 100, 0, 100);
     if (seek) {
       seek.value = String(value);
@@ -6994,8 +7030,20 @@ class HaMusicCard extends LitElement {
         (event) => {
           if (!event || event.type !== "progress" || !protocolMatches(event)) return;
           const duration = Number(event.duration) || 0;
+          let pos = Number(event.elapsed) || 0;
+          // 集成这帧的 elapsed 可能比插值落后一两百毫秒，直接用会让进度条每秒
+          // 往回退一小格；小幅落后时按已显示位置续上，真进度跳转（>0.4s）才认。
+          const shown = this._progShown;
+          if (
+            event.playing &&
+            shown != null &&
+            pos < shown &&
+            shown - pos < 0.4
+          ) {
+            pos = shown;
+          }
           this._progFrame = {
-            position: Number(event.elapsed) || 0,
+            position: pos,
             duration,
             at: Date.now(),
             playing: Boolean(event.playing),

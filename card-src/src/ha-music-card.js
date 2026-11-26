@@ -387,6 +387,7 @@ class HaMusicCard extends LitElement {
         at: anchor,
       };
     }
+    if (trackChanged) this._resetProgressTrack();
     if (this._settleSeekPending(state, attrs, trackChanged)) this.requestUpdate();
     // 切歌立即重绘，并同步解析当前封面，不依赖下一次整卡 updated()。
     if (trackChanged) this.requestUpdate();
@@ -2264,6 +2265,8 @@ class HaMusicCard extends LitElement {
     const state = this._state();
     const attrs = state?.attributes || {};
     this._seekPreview = clamped;
+    this._progFrame = null;
+    this._progShown = clamped;
     this._stopProgressTicker();
     this._seekPending = {
       value: clamped,
@@ -3535,7 +3538,7 @@ class HaMusicCard extends LitElement {
     const ratio = clamp((event.clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
     const media = this._readMedia();
     if (!media.duration) return;
-    this._seekTo(media.duration * ratio);
+    this._commitSeekValue(media.duration * ratio);
   }
 
   _canSeekNow() {
@@ -5546,9 +5549,39 @@ class HaMusicCard extends LitElement {
     return Boolean(frame && frame.at && Date.now() - frame.at < 3200);
   }
 
+  /** 换歌/换实体：帧、已显示位置、秒标签全部归零，别让上一首的进度渗过来。 */
+  _resetProgressTrack() {
+    this._progFrame = null;
+    this._progShown = null;
+    this._progressLastSecond = -1;
+    this._progressPaintAt = 0;
+  }
+
+  /**
+   * 集成帧是否还能当基准：拖动/快进后旧帧会落后整整一秒，
+   * 这时若还按它插值，进度条会先回跳到旧位置再前进。
+   */
+  _progFrameAligned(frame, media) {
+    if (!frame || !frame.duration) return false;
+    const duration = Number(media?.duration) || 0;
+    if (duration && Math.abs(duration - Number(frame.duration)) > 1) return false;
+    const predicted = this._studioFramePosition(frame);
+    const actual = Number(media?.position) || 0;
+    return Math.abs(predicted - actual) <= 1;
+  }
+
   _syncProgressTicker() {
     // 集成约每秒推一帧进度：只按帧画会一秒跳一格，这里改成按帧时间戳插值，
     // 由 rAF 以约 30fps 推进，松手拖拽（seekPreview）时仍然让位给用户操作。
+    const frameNow = this._progFrame;
+    if (
+      frameNow &&
+      this._progFresh() &&
+      frameNow.playing &&
+      !this._progFrameAligned(frameNow, this._readMedia())
+    ) {
+      this._progFrame = null;
+    }
     if (this._progFresh() && this._seekPreview === null) {
       if (this._state()?.state === "playing") {
         if (!this._progressRaf) {
@@ -5585,7 +5618,7 @@ class HaMusicCard extends LitElement {
       return;
     }
     const frame = this._progFrame;
-    if (this._progFresh() && frame?.duration) {
+    if (this._progFresh() && frame?.duration && this._progFrameAligned(frame, this._readMedia())) {
       const paintNow = performance.now();
       if (!this._progressPaintAt || paintNow - this._progressPaintAt >= 33) {
         this._progressPaintAt = paintNow;
@@ -5660,7 +5693,7 @@ class HaMusicCard extends LitElement {
       // 两份时间戳不同，混用会让进度条在每次 hass 刷新时跳一下。
       const frame = this._progFrame;
       const predicted =
-        this._progFresh() && frame?.duration && frame.playing
+        this._progFresh() && frame?.duration && frame.playing && this._progFrameAligned(frame, media)
           ? this._studioFramePosition(frame)
           : null;
       const value = predicted != null

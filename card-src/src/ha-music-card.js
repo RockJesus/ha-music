@@ -1069,8 +1069,11 @@ class HaMusicCard extends LitElement {
     }
     const state = this._state();
     const media = this._readMedia();
+    // 画布直径 = 封面直径 + 环带，所以封面尺寸必须用真实值：紧凑格里封面
+    // 只有 46px，若按老下限 72px 取，画布会凭空大出 26px，既让音柱飘在封面
+    // 之外，也把圆圈顶出卡片被裁。
     const width = Math.max(
-      72,
+      40,
       Math.round(cover.getBoundingClientRect().width || this._coverPx(this._layoutKey())),
     );
     // 窄屏面板同样要留出足够的环形律动空间。之前只外扩 10px，封面半径
@@ -1089,8 +1092,31 @@ class HaMusicCard extends LitElement {
     // 整圈音柱会被方形画布边缘削平（看起来就是「被裁切」的短毛刺）。
     // 28px 环带 = 每侧 14px，足够画 3 + 4 + 5 的外扩音柱，仍在卡片留白内。
     const fitted = narrowPanel ? hardBand : this._ringFit(width, hardBand);
-    const band = Math.min(hardBand, Math.max(width >= 300 ? 34 : 28, fitted));
+    let band = Math.min(hardBand, Math.max(width >= 300 ? 34 : 28, fitted));
     const cardEl = this.renderRoot?.querySelector?.(".hm-card");
+    // 音柱画布永远以封面为圆心、向四周各扩 band/2。紧凑格里封面常常紧贴
+    // 卡片内边距（只剩 8px），band 兜到 28px 后画布左右各 14px 就顶出了卡片
+    // 边框，左边的半圈音柱直接被裁掉。这里先量出封面左侧的真实留白，不够就
+    // 把封面整体右移（最多 14px）给环带腾地方；实在腾不出来再收窄 band，
+    // 保证整圈音柱都在卡片可视范围内。
+    const wrapBox = wrapNode?.getBoundingClientRect?.();
+    if (cardEl && wrapBox && wrapBox.width > 0) {
+      const cardBox = cardEl.getBoundingClientRect();
+      const curInset =
+        parseFloat(cardEl.style.getPropertyValue("--hm-ring-inset")) || 0;
+      const naturalLeft = wrapBox.left - curInset - cardBox.left;
+      const wantPad = Math.ceil(band / 2) + 1;
+      let inset = Math.max(0, Math.min(14, wantPad - naturalLeft));
+      const roomLeft = naturalLeft + inset;
+      if (roomLeft < wantPad) {
+        band = Math.max(16, Math.min(band, 2 * (roomLeft - 1)));
+        inset = Math.max(0, Math.min(14, Math.ceil(band / 2) + 1 - naturalLeft));
+      }
+      const nextInset = `${Math.round(inset * 100) / 100}px`;
+      if (cardEl.style.getPropertyValue("--hm-ring-inset") !== nextInset) {
+        cardEl.style.setProperty("--hm-ring-inset", nextInset);
+      }
+    }
     if (cardEl) {
       const nextBand = `${band}px`;
       if (cardEl.style.getPropertyValue("--hm-ring-band") !== nextBand) {

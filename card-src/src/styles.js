@@ -2251,6 +2251,9 @@ export const cardStyles = css`
     position: relative;
     isolation: isolate;
     min-width: 0;
+    /* 环形音柱左右各扩 band/2；封面离卡片左边太近时由脚本把这一格右移，
+       让整圈音柱落在卡片内，不会被边框裁掉。 */
+    margin-left: var(--hm-ring-inset, 0px);
     height: var(--hm-cover-size, 168px);
     min-height: 0;
     display: flex;

@@ -4844,11 +4844,20 @@ export const cardStyles = css`
     justify-content: flex-start;
   }
 
-  /* 矮卡里内容够放时，富余高度交还给主区自动外边距，上下均分，
-     不再出现「内容全挤在上半、底部一大块空白」。没有富余时 auto 归零。 */
+  /* 矮卡里内容够放时，富余高度全部收在封面块上方（margin-top:auto），
+     音柱块和它下面的进度条、播控一起贴着卡底走；上下均分会让进度条与播控
+     之间、卡底各留一截空，看上去就是「下半部留白太多」。
+     没有富余时 auto 自然归零，不会把内容顶出卡片。 */
   :host(.hm-compact) .hm-card[data-layout="full"] .hm-main,
   :host(.hm-stack-short) .hm-card[data-layout="full"] .hm-main {
-    margin-block: auto;
+    margin-block-start: auto;
+    margin-block-end: 0;
+  }
+
+  /* 进度条贴住播控行：下半部只留 4px 视觉缝，不再飘在中段 */
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-progress,
+  :host(.hm-stack-short) .hm-card[data-layout="full"] .hm-progress {
+    margin-bottom: 2px;
   }
 
   :host(.hm-compact) .hm-card[data-layout="full"] .hm-top {

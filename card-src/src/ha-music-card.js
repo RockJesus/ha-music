@@ -331,6 +331,7 @@ class HaMusicCard extends LitElement {
     this._progUnsub = null;
     this._progPending = false;
     this._progFrame = null;
+    this._progHoldUntil = 0;
     this._progFailedAt = 0;
     // 集成侧封面取色（随进度帧下发），命中就跳过 canvas 采样
     this._studioPalette = null;
@@ -2322,7 +2323,10 @@ class HaMusicCard extends LitElement {
     this._seekPreview = clamped;
     this._progFrame = null;
     this._progShown = clamped;
+    this._progHoldUntil = 0;
     this._stopProgressTicker();
+    // 立刻把滑块/时间标签挪到目标位置：只靠下一次 hass 刷新会晚半秒才动。
+    if (duration) this._paintProgress(clamped, duration);
     this._seekPending = {
       value: clamped,
       from: Number(attrs.media_position) || 0,
@@ -5609,7 +5613,10 @@ class HaMusicCard extends LitElement {
   /** 换歌/换实体：帧、已显示位置、秒标签全部归零，别让上一首的进度渗过来。 */
   _resetProgressTrack() {
     this._progFrame = null;
-    this._progShown = null;
+    this._progShown = 0;
+    // 新曲刚起时集成帧还没到，这段时间别拿 HA 的低频 position 顶替：
+    // 那份值可能已经跑到 1s 开外，等真帧到了又要往回修，看起来就是切歌乱跳。
+    this._progHoldUntil = Date.now() + 1600;
     this._progressLastSecond = -1;
     this._progressPaintAt = 0;
   }
@@ -5684,7 +5691,8 @@ class HaMusicCard extends LitElement {
       return;
     }
     this._progressPaintAt = paintNow;
-    this._paintProgress(position, duration);
+    const holding = Date.now() < (this._progHoldUntil || 0);
+    this._paintProgress(holding ? clamp(this._progShown ?? 0, 0, duration) : position, duration);
     // 没有集成帧时也要继续跑：否则 ticker 停摆，只剩每秒一次的 hass 刷新在推位置。
     this._progressRaf = nextFrame(() => this._progressTick());
   }
@@ -5735,9 +5743,12 @@ class HaMusicCard extends LitElement {
         this._progFresh() && frame?.duration && frame.playing
           ? this._studioFramePosition(frame)
           : null;
+      const holding = Date.now() < (this._progHoldUntil || 0);
       const value = predicted != null
         ? clamp(predicted, 0, max || predicted)
-        : clamp(media.position, 0, max || media.position);
+        : holding
+          ? clamp(this._progShown ?? 0, 0, max || 0)
+          : clamp(media.position, 0, max || media.position);
       seek.value = String(value);
       seek.max = String(max || 0);
       seek.style.setProperty(

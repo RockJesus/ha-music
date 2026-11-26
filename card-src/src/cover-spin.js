@@ -1,4 +1,5 @@
 // 歌曲封面旋转：播放时顺时针匀速旋转，暂停时平滑回正。
+import { nextFrame, cancelFrame } from "./tick.js";
 const DURATION = 16000;
 const states = new WeakMap();
 
@@ -10,7 +11,7 @@ function reducedMotion() {
 
 function stop(state) {
   if (state.raf) {
-    window.cancelAnimationFrame(state.raf);
+    cancelFrame(state.raf);
     state.raf = null;
   }
   state.last = 0;
@@ -29,7 +30,7 @@ function start(element, state) {
     // 手机端封面旋转降到 30fps，避免每帧都写 transform 触发样式重算。
     const minGap = window.innerWidth <= 700 ? 32 : 0;
     if (minGap && state.lastPaint && now - state.lastPaint < minGap) {
-      state.raf = window.requestAnimationFrame(tick);
+      state.raf = nextFrame(tick);
       return;
     }
     state.lastPaint = now;
@@ -38,9 +39,9 @@ function start(element, state) {
     state.last = now;
     state.angle = (state.angle + (delta * 360) / (DURATION / 1000)) % 360;
     element.style.transform = `rotate(${state.angle}deg)`;
-    state.raf = window.requestAnimationFrame(tick);
+    state.raf = nextFrame(tick);
   };
-  state.raf = window.requestAnimationFrame(tick);
+  state.raf = nextFrame(tick);
 }
 
 function reset(element, state) {
@@ -57,7 +58,7 @@ function reset(element, state) {
   const angle = state.angle;
   element.style.transition = "none";
   element.style.transform = `rotate(${angle}deg)`;
-  window.requestAnimationFrame(() => {
+  nextFrame(() => {
     if (!element.isConnected || state.playing) return;
     element.style.transition = "transform 1.15s cubic-bezier(0.22, 1, 0.36, 1)";
     element.style.transform = "rotate(0deg)";

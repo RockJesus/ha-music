@@ -3,6 +3,7 @@
 // 颜色从紫色过渡到青色，并叠加唱片轻微脉冲与外圈辉光。
 // HA 的音频由服务端播放，页面拿不到原始采样，因此以歌曲元数据和 media_position 驱动。
 import { clamp, hashString } from "./util.js";
+import { nextFrame, cancelFrame } from "./tick.js";
 
 const SIZE = 104;
 const BARS = 36;
@@ -192,7 +193,7 @@ function frame(canvas, now) {
   // 手机 WebView 上按 30fps 出帧即可，省掉一半合成开销；桌面保持原刷新率。
   const minGap = state.maxFps ? 1000 / state.maxFps : 0;
   if (minGap && state.lastPaint && now - state.lastPaint < minGap) {
-    state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
+    state.raf = nextFrame((ts) => frame(canvas, ts));
     return;
   }
   state.lastPaint = now;
@@ -248,14 +249,14 @@ function frame(canvas, now) {
     state.target,
     state.applyShadow,
   );
-  state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
+  state.raf = nextFrame((ts) => frame(canvas, ts));
 }
 
 function stop(canvas, { clearNow = false, persist = false } = {}) {
   const state = states.get(canvas);
   if (!state) return;
   if (state.raf) {
-    cancelAnimationFrame(state.raf);
+    cancelFrame(state.raf);
     state.raf = 0;
   }
   setBeat(state.root, 1, 0, state.accent, state.target, state.applyShadow);
@@ -406,7 +407,7 @@ export function syncFabEq(canvas, root, media = {}) {
     setBeat(state.root, 1, 0, state.accent, state.target, state.applyShadow);
     state.since = performance.now();
     state.lastPaint = 0;
-    state.raf = requestAnimationFrame((ts) => frame(canvas, ts));
+    state.raf = nextFrame((ts) => frame(canvas, ts));
   }
 }
 

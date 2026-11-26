@@ -38,6 +38,7 @@ import {
   dropIndexFromRects,
 } from "./util.js";
 import { paletteFor } from "./palette.js";
+import { nextFrame, cancelFrame } from "./tick.js";
 import { fallbackCover } from "./fallback-cover.js";
 import { installDocks, loadDockPref, saveDockPref, subscribeDockPref, uninstallDock, normalizeDockModes, normalizeDockEntities, normalizeDockThemes, normalizeDockFollow, DOCK_REMOVE_EVENT } from "./dock.js";
 import {
@@ -5584,7 +5585,7 @@ class HaMusicCard extends LitElement {
   }
 
   _stopProgressTicker() {
-    if (this._progressRaf) cancelAnimationFrame(this._progressRaf);
+    if (this._progressRaf) cancelFrame(this._progressRaf);
     this._progressRaf = null;
     this._progressLastSecond = -1;
     this._progressPaintAt = 0;
@@ -5642,7 +5643,7 @@ class HaMusicCard extends LitElement {
       if (this._state()?.state === "playing") {
         if (!this._progressRaf) {
           this._progressLastSecond = -1;
-          this._progressRaf = requestAnimationFrame(() => this._progressTick());
+          this._progressRaf = nextFrame(() => this._progressTick());
         }
         return;
       }
@@ -5664,7 +5665,7 @@ class HaMusicCard extends LitElement {
     }
     if (this._progressRaf) return;
     this._progressLastSecond = -1;
-    this._progressRaf = requestAnimationFrame(() => this._progressTick());
+    this._progressRaf = nextFrame(() => this._progressTick());
   }
 
   _progressTick() {
@@ -5680,7 +5681,7 @@ class HaMusicCard extends LitElement {
         this._progressPaintAt = paintNow;
         this._paintProgress(this._studioFramePosition(frame), frame.duration);
       }
-      this._progressRaf = requestAnimationFrame(() => this._progressTick());
+      this._progressRaf = nextFrame(() => this._progressTick());
       return;
     }
     const seek = this.renderRoot?.querySelector?.(
@@ -5699,7 +5700,7 @@ class HaMusicCard extends LitElement {
     const position = clamp(Number(media.position) || 0, 0, duration);
     const paintNow = performance.now();
     if (this._isMobileUi() && this._progressPaintAt && paintNow - this._progressPaintAt < 32) {
-      this._progressRaf = requestAnimationFrame(() => this._progressTick());
+      this._progressRaf = nextFrame(() => this._progressTick());
       return;
     }
     this._progressPaintAt = paintNow;
@@ -6919,7 +6920,7 @@ class HaMusicCard extends LitElement {
   }
 
   _stopSpectrum() {
-    if (this._spectrumRaf) cancelAnimationFrame(this._spectrumRaf);
+    if (this._spectrumRaf) cancelFrame(this._spectrumRaf);
     this._spectrumRaf = null;
     this._spectrumLast = 0;
     this._spectrumPaintAt = 0;
@@ -7448,7 +7449,7 @@ class HaMusicCard extends LitElement {
     this._ensureStudioSpectrum();
     if (this._spectrumRaf) return;
     this._spectrumLast = 0;
-    this._spectrumRaf = requestAnimationFrame((now) => this._spectrumTick(now));
+    this._spectrumRaf = nextFrame((now) => this._spectrumTick(now));
   }
 
   // 卡片尺寸变化（编辑器预览、旋转、拖拽格）时重新量宽并重算柱数，避免频谱只画一部分。
@@ -7510,7 +7511,7 @@ class HaMusicCard extends LitElement {
     }
     // 手机端 30fps 足够表现频谱律动；屏幕 90/120Hz 时不做上限会成倍放大合成开销。
     if (this._isMobileUi() && this._spectrumPaintAt && now - this._spectrumPaintAt < 32) {
-      this._spectrumRaf = requestAnimationFrame((nextNow) => this._spectrumTick(nextNow));
+      this._spectrumRaf = nextFrame((nextNow) => this._spectrumTick(nextNow));
       return;
     }
     this._spectrumPaintAt = now;
@@ -7601,7 +7602,7 @@ class HaMusicCard extends LitElement {
       levels[index] = next;
     }
     this._drawSpectrum(levels);
-    this._spectrumRaf = requestAnimationFrame((nextNow) => this._spectrumTick(nextNow));
+    this._spectrumRaf = nextFrame((nextNow) => this._spectrumTick(nextNow));
   }
 
   _renderDrawer() {

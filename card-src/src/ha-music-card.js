@@ -2645,20 +2645,14 @@ class HaMusicCard extends LitElement {
           this._webPlayerState = state;
         },
         onPairing: () => {
-          this._registerWebPlayerPairing().catch((error) => {
+          // 握手中途服务端要求配对：直接走一次服务端注册（含 pair）
+          this._exposeWebPlayer({ auto: true, force: true }).catch((error) => {
             console.warn("HA Music: web player pairing failed", error);
           });
         },
         onReconnected: () => {
-          // 配置保存/配对会让 MA 主动断开 socket，客户端用同一 URL 重连；
-          // 重连后补一次配对，并在还没有实体时补一次曝光，避免停在半路。
-          this._registerWebPlayerPairing()
-            .then(() => {
-              if (!this._webEntity) this._exposeWebPlayer().catch(() => {});
-            })
-            .catch((error) => {
-              console.warn("HA Music: web player re-pair failed", error);
-            });
+          // 配置保存/配对会让 MA 主动断开 socket，重连后补一次服务端注册即可
+          this._exposeWebPlayer({ auto: true }).catch(() => {});
         },
       });
       this._webPlayer = player;
@@ -2666,20 +2660,23 @@ class HaMusicCard extends LitElement {
       // does not resume an AudioContext here: desktop browsers reject that
       // outside a user gesture and abort the handshake.
       await player.connect();
-      // Music Assistant auto-pairs its built-in web player only when the
-      // browser hands over the Sendspin pairing token. Without this the
-      // server keeps the player unpaired and it never becomes playable.
-      try {
-        await this._registerWebPlayerPairing();
-      } catch (error) {
-        console.warn("HA Music: web player pairing failed", error);
-      }
       this._webAutoStarted = true;
       if (!auto) this._notify(translator(this._hass?.language)("webPlayerConnected"));
       this._webBusy = false;
       this.requestUpdate();
-      await this._exposeWebPlayer();
-      await this._waitForWebPlayer(beforeIds, { auto });
+      // 配对 + 曝光 + 找实体交给集成一次做完
+      const registered = await this._exposeWebPlayer({ auto });
+      if (!registered?.entity_id) {
+        await this._waitForWebPlayer(beforeIds, { auto });
+      } else if (!auto) {
+        const entityId = registered.entity_id;
+        if (entityId !== this._activeEntity) {
+          this._webReturnEntity = this._activeEntity;
+          this._switchEntity(entityId, true);
+        }
+        this.requestUpdate();
+        this._closePlayers();
+      }
     } catch (error) {
       this._webBusy = false;
       this._webAutoStarted = false;
@@ -2699,52 +2696,45 @@ class HaMusicCard extends LitElement {
     }
   }
 
-  async _registerWebPlayerPairing() {
-    const pairingToken = this._webPlayer?.pairingToken || "";
-    if (!pairingToken) {
-      this._webExposeError = "no pairing token";
-      return;
-    }
-    try {
-      await this._hass.connection.sendMessagePromise({
-        type: "ha_music_studio/web_player_pair",
-        pairing_token: pairingToken,
-        client_id: this._webClientId || this._webPlayer?.clientId || "",
-      });
-    } catch (error) {
-      this._webExposeError = `pair: ${error?.message || String(error)}`.slice(0, 120);
-      throw error;
-    }
-  }
-
-  async _exposeWebPlayer() {
-    // 配对后先让 Sendspin 会话稳定，再单独请求“暴露给 HA”。
-    // 后端不会在配对流程里做 config/players/save，避免重注册踢掉刚连上的会话。
+  /**
+   * 配对 + 曝光 + 找实体合并成一次服务端调用：
+   * 集成内部完成“pair → 等 MA 挂播放器 → expose → 等 HA 出实体”，
+   * 卡片不再自己 4×900ms 轮询曝光、40×500ms 轮询实体。
+   */
+  async _exposeWebPlayer(options = {}) {
     const clientId = this._webClientId || this._webPlayer?.clientId || "";
     if (!clientId) {
       this._webExposeError = "no client id";
-      return;
+      return null;
     }
-    await this._loadPlayers().catch(() => {});
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 900));
-      if (!this._webPlayer?.connected) return;
-      // 会话注册后 Music Assistant 才把它挂到 player 上；优先用列表里真实存在的
-      // player_id（有些 App WebView 会把它和 client id 分开），否则退回 client id。
-      const known = this._findWebPlayer()?.player_id || "";
-      try {
-        await this._hass.connection.sendMessagePromise({
-          type: "ha_music_studio/web_player_expose",
-          client_id: known || clientId,
-        });
-        this._webExposeError = "";
-        return;
-      } catch (error) {
-        this._webExposeError = `expose: ${error?.message || String(error)}`.slice(0, 120);
-        if (attempt === 3) {
-          console.warn("HA Music: web player expose failed", error);
-        }
+    const pairingToken =
+      options?.pairingToken !== undefined
+        ? options.pairingToken
+        : this._webPlayer?.pairingToken || "";
+    if (!this._webPlayer?.connected && !options?.force) return null;
+    try {
+      const result = await this._hass.connection.sendMessagePromise({
+        type: "ha_music_studio/web_player_register",
+        client_id: clientId,
+        pairing_token: pairingToken || "",
+        name: this._webName,
+      });
+      this._webExposeError = result?.errors?.length
+        ? String(result.errors[0]).slice(0, 120)
+        : "";
+      if (result?.player_id) this._webPlayerId = result.player_id;
+      const entityId = result?.entity_id || "";
+      if (entityId) {
+        this._webEntity = entityId;
+        this._localWebEntity = entityId;
+        this._clearWebRegisterRetry();
+        await this._syncLocalWebEntity(entityId).catch(() => {});
       }
+      return result;
+    } catch (error) {
+      this._webExposeError = `register: ${error?.message || String(error)}`.slice(0, 120);
+      console.warn("HA Music: web player register failed", error);
+      return null;
     }
   }
 
@@ -2752,19 +2742,18 @@ class HaMusicCard extends LitElement {
     this._clearWebRegisterRetry();
     this._webExposeError = "";
     this.requestUpdate();
-    try {
-      await this._registerWebPlayerPairing();
-    } catch (error) {
-      console.warn("HA Music: web player re-pair failed", error);
+    const registered = await this._exposeWebPlayer({ auto: true }).catch(() => null);
+    if (!registered?.entity_id) {
+      await this._waitForWebPlayer(new Set(), { auto: true }).catch(() => {});
     }
-    await this._exposeWebPlayer().catch(() => {});
-    await this._waitForWebPlayer(new Set(), { auto: true }).catch(() => {});
     this.requestUpdate();
   }
 
   async _waitForWebPlayer(beforeIds = new Set(), options = {}) {
     const auto = Boolean(options?.auto);
-    for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (this._webEntity) return;
+    // register 没拿到实体时只做短兜底，不再 20 秒长轮询
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       await this._loadPlayers();
       const player = this._findWebPlayer(beforeIds);
       if (player) {
@@ -2814,13 +2803,8 @@ class HaMusicCard extends LitElement {
       if (!this._webPlayer?.connected || this._webEntity) return;
       this._webRegisterRound += 1;
       this._webExposeError = "";
-      try {
-        await this._registerWebPlayerPairing();
-      } catch (error) {
-        console.warn("HA Music: web player re-pair failed", error);
-      }
-      await this._exposeWebPlayer().catch(() => {});
-      if (this._webPlayer?.connected && !this._webEntity) {
+      const registered = await this._exposeWebPlayer({ auto: true }).catch(() => null);
+      if (!registered?.entity_id && this._webPlayer?.connected && !this._webEntity) {
         await this._waitForWebPlayer(new Set(), {
           auto: !this._playersOpen,
           round: this._webRegisterRound,

@@ -5730,6 +5730,31 @@ class HaMusicCard extends LitElement {
     return clamp(base + drift, 0, duration);
   }
 
+  /** 当前应上屏的播放位置：播放/暂停都只走一条时间线，避免两条时间线来回切。 */
+  _progressPosition() {
+    const media = this._readMedia();
+    const duration = Number(media.duration) || 0;
+    if (this._seekPreview !== null) {
+      return clamp(Number(this._seekPreview) || 0, 0, duration || Number(this._seekPreview) || 0);
+    }
+    const frame = this._progFrame;
+    if (this._state()?.state === "playing") {
+      if (this._progFresh() && frame?.duration && frame.playing) {
+        return clamp(this._studioFramePosition(frame), 0, frame.duration);
+      }
+      const holding = Date.now() < (this._progHoldUntil || 0);
+      const raw = holding ? (this._progShown ?? 0) : (Number(media.position) || 0);
+      return clamp(raw, 0, duration || 0);
+    }
+    // 非播放态进度是静止的：只认已提交的位置或集成暂停帧，绝不掺 HA 的
+    // media_position——它比集成帧晚约 1s，两条时间线交替上屏就是左右跳。
+    if (frame?.duration && !frame.playing) {
+      return clamp(Number(frame.position) || 0, 0, frame.duration);
+    }
+    if (Number.isFinite(this._progShown)) return clamp(this._progShown, 0, duration || 0);
+    return clamp(Number(media.position) || 0, 0, duration || 0);
+  }
+
   _progFresh() {
     const frame = this._progFrame;
     return Boolean(frame && frame.at && Date.now() - frame.at < 3200);
@@ -5759,7 +5784,9 @@ class HaMusicCard extends LitElement {
       }
       this._stopProgressTicker();
       const frame = this._progFrame;
-      if (frame) this._paintProgress(frame.position, frame.duration);
+      if (frame || Number.isFinite(this._progShown)) {
+        this._paintProgress(this._progressPosition(), frame?.duration || this._readMedia().duration);
+      }
       return;
     }
     if (this._seekPreview !== null || this._state()?.state !== "playing") {
@@ -5863,17 +5890,7 @@ class HaMusicCard extends LitElement {
       const max = media.duration || 0;
       // 集成帧新鲜时用它插值出的位置，别用 HA 状态里那份低频 position：
       // 两份时间戳不同，混用会让进度条在每次 hass 刷新时跳一下。
-      const frame = this._progFrame;
-      const predicted =
-        this._progFresh() && frame?.duration && frame.playing
-          ? this._studioFramePosition(frame)
-          : null;
-      const holding = Date.now() < (this._progHoldUntil || 0);
-      const value = predicted != null
-        ? clamp(predicted, 0, max || predicted)
-        : holding
-          ? clamp(this._progShown ?? 0, 0, max || 0)
-          : clamp(media.position, 0, max || media.position);
+      const value = clamp(this._progressPosition(), 0, max || this._progressPosition());
       seek.value = String(value);
       seek.max = String(max || 0);
       seek.style.setProperty(
@@ -6200,7 +6217,7 @@ class HaMusicCard extends LitElement {
       fusionMode === "ring" ? "none" : fusionMode || (fusionRequested ? "bars" : visualizer);
     const coverMode = config.cover || "ambient";
     const duration = media.duration;
-    const position = this._seekPreview ?? media.position;
+    const position = this._progressPosition();
     const percent = duration ? clamp((position / duration) * 100, 0, 100) : 0;
     const waveBars = this._waveBars();
     const volumePercent = Math.round(
@@ -6986,15 +7003,14 @@ class HaMusicCard extends LitElement {
     const media = this._readMedia();
     const duration = Number(media.duration) || 0;
     if (!duration) return -1;
-    const position = Number(this._seekPreview ?? media.position) || 0;
-    return clamp(position / duration, 0, 1);
+    return clamp(this._progressPosition() / duration, 0, 1);
   }
 
   _renderFusionSeek(kind) {
     const state = this._state();
     const media = this._readMedia();
     const duration = Number(media.duration) || 0;
-    const position = Number(this._seekPreview ?? media.position) || 0;
+    const position = this._progressPosition();
     const percent = duration ? clamp((position / duration) * 100, 0, 100) : 0;
     const canSeek = duration > 0 && hasFeature(state, FEATURES.SEEK);
     const t = translator(this._hass?.language);

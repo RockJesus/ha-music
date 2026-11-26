@@ -2064,6 +2064,75 @@ export const cardStyles = css`
 
   }
 
+  /* 窄卡同时有当前歌词行时，先收起次要的播放模式胶囊：
+     歌词只占一行，但不能因此把封面和控件挤出卡片。 */
+  @container (max-width: 520px) {
+    .hm-card[data-layout="full"]:has(.hm-now-lyric) .hm-modes {
+      display: none;
+    }
+  }
+
+  /* 300~325px 极窄卡：同样单行，但图标再缩一档 */
+  @container (min-width: 276px) and (max-width: 325px) {
+    .hm-card[data-layout="full"] .hm-top {
+      flex-wrap: nowrap;
+      row-gap: 0;
+      min-height: 22px;
+    }
+
+    .hm-card[data-layout="full"] .hm-status {
+      flex: 0 1 auto;
+      font-size: 8.5px;
+      letter-spacing: 0.1em;
+    }
+
+    .hm-card[data-layout="full"] .hm-status-player {
+      display: none;
+    }
+
+    .hm-card[data-layout="full"] .hm-top-actions {
+      width: auto;
+      gap: 3px;
+    }
+
+    .hm-card[data-layout="full"] .hm-icon-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 8px;
+    }
+  }
+
+  /* 326~380px 的窄卡：顶栏改成单行 + 小按钮，省下一整行高度。
+     320px 以下才折行，避免状态文字被压成单字。 */
+  @container (min-width: 326px) and (max-width: 380px) {
+    .hm-card[data-layout="full"] .hm-top {
+      flex-wrap: nowrap;
+      row-gap: 0;
+      min-height: 22px;
+    }
+
+    .hm-card[data-layout="full"] .hm-status {
+      flex: 0 1 auto;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+    }
+
+    .hm-card[data-layout="full"] .hm-status-player {
+      display: none;
+    }
+
+    .hm-card[data-layout="full"] .hm-top-actions {
+      width: auto;
+      gap: 4px;
+    }
+
+    .hm-card[data-layout="full"] .hm-icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+    }
+  }
+
   @container (max-width: 470px) {
     .hm-card[data-layout="full"] .hm-controls {
       flex-direction: column;

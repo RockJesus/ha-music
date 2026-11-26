@@ -5010,18 +5010,59 @@ class HaMusicCard extends LitElement {
         width > 0
     );
     const tight = on && height < 300;
+    // 竖排居中构图（381~620px）但卡片不高时，先收紧间距、收起胶囊。
+    const stackShort = Boolean(
+      !this._panel &&
+        !this._thumbMode() &&
+        this._layoutKey() === "full" &&
+        width > 0 &&
+        width <= 620 &&
+        height > 0 &&
+        height < 500
+    );
+    const card = this.renderRoot?.querySelector?.(".hm-card");
     if (
-      on === this.classList.contains("hm-compact") &&
-      tight === this.classList.contains("hm-compact-tight")
+      on !== this.classList.contains("hm-compact") ||
+      tight !== this.classList.contains("hm-compact-tight")
     ) {
+      this.classList.toggle("hm-compact", on);
+      this.classList.toggle("hm-compact-tight", tight);
+      // 覆盖层/抽屉等非 shadow 元素也跟随，避免主题层还按大卡排版。
+      card?.classList.toggle("hm-compact", on);
+      card?.classList.toggle("hm-compact-tight", tight);
+    }
+    if (stackShort !== this.classList.contains("hm-stack-short")) {
+      this.classList.toggle("hm-stack-short", stackShort);
+      card?.classList.toggle("hm-stack-short", stackShort);
+    }
+    this._syncFit();
+  }
+
+  /**
+   * 竖排居中后如果内容仍然超出卡片，就收起那一行歌词（封面与控件尺寸不变）。
+   * 卡片变高 ≥ 24px 时重新给歌词一次机会，避免小抖动反复闪烁。
+   */
+  _syncFit() {
+    if (this._panel || this._thumbMode() || this._layoutKey() !== "full") return;
+    const body = this.renderRoot?.querySelector?.(".hm-body");
+    const lyric = this.renderRoot?.querySelector?.(".hm-now-lyric");
+    if (!body) return;
+    const dropped = this.classList.contains("hm-drop-lyric");
+    const height = this._height || 0;
+    if (dropped) {
+      if (height >= (this._fitRestoreAt || 0)) {
+        this.classList.remove("hm-drop-lyric");
+        this.renderRoot?.querySelector?.(".hm-card")?.classList.remove("hm-drop-lyric");
+        this._fitRestoreAt = 0;
+      }
       return;
     }
-    this.classList.toggle("hm-compact", on);
-    this.classList.toggle("hm-compact-tight", tight);
-    // 覆盖层/抽屉等非 shadow 元素也跟随，避免主题层还按大卡排版。
-    const card = this.renderRoot?.querySelector?.(".hm-card");
-    card?.classList.toggle("hm-compact", on);
-    card?.classList.toggle("hm-compact-tight", tight);
+    if (!lyric) return;
+    if (body.scrollHeight - body.clientHeight > 2) {
+      this.classList.add("hm-drop-lyric");
+      this.renderRoot?.querySelector?.(".hm-card")?.classList.add("hm-drop-lyric");
+      this._fitRestoreAt = height + 24;
+    }
   }
 
   _isThumbnailPreview() {

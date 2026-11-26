@@ -2064,6 +2064,54 @@ export const cardStyles = css`
 
   }
 
+  /* 381~620px：改成竖排居中构图（封面在环内居中，歌名/歌手/规格/胶囊全部居中），
+     与窄卡保持同一套视觉语言。 */
+  @container (min-width: 381px) and (max-width: 620px) {
+    .hm-card[data-layout="full"] .hm-main {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      text-align: center;
+      gap: 8px;
+    }
+
+    .hm-card[data-layout="full"] .hm-cover {
+      border-radius: 50%;
+    }
+
+    .hm-card[data-layout="full"] .hm-meta {
+      align-items: center;
+      width: 100%;
+    }
+
+    .hm-card[data-layout="full"] .hm-info {
+      width: 100%;
+      align-items: center;
+    }
+
+    .hm-card[data-layout="full"] .hm-tags {
+      display: none;
+    }
+  }
+
+  /* 居中构图但卡不高：收紧间距，先让封面与控件全部留在卡内 */
+  :host(.hm-stack-short) .hm-body {
+    padding: 13px;
+    gap: 6px;
+  }
+
+  :host(.hm-stack-short) .hm-main {
+    gap: 6px;
+  }
+
+  :host(.hm-stack-short) .hm-modes {
+    display: none;
+  }
+
+  /* 竖排后确实放不下歌词行时才收起（封面尺寸始终不变） */
+  :host(.hm-drop-lyric) .hm-now-lyric {
+    display: none;
+  }
+
   /* 窄卡同时有当前歌词行时，先收起次要的播放模式胶囊：
      歌词只占一行，但不能因此把封面和控件挤出卡片。 */
   @container (max-width: 520px) {

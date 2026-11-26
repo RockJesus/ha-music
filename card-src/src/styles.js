@@ -1856,6 +1856,13 @@ export const cardStyles = css`
     border-radius: 50%;
   }
 
+  /* 紧凑布局里环形音柱同样向封面外扩 band/2，右半圈会压到标题/歌手。
+     信息列左侧留出等宽净空，标题从环带外缘右侧起步，不再贴着封面。 */
+  .hm-card[data-layout="compact"] .hm-info {
+    padding-left: calc(var(--hm-ring-band, 0px) * 0.5 + 8px);
+    box-sizing: border-box;
+  }
+
   .hm-card[data-layout="compact"] .hm-title {
     font-size: clamp(15px, 4.2cqi, 19px);
     -webkit-line-clamp: 1;

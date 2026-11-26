@@ -582,7 +582,7 @@ export const cardStyles = css`
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 6px;
+    column-gap: 10px;
     row-gap: 3px;
     font-size: clamp(10px, 2.4cqi, 11.5px);
     line-height: 1.3;
@@ -596,10 +596,18 @@ export const cardStyles = css`
     display: none;
   }
 
+  /* 规格文本整体作为一段，不拆字断行；放不下时整段换到下一行 */
+  .hm-spec-full,
+  .hm-spec-short {
+    white-space: nowrap;
+    min-width: 0;
+  }
+
   /* 「比特完美」标识：MA 报告该输出未重采样/未改位深时出现 */
   .hm-spec-bp {
     display: inline-block;
     flex: 0 0 auto;
+    margin-inline-start: 2px;
     padding: 1px 5px;
     border: 1px solid rgba(120, 255, 214, 0.5);
     border-radius: 4px;
@@ -4817,6 +4825,13 @@ export const cardStyles = css`
     gap: 8px;
     padding: clamp(10px, 2.8cqi, 14px);
     justify-content: flex-start;
+  }
+
+  /* 矮卡里内容够放时，富余高度交还给主区自动外边距，上下均分，
+     不再出现「内容全挤在上半、底部一大块空白」。没有富余时 auto 归零。 */
+  :host(.hm-compact) .hm-card[data-layout="full"] .hm-main,
+  :host(.hm-stack-short) .hm-card[data-layout="full"] .hm-main {
+    margin-block: auto;
   }
 
   :host(.hm-compact) .hm-card[data-layout="full"] .hm-top {

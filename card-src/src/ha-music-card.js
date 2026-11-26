@@ -1119,12 +1119,16 @@ class HaMusicCard extends LitElement {
       visible: true,
       position: this._seekPreview ?? media.position,
       size,
-      innerRadius: width / 2 + 3,
-      edge: 4,
+      // 紧凑格的环带只有 28px，每侧 14px；起点离封面再退 3px、再留 4px 边距，
+      // 柱子只剩 5px 长、柱尖又贴着画布边缘，看起来就是一圈毛刺。
+      // 大封面（>=300）保持原来的 3px 呼吸缝；小封面把起点贴到封面外 2px、
+      // 边距收到 2px，把省下的空间全给柱长，同时仍保证柱尖在画布内。
+      innerRadius: width / 2 + (width >= 300 ? 3 : 2),
+      edge: width >= 300 ? 4 : 2,
       lineWidth:
         width >= 300
           ? Math.max(1.8, Math.min(2.6, width / 210))
-          : Math.max(2.2, Math.min(4.8, width / 130)),
+          : Math.max(2.4, Math.min(4.8, width / 110)),
       bars: width >= 300 ? 192 : width >= 150 ? 64 : 48,
       cap: width >= 300 ? "butt" : "round",
       maxSize: 1200,

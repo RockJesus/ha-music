@@ -275,9 +275,6 @@ class HaMusicCard extends LitElement {
     this._lyrics = { status: "idle", lines: [], plain: [], instrumental: false, source: "" };
     this._lyricsActive = -1;
     this._lyricsScrolled = -2;
-    this._lyricsScrollRaf = null;
-    this._lyricsScrollObserver = null;
-    this._lyricsScrollObserved = null;
     this._lyricsOffset = this._loadLyricsOffset();
     this._lyricsUnsub = null;
     this._lyricsPending = false;
@@ -640,13 +637,6 @@ class HaMusicCard extends LitElement {
     this._coverPending = null;
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
-    this._lyricsScrollObserver?.disconnect();
-    this._lyricsScrollObserver = null;
-    this._lyricsScrollObserved = null;
-    if (this._lyricsScrollRaf && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(this._lyricsScrollRaf);
-    }
-    this._lyricsScrollRaf = null;
     if (this._fitPanelRaf) cancelAnimationFrame(this._fitPanelRaf);
     this._fitPanelRaf = null;
     if (this._toastTimer) clearTimeout(this._toastTimer);
@@ -1028,13 +1018,19 @@ class HaMusicCard extends LitElement {
       source: "Music Assistant",
       index: Number.isInteger(event.index) ? event.index : -1,
       progress: Number(event.progress) || 0,
+      // 服务端算好的 7 行窗口（start/end/anchor），卡片直接按窗口渲染
+      window:
+        event.window && Number.isInteger(event.window.start)
+          ? {
+              start: event.window.start,
+              end: Math.max(event.window.start + 1, event.window.end ?? 0),
+              anchor: Number(event.window.anchor) || 0,
+              active: Number.isInteger(event.window.active) ? event.window.active : -1,
+            }
+          : null,
     };
     if (ready && Number.isInteger(event.index) && event.index >= 0) {
-      if (event.index !== this._lyricsActive) {
-        this._lyricsActive = event.index;
-        this._lyricsScrolled = event.index;
-        this._centerActiveLyric();
-      }
+      this._lyricsActive = event.index;
     } else if (ready) {
       this._lyricsActive = -1;
     }
@@ -4456,58 +4452,33 @@ class HaMusicCard extends LitElement {
     return this._entities().find((id) => this._isMaPlayer(id)) || "";
   }
 
-  async _browseMedia(contentId, contentType, entityId = this._eid()) {
-    const connection = this._hass?.connection;
-    if (!connection?.sendMessagePromise) throw new Error("unsupported");
-    const payload = {
-      type: "media_player/browse_media",
-      entity_id: entityId,
-    };
-    if (contentId) {
-      payload.media_content_id = contentId;
-      if (contentType) payload.media_content_type = contentType;
-    }
-    return connection.sendMessagePromise(payload);
-  }
-
   async _fetchPlaylists() {
     const t = translator(this._hass?.language);
+    const connection = this._hass?.connection;
+    const entityId = this._playlistEntityId() || this._eid();
+    if (!connection?.sendMessagePromise || !entityId) {
+      if (this._drawer.mode !== "playlists") return;
+      this._drawer = { ...this._drawer, loading: false, items: [], error: t("browseFailed") };
+      this.requestUpdate();
+      return;
+    }
     try {
-      const browseEntity = this._playlistEntityId() || this._eid();
-      const root = await this._browseMedia(null, null, browseEntity);
-      const children = root?.children || [];
-      const folder = children.find(
-        (child) =>
-          (child.can_expand &&
-            (/playlist/i.test(child.media_class || "") ||
-              /playlist/i.test(child.media_content_type || "") ||
-              /播放列表|playlists?/i.test(child.title || ""))) ||
-          false
-      );
-      let list = [];
-      if (folder) {
-        const result = await this._browseMedia(
-          folder.media_content_id,
-          folder.media_content_type,
-          browseEntity
-        );
-        list = result?.children || [];
-      }
-      if (!list.length) {
-        list = children.filter((child) =>
-          /playlist/i.test(child.media_class || "")
-        );
-      }
-      const items = list
+      // 歌单文件夹的定位（根目录 → playlists 子目录 → 列表）在集成侧完成并缓存
+      const result = await connection.sendMessagePromise({
+        type: "ha_music_studio/playlists",
+        entity_id: entityId,
+      });
+      if (result?.error) throw new Error(String(result.error));
+      const items = (result?.items || [])
         .map((child) => ({
           title: child.title || "",
           subtitle: (() => {
-            const label = mediaClassLabel(child.media_class, this._hass?.language);
+            const label = mediaClassLabel(child.cls, this._hass?.language);
             return label && label !== t("playlists") ? label : "";
           })(),
-          contentId: child.media_content_id || "",
-          contentType: child.media_content_type || "playlist",
-          thumb: child.thumbnail || "",
+          contentId: child.content_id || "",
+          contentType: child.content_type || "playlist",
+          thumb: child.thumb || "",
         }))
         .filter((item) => item.contentId);
       if (this._drawer.mode !== "playlists") return;
@@ -4610,19 +4581,10 @@ class HaMusicCard extends LitElement {
   }
 
   async _fetchBrowse() {
-    const hass = this._hass;
-    const connection = hass?.connection;
-    const t = translator(hass?.language);
+    const connection = this._hass?.connection;
+    const t = translator(this._hass?.language);
     const node =
       this._drawer.cursor >= 0 ? this._drawer.nodes[this._drawer.cursor] : null;
-    const payload = {
-      type: "media_player/browse_media",
-      entity_id: this._eid(),
-    };
-    if (node) {
-      payload.media_content_id = node.contentId;
-      if (node.contentType) payload.media_content_type = node.contentType;
-    }
     this._drawer = { ...this._drawer, loading: true, error: "" };
     this.requestUpdate();
     if (!connection?.sendMessagePromise) {
@@ -4635,19 +4597,30 @@ class HaMusicCard extends LitElement {
       return;
     }
     try {
-      const result = await connection.sendMessagePromise(payload);
-      const items = (result?.children || []).map((child) => ({
+      // 目录读取与短时缓存在集成侧，卡片不再自己拼 browse_media 载荷
+      const result = await connection.sendMessagePromise({
+        type: "ha_music_studio/browse",
+        entity_id: this._eid(),
+        ...(node
+          ? {
+              media_content_id: node.contentId || "",
+              media_content_type: node.contentType || "",
+            }
+          : {}),
+      });
+      if (result?.error) throw new Error(String(result.error));
+      const items = (result?.items || []).map((child) => ({
         title: child.title || "",
         subtitle:
-          mediaClassLabel(child.media_class, this._hass?.language) ||
-          child.media_content_type ||
+          mediaClassLabel(child.cls, this._hass?.language) ||
+          child.content_type ||
           "",
-        contentId: child.media_content_id || "",
-        contentType: child.media_content_type || "",
-        thumb: child.thumbnail || "",
+        contentId: child.content_id || "",
+        contentType: child.content_type || "",
+        thumb: child.thumb || "",
         canPlay: Boolean(child.can_play),
         canExpand: Boolean(child.can_expand),
-        cls: child.media_class || "",
+        cls: child.cls || "",
       }));
       if (this._drawer.mode !== "library") return;
       this._drawer = {
@@ -4747,14 +4720,6 @@ class HaMusicCard extends LitElement {
     this._safeEffect("cover-eq", () => this._syncCoverEq());
     this._safeEffect("lyrics", () => {
       this._maybeLoadLyrics();
-      if (
-        (this._lyricsOpen || this._sideLyricsVisible()) &&
-        this._lyricsActive !== this._lyricsScrolled
-      ) {
-        this._lyricsScrolled = this._lyricsActive;
-        this._centerActiveLyric();
-      }
-      this._observeLyricsScroll();
     });
     this._safeEffect("spectrum", () => this._syncSpectrum());
     this._safeEffect("progress", () => this._ensureStudioProgress());
@@ -5731,82 +5696,6 @@ class HaMusicCard extends LitElement {
 
   /* ---------------- 渲染 ---------------- */
 
-  _observeLyricsScroll() {
-    if (typeof ResizeObserver === "undefined") return;
-    const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
-    if (!scroll || scroll === this._lyricsScrollObserved) return;
-    this._lyricsScrollObserver?.disconnect();
-    this._lyricsScrollObserved = scroll;
-    this._lyricsScrollObserver = new ResizeObserver(() => {
-      if (this._lyricsActive >= 0 && scroll.isConnected) {
-        this._centerActiveLyric();
-      }
-    });
-    this._lyricsScrollObserver.observe(scroll);
-  }
-
-  _centerActiveLyric() {
-    if (typeof requestAnimationFrame === "undefined") return;
-    const run = (attempt = 0) => {
-      requestAnimationFrame(() => {
-        const scroll = this.renderRoot?.querySelector?.(".hm-lyrics-scroll");
-        const line = this.renderRoot?.querySelector?.(
-          '.hm-lyrics-line[data-active="true"]'
-        );
-        if (!scroll || !line) return;
-        const viewH = scroll.clientHeight;
-        if (viewH < 24) {
-          if (attempt < 4) run(attempt + 1);
-          return;
-        }
-        // 上下各留半屏滚动空间，首句与末句也有空间停在垂直中线。
-        const pad = Math.max(0, Math.round((viewH - line.offsetHeight) / 2));
-        const padValue = `${pad}px`;
-        if (scroll.style.paddingTop !== padValue) {
-          scroll.style.paddingTop = padValue;
-          scroll.style.paddingBottom = padValue;
-        }
-        // 读一次布局，确保 padding 已生效后再计算位置。
-        void scroll.offsetHeight;
-        const target = () => {
-          const scrollRect = scroll.getBoundingClientRect();
-          const lineRect = line.getBoundingClientRect();
-          const top =
-            scroll.scrollTop +
-            lineRect.top -
-            scrollRect.top -
-            scrollRect.height / 2 +
-            lineRect.height / 2;
-          return Math.max(0, top);
-        };
-        const from = scroll.scrollTop;
-        const to = target();
-        const distance = Math.abs(to - from);
-        if (distance < 1.5) return;
-        // 自己用缓动动画滚动，避免原生 smooth 结束后再硬跳一次。
-        // 句子越远，过渡稍长，但上限 720ms，保持柔和而不拖沓。
-        const duration = Math.min(720, Math.max(320, distance * 0.9));
-        const started = performance.now();
-        if (this._lyricsScrollRaf && typeof cancelAnimationFrame === "function") {
-          cancelAnimationFrame(this._lyricsScrollRaf);
-        }
-        const step = (now) => {
-          if (!scroll.isConnected) return;
-          const k = Math.min(1, (now - started) / duration);
-          const ease = 1 - Math.pow(1 - k, 3);
-          scroll.scrollTop = from + (to - from) * ease;
-          if (k < 1) {
-            this._lyricsScrollRaf = requestAnimationFrame(step);
-          } else {
-            this._lyricsScrollRaf = null;
-          }
-        };
-        this._lyricsScrollRaf = requestAnimationFrame(step);
-      });
-    };
-    run();
-  }
-
   _renderLyrics(media, position, inline = false) {
     const t = translator(this._hass?.language);
     const lyrics = this._lyrics;
@@ -5818,14 +5707,7 @@ class HaMusicCard extends LitElement {
       : { index: -1, progress: 0 };
     const active = timed && lyrics.status !== "loading" ? Math.max(0, progress.index) : -1;
     const lineProgress = active >= 0 ? progress.progress : 0;
-    const activeChanged = active !== this._lyricsActive;
     this._lyricsActive = active;
-    // 不依赖 updated() 的生命周期时机：句子一变化就排一次居中。
-    // 面板未打开或没有歌词容器时，_centerActiveLyric 会自行 no-op。
-    if (activeChanged && active >= 0) {
-      this._lyricsScrolled = active;
-      this._centerActiveLyric();
-    }
     const canSeek = hasFeature(this._state(), FEATURES.SEEK);
     const offsetLabel = `${this._lyricsOffset > 0 ? "+" : ""}${this._lyricsOffset.toFixed(1)}s`;
 
@@ -5860,8 +5742,13 @@ class HaMusicCard extends LitElement {
     } else if (lyrics.instrumental) {
       body = html`<div class="hm-lyrics-empty">${t("lyricsInstrumental")}</div>`;
     } else if (timed) {
-      body = lyrics.lines.map(
-        (line, index) => html`<button
+      // 定位（当前句、7 行窗口）都由集成算好；卡片只负责把这段窗口画出来，
+      // 当前句作为窗口锚点用 flex 居中，不再量 DOM、不再排 rAF 滚动动画。
+      const win = lyrics.window;
+      const lines = win ? lyrics.lines.slice(win.start, win.end) : lyrics.lines;
+      body = lines.map((line, offset) => {
+        const index = win ? win.start + offset : offset;
+        return html`<button
           class="hm-lyrics-line"
           data-active=${index === active ? "true" : "false"}
           data-distance=${active >= 0 ? Math.min(4, Math.abs(index - active)) : 0}
@@ -5874,8 +5761,8 @@ class HaMusicCard extends LitElement {
           }}
         >
           <span class="hm-lyrics-text">${line.text}</span>
-        </button>`
-      );
+        </button>`;
+      });
     } else if (plain.length) {
       body = plain.map(
         (line) => html`<div class="hm-lyrics-line" data-static="true">${line}</div>`
@@ -5928,7 +5815,9 @@ class HaMusicCard extends LitElement {
               ${icon("close", 14)}
             </button>`}
       </div>
-      <div class="hm-lyrics-scroll">${body}</div>
+      <div
+        class="hm-lyrics-scroll ${timed && lyrics.window ? "hm-lyrics-window" : ""}"
+      >${body}</div>
     </section>`;
   }
 

@@ -3161,6 +3161,21 @@ export const cardStyles = css`
     );
   }
 
+  /* 服务端下发固定窗口（当前句居中、前后各三句）：不滚动、不测量，
+     当前句是窗口中间项，flex 居中天然落位。 */
+  .hm-lyrics-scroll.hm-lyrics-window {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    padding: 4px 2px;
+    scrollbar-width: none;
+  }
+
+  .hm-lyrics-scroll.hm-lyrics-window .hm-lyrics-line {
+    flex: 0 0 auto;
+  }
+
   .hm-lyrics-scroll::-webkit-scrollbar {
     display: none;
   }

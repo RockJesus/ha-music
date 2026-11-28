@@ -13,7 +13,7 @@ await build({
   target: ["es2020", "chrome100", "safari15"],
   outfile,
   minify: true,
-  legalComments: "none",
+  legalComments: "eof",
   logLevel: "info",
   define: {
     "process.env.NODE_ENV": '"production"',

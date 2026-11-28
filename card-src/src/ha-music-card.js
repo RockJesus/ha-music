@@ -144,6 +144,37 @@ function formatEntityState(state) {
 const QUEUE_WINDOW_BEFORE = 40;
 const QUEUE_WINDOW_SIZE = 120;
 
+const CARD_ENTITY_PREF_PREFIX = "ha-music-entities:";
+
+function cardEntityPrefKey(list) {
+  const path = String(window.location?.pathname || "").replace(/\/+$/, "") || "/";
+  return `${CARD_ENTITY_PREF_PREFIX}${path}:${list.join("|")}`;
+}
+
+function loadCardEntityPref(key) {
+  if (!key) return null;
+  try {
+    const raw = window.localStorage?.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed)
+      ? parsed.filter((id) => typeof id === "string" && id)
+      : [];
+    return list.length ? list : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCardEntityPref(key, list) {
+  if (!key) return;
+  try {
+    window.localStorage?.setItem(key, JSON.stringify(list));
+  } catch {
+    /* localStorage 不可用时只保留当前会话 */
+  }
+}
+
 class HaMusicCard extends LitElement {
   static get styles() {
     return cardStyles;
@@ -224,11 +255,8 @@ class HaMusicCard extends LitElement {
     this._webTicketTtl = 300;
     this._webTicketLoading = null;
     this._webBusy = false;
-    this._webAutoScheduled = false;
-    this._webAutoTimer = null;
     this._webAutoFailed = false;
     this._webAutoStarted = false;
-    this._webAutoOwner = null;
     this._webLastState = "";
     this._webPlayerId = "";
     this._webExposeError = "";
@@ -347,7 +375,6 @@ class HaMusicCard extends LitElement {
     const previous = this._hass;
     this._hass = hass;
     if (!hass) return;
-    this._scheduleAutoWebPlayer();
     this._pinLocalWebEntityFromStates();
     if (!this._webNameResolved) this._resolveWebPlayerName();
     if (this._webPlayer?.connected && this._webEntity) {
@@ -444,6 +471,7 @@ class HaMusicCard extends LitElement {
     }
     const prevTheme = this._config?.theme;
     this._config = { ...config };
+    this._entityPrefKey = cardEntityPrefKey(list);
     // 卡片设置（编辑器 / YAML）里的 theme 变更时，清掉运行时选择，回到设置值
     if (prevTheme !== undefined && prevTheme !== config.theme && this._themeOverride) {
       this._themeOverride = null;
@@ -531,7 +559,6 @@ class HaMusicCard extends LitElement {
         // 只有页面被销毁（disconnectedCallback）或用户手动断开才真正断连。
         return;
       }
-      this._webAutoScheduled = false;
       // 后台期间若被浏览器回收/网络掐断，回到前台时静默重建会话。
       if (this._webPlayer && !this._webPlayer.isConnected) {
         const keepEntity = this._webEntity || this._localWebEntity;
@@ -543,7 +570,6 @@ class HaMusicCard extends LitElement {
         this._webEntity = keepEntity;
         this.requestUpdate();
       }
-      this._scheduleAutoWebPlayer();
     };
     document.addEventListener("visibilitychange", this._onVisibilityChange);
     this._unlockWebAudio = () => {
@@ -599,9 +625,6 @@ class HaMusicCard extends LitElement {
       document.removeEventListener("pointerdown", this._unlockWebAudio, true);
       this._unlockWebAudio = null;
     }
-    if (this._webAutoTimer) clearTimeout(this._webAutoTimer);
-    this._webAutoTimer = null;
-    if (this._webAutoOwner === this) this._webAutoOwner = null;
     this._cancelChipPress();
     this._chipDrag = null;
     this._chipOrderStyles = null;
@@ -675,7 +698,9 @@ class HaMusicCard extends LitElement {
         : config.entity
           ? [config.entity]
           : [];
-    const out = list.filter(Boolean);
+    // 玩家抽屉里的增删和拖动排序只记在浏览器里，不写回仪表盘配置。
+    const local = loadCardEntityPref(this._entityPrefKey);
+    const out = (local || list).filter(Boolean);
     // 本机 Web 播放器常驻：仪表盘重渲染会用保存的配置覆盖内存态，这里
     // 每次取实体列表都把它补回来，停止/闲置都不会从列表里消失。
     const pinned = this._localWebEntity;
@@ -2719,8 +2744,6 @@ class HaMusicCard extends LitElement {
     const wasConnected = Boolean(this._webPlayer?.connected);
     this._webName = next;
     this.requestUpdate();
-    const entity = this._currentLocalWebEntity();
-    if (entity) this._alignLocalWebEntityName(entity);
     if (wasConnected) {
       // The name travels in the Sendspin handshake, so re-announce it.
       this._disconnectWebPlayer(true);
@@ -2766,28 +2789,6 @@ class HaMusicCard extends LitElement {
       models.add(model);
     }
     return models.size === 1 ? [...models][0] : "";
-  }
-
-  _scheduleAutoWebPlayer() {
-    if (this._isPreviewContext()) return;
-    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-      return;
-    }
-    if (this._webAutoScheduled || this._webBusy || this._webPlayer?.connected) return;
-    // 同一页面可能放了多张 ha-music 卡片；Web 播放器按浏览器身份只有一份，
-    // 由第一张卡负责连接，其它卡只读取实体，避免互踢重连。
-    const owner = window.__haMusicWebPlayerOwner;
-    if (owner && owner !== this && owner.isConnected !== false) return;
-    window.__haMusicWebPlayerOwner = this;
-    this._webAutoOwner = this;
-    this._webAutoScheduled = true;
-    this._webAutoTimer = setTimeout(() => {
-      this._webAutoTimer = null;
-      if (!this._webAutoScheduled) return;
-      this._webAutoScheduled = false;
-      if (document.visibilityState === "hidden") return;
-      this._connectWebPlayer({ auto: true });
-    }, 1800);
   }
 
   async _connectWebPlayer(options = {}) {
@@ -3134,9 +3135,11 @@ class HaMusicCard extends LitElement {
                 : this._webExposeError
                   ? t("webPlayerExposeFailed")
                   : t("webPlayerWaitEntity")
-              : this._webAutoFailed
-                ? t("webPlayerAutoFailed")
-                : t("webPlayerConnecting")}
+              : this._webBusy
+                ? t("webPlayerConnecting")
+                : this._webAutoFailed
+                  ? t("webPlayerAutoFailed")
+                  : t("webPlayerHint")}
           </span>
         </div>
       </div>
@@ -3163,17 +3166,15 @@ class HaMusicCard extends LitElement {
               >
                 ${t("webPlayerDisconnect")}
               </button>`
-          : this._webAutoFailed
-            ? html`<button
-                class="hm-player-btn"
-                data-role="web-connect"
-                data-disabled=${this._webBusy ? "true" : "false"}
-                ?disabled=${this._webBusy}
-                @click=${() => this._connectWebPlayer({ auto: true })}
-              >
-                ${t("webPlayerRetry")}
-              </button>`
-            : nothing}
+          : html`<button
+              class="hm-player-btn"
+              data-role="web-connect"
+              data-disabled=${this._webBusy ? "true" : "false"}
+              ?disabled=${this._webBusy}
+              @click=${() => this._connectWebPlayer()}
+            >
+              ${this._webAutoFailed ? t("webPlayerRetry") : t("webPlayerConnect")}
+            </button>`}
       </div>
     </div>`;
   }
@@ -3200,52 +3201,6 @@ class HaMusicCard extends LitElement {
       this._localWebSyncTimer = null;
       this._syncLocalWebEntity();
     }, delay);
-  }
-
-  async _alignLocalWebEntityName(entityId) {
-    // Music Assistant renames the player (Web iOS iPhone 13 Pro Max), but the HA
-    // device created for it keeps the old name, so the entity's friendly_name -
-    // and therefore the chip and every dashboard - stays "Web (Browser on iOS)".
-    // Fix both: rename the device (name_by_user) and drop any entity-level name
-    // override, so the entity simply follows the device name.
-    if (!this._hass?.callWS || !this._webName || !this._webPlayerId) return;
-    if (this._webEntityNamed === this._webName) return;
-    const entity = entityId || this._webEntity || this._currentLocalWebEntity();
-    try {
-      const devices = await this._hass.callWS({ type: "config/device_registry/list" });
-      const device = (Array.isArray(devices) ? devices : []).find((entry) =>
-        (entry?.identifiers || []).some(
-          (ident) =>
-            Array.isArray(ident) &&
-            ident[0] === "music_assistant" &&
-            ident[1] === this._webPlayerId
-        )
-      );
-      if (!device) return;
-      if (String(device.name_by_user || "") !== this._webName) {
-        await this._hass.callWS({
-          type: "config/device_registry/update",
-          device_id: device.id,
-          name_by_user: this._webName,
-        });
-      }
-      if (entity) {
-        const entry = await this._hass.callWS({
-          type: "config/entity_registry/get",
-          entity_id: entity,
-        });
-        if (String(entry?.unique_id || "") === this._webPlayerId && entry?.name) {
-          await this._hass.callWS({
-            type: "config/entity_registry/update",
-            entity_id: entity,
-            name: null,
-          });
-        }
-      }
-      this._webEntityNamed = this._webName;
-    } catch (error) {
-      // Non-admin sessions cannot edit the registry; the name still shows in MA.
-    }
   }
 
   _isLocalWebEntity(entityId) {
@@ -3296,7 +3251,6 @@ class HaMusicCard extends LitElement {
     if (!current.length) return;
     const target = removeEntity ? "" : preferredTarget || this._currentLocalWebEntity();
     if (target) this._localWebEntity = target;
-    if (target) this._alignLocalWebEntityName(target);
     const webIds = current.filter((id) => this._isLocalWebEntity(id));
     let next = null;
     if (target) {
@@ -3404,78 +3358,14 @@ class HaMusicCard extends LitElement {
     this._closePlayers();
   }
 
-  _cardsInView(config) {
-    const views = Array.isArray(config?.views) ? config.views : [];
-    const parts = String(window.location.pathname || "")
-      .split("/")
-      .filter(Boolean);
-    const viewPath = parts[parts.length - 1] || "";
-    let viewIndex = views.findIndex(
-      (view) => view && (view.url_path === viewPath || view.path === viewPath)
-    );
-    if (viewIndex < 0 && /^\d+$/.test(viewPath)) {
-      const numeric = Number(viewPath);
-      if (numeric >= 0 && numeric < views.length) viewIndex = numeric;
-    }
-    if (viewIndex < 0) throw new Error(translator(this._hass?.language)("cardConfigMissing"));
-    return { config, viewIndex };
-  }
-
-  _dashboardUrlPath() {
-    const parts = String(window.location.pathname || "")
-      .split("/")
-      .filter(Boolean);
-    const section = parts[0] || "";
-    return section === "lovelace" ? null : section || null;
-  }
-
-  async _saveCardEntities(next) {
-    const language = this._hass?.language;
-    const t = translator(language);
-    const urlPath = this._dashboardUrlPath();
-    const response = await this._hass.callWS({
-      type: "lovelace/config",
-      url_path: urlPath,
-    });
-    const locationInfo = this._cardsInView(response);
-    const view = locationInfo.config.views[locationInfo.viewIndex];
-    const cards = Array.isArray(view?.cards) ? view.cards : [];
-    const current = this._entities();
-    const signature = (card) => {
-      const list =
-        Array.isArray(card?.entities) && card.entities.length
-          ? card.entities.filter(Boolean)
-          : card?.entity
-            ? [card.entity]
-            : [];
-      return list.join("|");
-    };
-    let cardIndex = cards.findIndex(
-      (card) => card?.type === "custom:ha-music" && signature(card) === current.join("|")
-    );
-    if (cardIndex < 0) {
-      const candidates = cards
-        .map((card, index) => ({ card, index }))
-        .filter((entry) => entry.card?.type === "custom:ha-music");
-      if (candidates.length === 1) cardIndex = candidates[0].index;
-    }
-    if (cardIndex < 0) throw new Error(t("cardConfigMissing"));
-    const previous = { ...view.cards[cardIndex] };
-    const replacement = { ...previous };
-    if (next.length > 1) {
-      replacement.entities = next;
-      delete replacement.entity;
-    } else {
-      replacement.entity = next[0];
-      delete replacement.entities;
-    }
-    view.cards[cardIndex] = replacement;
-    await this._hass.callWS({
-      type: "lovelace/config/save",
-      url_path: urlPath,
-      config: locationInfo.config,
-    });
-    this._config = replacement;
+  _applyCardEntities(next) {
+    if (!next || !next.length) return;
+    const previous = { ...(this._config || {}) };
+    this._config =
+      next.length > 1
+        ? { ...previous, entities: next, entity: undefined }
+        : { ...previous, entity: next[0], entities: undefined };
+    saveCardEntityPref(this._entityPrefKey, next);
     if (!next.includes(this._activeEntity)) this._activeEntity = next[0];
     this.requestUpdate();
   }
@@ -3505,7 +3395,7 @@ class HaMusicCard extends LitElement {
     this._cardBusy = true;
     this.requestUpdate();
     try {
-      await this._saveCardEntities(next);
+      this._applyCardEntities(next);
     } catch (error) {
       this._notify(error?.message || String(error));
     } finally {
@@ -3995,7 +3885,7 @@ class HaMusicCard extends LitElement {
     if (this._cardBusy) return;
     this._cardBusy = true;
     try {
-      await this._saveCardEntities(next);
+      this._applyCardEntities(next);
     } catch (error) {
       this._notify(error?.message || String(error));
     } finally {
@@ -5310,37 +5200,8 @@ class HaMusicCard extends LitElement {
     };
     this._dockOwner = false;
     this.requestUpdate();
-    this._saveCardDock(nextDock, entities, themes, follow).catch(() => {
-      /* 保存失败时仍保留当前会话内的删除效果 */
-    });
-  }
-
-  async _saveCardDock(dock, entities, themes, follow) {
-    if (!this._hass?.callWS) throw new Error("not connected");
-    const urlPath = this._dashboardUrlPath();
-    const response = await this._hass.callWS({
-      type: "lovelace/config",
-      url_path: urlPath,
-    });
-    const locationInfo = this._cardsInView(response);
-    const view = locationInfo.config.views[locationInfo.viewIndex];
-    const cards = Array.isArray(view?.cards) ? view.cards : [];
-    let cardIndex = cards.findIndex((card) => card?.type === "custom:ha-music");
-    if (cardIndex < 0) throw new Error(translator(this._hass?.language)("cardConfigMissing"));
-    const replacement = {
-      ...cards[cardIndex],
-      dock,
-      dock_entities: entities,
-      dock_themes: themes,
-      dock_follow: follow,
-      dock_edited: Date.now(),
-    };
-    view.cards[cardIndex] = replacement;
-    await this._hass.callWS({
-      type: "lovelace/config/save",
-      url_path: urlPath,
-      config: locationInfo.config,
-    });
+    // 停用某个 dock 只改浏览器偏好，不回写仪表盘配置。
+    saveDockPref({ modes, entities, themes, follow, updated: Date.now() });
   }
 
   _dockPlayingEntity(fallback = "") {

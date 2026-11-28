@@ -1,13 +1,19 @@
-# HA Music
+<h1 align="center">HA Music</h1>
 
-> 为 Home Assistant 打造的高颜值、全功能音乐播放器 Lovelace 卡片。<br>
-> 液态玻璃 / 赛博霓虹 / 极光 / 天鹅绒 / 黑白 / 日落 / 海洋 七套主题，三种自适应布局，从封面取色的动态氛围光。
+<p align="center"><b>为 Home Assistant 打造的高颜值、全功能音乐播放器 Lovelace 卡片</b><br>
+液态玻璃 / 赛博霓虹 / 极光 / 天鹅绒 / 黑白 / 日落 / 海洋 七套主题，三种自适应布局，从封面取色的动态氛围光。</p>
 
-[![GitHub Release](https://img.shields.io/github/v/release/RockJesus/ha-music?style=flat-square)](https://github.com/RockJesus/ha-music/releases)
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz)
-[![License](https://img.shields.io/github/license/RockJesus/ha-music?style=flat-square)](LICENSE)
+<p align="center">
+  <a href="https://github.com/RockJesus/ha-music/releases"><img src="https://img.shields.io/github/v/release/RockJesus/ha-music?style=flat-square&color=41BDF5" alt="Release"></a>
+  <a href="https://github.com/RockJesus/ha-music-studio"><img src="https://img.shields.io/badge/%E9%9A%8F%E9%9B%86%E6%88%90%E5%88%86%E5%8F%91-HA%20Music%20Studio-41BDF5.svg?style=flat-square" alt="Ships with HA Music Studio"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/RockJesus/ha-music?style=flat-square" alt="License"></a>
+</p>
 
-![HA Music 极光主题](docs/preview-aurora.webp)
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=RockJesus&amp;repository=ha-music-studio&amp;category=integration"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open the HA Music Studio integration in HACS"></a>
+</p>
+
+<p align="center"><img src="docs/preview-aurora.webp" alt="HA Music 极光主题" width="720"></p>
 
 ---
 
@@ -35,9 +41,10 @@
 - **频谱与进度合一**（可选）：`ring` 把封面外圈音柱兼作进度，拖动外圈任意角度快进；`rail` 把横向频谱条直接当进度条。选中后隐藏原来的独立进度行，只保留融合控件。
 - **完整播放控制**：播放/暂停、上一首/下一首、进度拖动、音量拖动与静音、随机、循环（关/列表/单曲）、电源开关。
 - **音源与声音模式**：读取 `source_list` / `sound_mode_list`，点击 chip 直接切换。
-- **当前播放列表**：原生播放器读取 `queue` 属性；Music Assistant 播放器经 HA Supervisor Ingress 直连 MA API 读取完整队列，抽屉内点击任意曲目精确切歌，无需安装 Mass Queue。非管理员、外部 MA 服务器或读取失败时，自动回退到当前/下一首，并保留「在 Music Assistant 查看全部」入口。
+- **当前播放列表**：原生播放器读取 `queue` 属性；Music Assistant 播放器的完整队列由集成通过 WebSocket 推给卡片（`ha_music_studio/subscribe_queue`），抽屉内点击任意曲目精确切歌，无需 Mass Queue、无需 Ingress。后端不可用时自动回退到当前/下一首，并保留「在 Music Assistant 查看全部」入口。
 - **媒体库浏览**：走 HA 原生 WebSocket `media_player/browse_media`，支持逐层进入、返回与播放叶子项。
-- **本机 Web 播放器**：页面加载后自动连接当前浏览器的 Sendspin 播放器，无需在设备面板手动点「连接」；连接成功且真正播放时自动加入播放器胶囊，停止/闲置或页面切到后台时自动隐藏并断开。首次点击页面会顺带恢复音频上下文。Music Assistant 与 Home Assistant 会自动生成对应 `media_player`，卡片可像普通播放器一样切歌、调音量、看进度和歌词。手机、平板、另一台电脑打开同一个仪表盘都能各自在本机出声。
+- **本机 Web 播放器**：在播放器抽屉的「此设备」一行点 **连接** 后，浏览器才通过 Sendspin 注册成一台本机播放器；连接成功且真正播放时加入播放器胶囊，停止/闲置或切到后台时断开。打开仪表盘不会自动注册播放器，也不会为每个浏览器凭空生成 `media_player`。Music Assistant 与 Home Assistant 会为该浏览器生成对应 `media_player`，之后可像普通播放器一样切歌、调音量、看进度和歌词。手机、平板、另一台电脑打开同一个仪表盘，点各自的「连接」后都能在本机出声。
+- **浏览器侧状态**：抽屉里的播放器增删与拖动排序、浮层移除、迷你播放器位置都只写入浏览器 `localStorage`；卡片从不调用 `lovelace/config` 改写你所在的仪表盘，也不写设备/实体注册表（播放器名字只在 Sendspin 握手时传递）。
 - **多设备切换**：`entities` 列表顶部胶囊切换，同一张卡管理多个 `media_player`；首次加载或有播放器刚开始播放时，会自动跟到正在播放的那台，多台同时播放则优先最近更新的一台。手动点选播放器后不会被立刻抢回，避免影响操作。
 - **主题 / 音效 / 全屏**：顶栏三个按钮——主题按钮展开七套主题选项，选择即时生效并本地记住，卡片设置里的 theme 作为默认值；音效默认关闭，可选模拟 Hifi 环绕、清澈人声、重低音，经 HA Music Studio 调用 Music Assistant DSP 作用于正在播放的音乐本身；全屏按钮调用浏览器 Fullscreen API 把播放器铺满屏幕，再次点击或按 Esc 退出。
 - **触屏优先**：`pointer: coarse` 下按钮/滑杆/列表自动放大到 40–48px，抽屉滚动不穿透页面，点按有按压反馈；窄屏自动把音量条换到下一行，避免大按钮把卡片撑破。
@@ -84,11 +91,11 @@
 
 ### 第一步：安装后端集成
 
-频谱、歌词与完整队列都依赖 **HA Music Studio**。在 HACS → **Custom repositories** 添加 `https://github.com/RockJesus/ha-music-studio`，Category 选 **Integration**；下载后重启 Home Assistant，再到「设置 → 设备与服务」添加 **HA Music Studio**。
+频谱、歌词与完整队列都依赖 **HA Music Studio**，它已经在 HACS 默认仓库里：HACS → 搜索 **HA Music Studio** → 下载 → 重启 Home Assistant → 「设置 → 设备与服务」添加 **HA Music Studio**，填入 Music Assistant 地址（例如 `http://music-assistant.local:8095`）和你在 Music Assistant → 设置 → 安全 里创建的长期令牌。也可以点页面顶部的按钮，直接在自己 HA 的 HACS 里打开这个仓库。
 
 ### 第二步：卡片随集成一起装
 
-从 `v0.12.0` 起卡片已并入集成仓库，集成启动时会自动把 `ha-music.js` 注册成前端模块（`/ha_music_studio_files/ha-music.js?v=<集成版本>`），**不需要再单独安装卡片**。
+卡片已并入集成仓库，集成启动时会把 `ha-music.js` 注册成前端模块（`/ha_music_studio_files/ha-music.js?v=<集成版本>`），**不需要再单独安装卡片**。
 
 如果你之前用 HACS 装过卡片插件，请删掉 HACS 里的 **HA Music** 仓库，并在「设置 → 仪表盘 → 资源」里删除指向 `hacsfiles/ha-music/...` 或 `/local/community/ha-music/...` 的旧资源——两份副本会把同名自定义元素注册两次。集成检测到旧资源时会跳过自己的注册并在日志提示，删掉后重启即可切到内置版本。
 
@@ -97,7 +104,7 @@
 1. 下载 [最新 Release](https://github.com/RockJesus/ha-music/releases/latest) 中的 `ha-music.js`。
 2. 放到 `/config/www/ha-music.js`。
 3. 设置 → 仪表盘 → 右上角菜单 → 资源，添加：
-   - URL：`/local/ha-music.js?v=2.14.1`
+   - URL：`/local/ha-music.js?v=2.60.0`
    - 类型：JavaScript 模块
 
 ## 配置
@@ -205,7 +212,7 @@ show_volume: false
 - 顶栏 MA 按钮直接跳转 MA 面板（完整功能）；未检测到 MA 面板时回退为卡内歌单列表（走 `media_player/browse_media` 的 `Playlists` 目录），点击后调用 `music_assistant.play_media`（`media_type: playlist`、`enqueue: play`）直接开播。
 - 没有 MA 服务时自动回退 `media_player.play_media`，因此普通播放器的歌单也能用。
 - 抽屉右上角的跳转图标打开 MA 面板：默认自动读取 HA 面板路径（加载项 ingress 的前缀因实例而异，如 `/b93b5321_music_assistant`），也可用 `music_assistant` 指定相对路径或 `https://` 地址。
-- 完整队列优先经 HA Supervisor Ingress 直连 MA 的 `player_queues/items`，支持 3000+ 首并在抽屉内精确切歌；没有 MA 加载项、当前用户不是管理员或 Ingress 不可用时，回退到 `music_assistant.get_queue` 的当前/下一首与 `mass_queue`（若已安装）。
+- 完整队列由集成经 `ha_music_studio/subscribe_queue` 窗口推给卡片，切歌、移动、删除、清空、随机、循环、传输控制走 `ha_music_studio/queue_command`，支持 3000+ 首并在抽屉内精确切歌；不再需要 Supervisor Ingress、`mass_queue` 或浏览器直连 MA WebSocket。后端不可用时回退到播放器自身的 `queue` 属性（当前/下一首）。
 
 ## 交互说明
 
@@ -221,7 +228,7 @@ show_volume: false
 ## 兼容性
 
 - Home Assistant 2023.8 及以上；不需要任何前端集成或后端组件。
-- 原生队列依赖播放器暴露 `queue` 属性（Sonos 等支持）；Music Assistant 完整队列依赖 MA 加载项的 Ingress，无需 mass_queue。
+- 原生队列依赖播放器暴露 `queue` 属性（Sonos 等支持）；Music Assistant 完整队列由 **HA Music Studio** 集成提供，无需 MA 加载项 Ingress，也无需 mass_queue。
 - 媒体库依赖播放器支持 `BROWSE_MEDIA`，部分集成可能只返回扁平列表。
 - 音量默认作用于当前播放器，可用 `volume_entity` 指向功放/音箱实体。
 
